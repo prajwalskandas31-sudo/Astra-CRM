@@ -55,6 +55,13 @@ export const CRMProvider = ({ children }) => {
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
   const [customRoles, setCustomRoles] = useState(DEFAULT_CUSTOM_ROLES);
+  const [masterRecords, setMasterRecords] = useState([
+    { contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', language: 'Hindi' },
+    { contactPerson: 'Kavita Rao', phone: '+91 91234 56790', language: 'English' },
+    { contactPerson: 'Dr. Suresh Patil', phone: '+91 91234 56791', language: 'Marathi' },
+    { contactPerson: 'Neha Sharma', phone: '+91 91234 56792', language: 'Hindi' },
+    { contactPerson: 'Amit Gupta', phone: '+91 91234 56793', language: 'English' }
+  ]);
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -305,21 +312,56 @@ export const CRMProvider = ({ children }) => {
     return newLeadObj;
   };
 
+  const addMasterRecords = (newRecords) => {
+    setMasterRecords(prev => [...prev, ...newRecords]);
+  };
+
+  const assignLeadsByLanguage = (language, quantity, targetUserId) => {
+    const targetUser = users.find(u => u.id === targetUserId);
+    if (!targetUser) return 0;
+    const numToAssign = parseInt(quantity, 10);
+    if (isNaN(numToAssign) || numToAssign <= 0) return 0;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let count = 0;
+
+    setLeads(prev => prev.map(l => {
+      if (l.language?.toLowerCase() === language.toLowerCase() && (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned') && count < numToAssign) {
+        count++;
+        return {
+          ...l,
+          assignedToId: targetUser.id,
+          assignedToName: targetUser.name,
+          isUnassigned: false,
+          history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
+        };
+      }
+      return l;
+    }));
+
+    return count;
+  };
+
   const addBulkLeads = (newLeadsArray) => {
     const todayStr = new Date().toISOString().split('T')[0];
-    const formatted = newLeadsArray.map((ld, i) => ({
-      id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
-      clientName: ld.contactPerson + ' Org',
-      contactPerson: ld.contactPerson,
-      phone: ld.phone,
-      language: ld.language || 'English',
-      assignedToId: ld.assignedToId || 'usr-5',
-      assignedToName: ld.assignedToName || 'ABHINAYA M',
-      disposition: 'New Lead', // Default status per Block 2 specification
-      dispositionScheduledAt: '',
-      value: ld.value || '₹4,00,000',
-      history: [{ date: todayStr, text: 'Bulk uploaded with default disposition [New Lead].' }]
-    }));
+    const formatted = newLeadsArray.map((ld, i) => {
+      const isUnassigned = !ld.assignedToId || ld.assignedToId === 'unassigned';
+      const targetUser = users.find(u => u.id === ld.assignedToId);
+      return {
+        id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
+        clientName: ld.contactPerson + ' Org',
+        contactPerson: ld.contactPerson,
+        phone: ld.phone,
+        language: ld.language || 'English',
+        assignedToId: isUnassigned ? null : (ld.assignedToId || 'usr-5'),
+        assignedToName: isUnassigned ? 'Unassigned' : (targetUser?.name || ld.assignedToName || 'ABHINAYA M'),
+        isUnassigned: isUnassigned,
+        disposition: 'New Lead', // Default status per Block 2 specification
+        dispositionScheduledAt: '',
+        value: ld.value || '₹4,00,000',
+        history: [{ date: todayStr, text: `Bulk uploaded with default disposition [New Lead]. ${isUnassigned ? 'Marked Unassigned.' : `Assigned to ${targetUser?.name || 'User'}.`}` }]
+      };
+    });
     setLeads(prev => [...formatted, ...prev]);
     return formatted;
   };
@@ -442,7 +484,10 @@ export const CRMProvider = ({ children }) => {
       rejectSale,
       addCustomRole,
       addLead,
-      addBulkLeads
+      addBulkLeads,
+      masterRecords,
+      addMasterRecords,
+      assignLeadsByLanguage
     }}>
       {children}
     </CRMContext.Provider>
