@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { CRMDashboard } from './components/CRMDashboard';
 import { UserDirectory } from './components/UserDirectory';
 import { DispositionsManager } from './components/DispositionsManager';
+import { LeadUploadModule } from './components/LeadUploadModule';
 import { TeamMonitoring } from './components/TeamMonitoring';
 import { SaleApprovalWorkflow } from './components/SaleApprovalWorkflow';
 import { LeadReassignmentView } from './components/LeadReassignmentView';
@@ -24,6 +25,7 @@ const AppContent = () => {
     dashboard: 'CRM Dashboard & Dynamic Dispositions Bar',
     directory: 'User Directory & Account Controls',
     dispositions: 'Dispositions & Pipeline Manager (Block 2 Settings)',
+    'lead-upload': 'Lead Upload Module & Block 3 Report Sync',
     'team-monitoring': 'Team Performance & Compliance Monitoring',
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
@@ -39,6 +41,8 @@ const AppContent = () => {
         return <UserDirectory />;
       case 'dispositions':
         return <DispositionsManager />;
+      case 'lead-upload':
+        return <LeadUploadModule />;
       case 'team-monitoring':
         return <TeamMonitoring />;
       case 'sale-approvals':

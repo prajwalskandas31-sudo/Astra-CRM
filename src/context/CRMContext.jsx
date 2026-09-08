@@ -15,20 +15,22 @@ const DEFAULT_USERS = [
 ];
 
 const DEFAULT_DISPOSITIONS = [
-  { id: 'disp-1', name: 'Interested', description: 'Client showed interest in product offering', color: 'emerald', isDefault: true },
-  { id: 'disp-2', name: 'New Lead', description: 'Fresh inbound query awaiting callback', color: 'blue', isDefault: true },
-  { id: 'disp-3', name: 'Call Back Later', description: 'Requested follow-up at specific time slot', color: 'amber', isDefault: true },
-  { id: 'disp-4', name: 'Meeting Scheduled', description: 'Demo or executive discussion scheduled', color: 'purple', isDefault: false },
-  { id: 'disp-5', name: 'Closed Won', description: 'Deal finalized and sent to sale workflow', color: 'emerald', isDefault: false },
-  { id: 'disp-6', name: 'Not Interested', description: 'Declined service offering', color: 'rose', isDefault: false }
+  { id: 'disp-1', name: 'New Lead', requiresDateTimePicker: false, color: 'blue', isDefault: true },
+  { id: 'disp-2', name: 'Interested', requiresDateTimePicker: false, color: 'emerald', isDefault: true },
+  { id: 'disp-3', name: 'Call Back Later', requiresDateTimePicker: true, color: 'amber', isDefault: true },
+  { id: 'disp-4', name: 'Give Demo Call', requiresDateTimePicker: true, color: 'purple', isDefault: true },
+  { id: 'disp-5', name: 'Follow Up', requiresDateTimePicker: true, color: 'indigo', isDefault: true },
+  { id: 'disp-6', name: 'Not Interested', requiresDateTimePicker: false, color: 'rose', isDefault: false },
+  { id: 'disp-7', name: 'Commitment', requiresDateTimePicker: false, color: 'cyan', isDefault: false },
+  { id: 'disp-8', name: 'Paid / Converted', requiresDateTimePicker: false, color: 'emerald', isDefault: false }
 ];
 
 const DEFAULT_LEADS = [
-  { id: 'LD-1001', clientName: 'Apex Financial Services', contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'Interested', value: '₹4,50,000', history: [{ date: '2026-09-01', text: 'Initial discovery call logged.' }] },
-  { id: 'LD-1002', clientName: 'Zenith Logistics', contactPerson: 'Kavita Rao', phone: '+91 91234 56790', assignedToId: 'usr-5', assignedToName: 'ABHINAYA M', disposition: 'Meeting Scheduled', value: '₹12,00,000', history: [{ date: '2026-09-02', text: 'Product demo scheduled.' }] },
-  { id: 'LD-1003', clientName: 'Vanguard Healthcare', contactPerson: 'Dr. Suresh Patil', phone: '+91 91234 56791', assignedToId: 'usr-6', assignedToName: 'AJAY', disposition: 'Call Back Later', value: '₹8,20,000', history: [{ date: '2026-09-03', text: 'Callback requested after board review.' }] },
-  { id: 'LD-1004', clientName: 'Nexus Digital Media', contactPerson: 'Neha Sharma', phone: '+91 91234 56792', assignedToId: 'usr-8', assignedToName: 'ANITHA', disposition: 'New Lead', value: '₹3,00,000', history: [{ date: '2026-09-04', text: 'Inbound website lead assigned.' }] },
-  { id: 'LD-1005', clientName: 'Starlight Tech Ltd', contactPerson: 'Amit Gupta', phone: '+91 91234 56793', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'Closed Won', value: '₹15,00,000', history: [{ date: '2026-09-04', text: 'Contract signed.' }] }
+  { id: 'LD-1001', clientName: 'Apex Financial Services', contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', language: 'Hindi', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'New Lead', value: '₹4,50,000', history: [{ date: '2026-09-01', text: 'Initial lead assigned.' }] },
+  { id: 'LD-1002', clientName: 'Zenith Logistics', contactPerson: 'Kavita Rao', phone: '+91 91234 56790', language: 'English', assignedToId: 'usr-5', assignedToName: 'ABHINAYA M', disposition: 'Give Demo Call', dispositionScheduledAt: '2026-09-10 11:00', value: '₹12,00,000', history: [{ date: '2026-09-02', text: 'Product demo call scheduled.' }] },
+  { id: 'LD-1003', clientName: 'Vanguard Healthcare', contactPerson: 'Dr. Suresh Patil', phone: '+91 91234 56791', language: 'Marathi', assignedToId: 'usr-6', assignedToName: 'AJAY', disposition: 'Call Back Later', dispositionScheduledAt: '2026-09-09 15:30', value: '₹8,20,000', history: [{ date: '2026-09-03', text: 'Callback requested after board review.' }] },
+  { id: 'LD-1004', clientName: 'Nexus Digital Media', contactPerson: 'Neha Sharma', phone: '+91 91234 56792', language: 'Hindi', assignedToId: 'usr-8', assignedToName: 'ANITHA', disposition: 'New Lead', value: '₹3,00,000', history: [{ date: '2026-09-04', text: 'Inbound website lead assigned.' }] },
+  { id: 'LD-1005', clientName: 'Starlight Tech Ltd', contactPerson: 'Amit Gupta', phone: '+91 91234 56793', language: 'English', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'Interested', value: '₹15,00,000', history: [{ date: '2026-09-04', text: 'Interested after demo.' }] }
 ];
 
 const DEFAULT_SALES = [
@@ -229,6 +231,7 @@ export const CRMProvider = ({ children }) => {
 
     const newDisp = {
       id: 'disp-' + (dispositions.length + 1),
+      requiresDateTimePicker: false,
       ...dispData,
       isDefault: false
     };
@@ -260,13 +263,13 @@ export const CRMProvider = ({ children }) => {
     setDispositions(prev => prev.filter(d => d.id !== dispId));
   };
 
-  // Post-Call Lead Outcome Update
-  const updateLeadDisposition = async (leadId, dispositionName, callNotes = '') => {
+  // Post-Call Lead Outcome Update with Date/Time Support
+  const updateLeadDisposition = async (leadId, dispositionName, callNotes = '', scheduledDateTime = '') => {
     try {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}/disposition`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ dispositionName, callNotes })
+        body: JSON.stringify({ dispositionName, callNotes, scheduledDateTime })
       });
       if (res.ok) { refreshData(); return; }
     } catch (err) {}
@@ -274,11 +277,51 @@ export const CRMProvider = ({ children }) => {
     const todayStr = new Date().toISOString().split('T')[0];
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        const newHistory = [...(l.history || []), { date: todayStr, text: `Disposition set to [${dispositionName}]. ${callNotes}` }];
-        return { ...l, disposition: dispositionName, history: newHistory };
+        const timeLog = scheduledDateTime ? ` Scheduled for: ${scheduledDateTime}.` : '';
+        const newHistory = [...(l.history || []), { date: todayStr, text: `Disposition set to [${dispositionName}].${timeLog} ${callNotes}` }];
+        return { ...l, disposition: dispositionName, dispositionScheduledAt: scheduledDateTime || '', history: newHistory };
       }
       return l;
     }));
+  };
+
+  // Lead Upload Integration (Block 2 & Block 3 requirement: new uploaded leads get 'New Lead' disposition by default)
+  const addLead = (leadData) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newLeadObj = {
+      id: 'LD-' + Math.floor(1000 + Math.random() * 9000),
+      clientName: leadData.clientName || leadData.contactPerson + ' Co.',
+      contactPerson: leadData.contactPerson,
+      phone: leadData.phone,
+      language: leadData.language || 'English',
+      assignedToId: leadData.assignedToId || currentUser?.id || 'usr-5',
+      assignedToName: leadData.assignedToName || currentUser?.name || 'Assigned User',
+      disposition: 'New Lead', // Default status per Block 2 specification
+      dispositionScheduledAt: '',
+      value: leadData.value || '₹5,00,000',
+      history: [{ date: todayStr, text: 'Uploaded & assigned with default disposition [New Lead].' }]
+    };
+    setLeads(prev => [newLeadObj, ...prev]);
+    return newLeadObj;
+  };
+
+  const addBulkLeads = (newLeadsArray) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const formatted = newLeadsArray.map((ld, i) => ({
+      id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
+      clientName: ld.contactPerson + ' Org',
+      contactPerson: ld.contactPerson,
+      phone: ld.phone,
+      language: ld.language || 'English',
+      assignedToId: ld.assignedToId || 'usr-5',
+      assignedToName: ld.assignedToName || 'ABHINAYA M',
+      disposition: 'New Lead', // Default status per Block 2 specification
+      dispositionScheduledAt: '',
+      value: ld.value || '₹4,00,000',
+      history: [{ date: todayStr, text: 'Bulk uploaded with default disposition [New Lead].' }]
+    }));
+    setLeads(prev => [...formatted, ...prev]);
+    return formatted;
   };
 
   const reassignLeads = async (fromUserId, toUserId) => {
@@ -397,7 +440,9 @@ export const CRMProvider = ({ children }) => {
       registerSale,
       approveSale,
       rejectSale,
-      addCustomRole
+      addCustomRole,
+      addLead,
+      addBulkLeads
     }}>
       {children}
     </CRMContext.Provider>

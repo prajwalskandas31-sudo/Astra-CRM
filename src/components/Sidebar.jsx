@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
   const { simulatedRole, sales } = useCRM();
@@ -24,6 +24,12 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       id: 'dispositions',
       label: 'Dispositions (Block 2)',
       icon: Layers,
+      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+    },
+    {
+      id: 'lead-upload',
+      label: 'Lead Upload & Reports',
+      icon: Upload,
       allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
     },
     {
