@@ -233,3 +233,60 @@ CUSTOM_ROLES_DB = [
   { "id": "crole-1", "roleName": "Regional Manager", "level": "Level 2", "accessScope": "Region" },
   { "id": "crole-2", "roleName": "Compliance Specialist", "level": "Level 3", "accessScope": "Audit" }
 ]
+
+LEAD_REQUESTS_DB = [
+  {
+    "id": "req-101",
+    "requestedByUserId": "usr-3",
+    "requestedByName": "AJAY",
+    "role": "Executive",
+    "team": "Team Alpha",
+    "language": "Hindi",
+    "quantity": 50,
+    "date": "2026-09-18",
+    "status": "Pending",
+    "note": "Urgent leads needed for weekend outreach campaign."
+  },
+  {
+    "id": "req-102",
+    "requestedByUserId": "usr-10",
+    "requestedByName": "Priya Nair",
+    "role": "Team Leader",
+    "team": "Sales Team South",
+    "language": "English",
+    "quantity": 100,
+    "date": "2026-09-19",
+    "status": "Pending",
+    "note": "High priority enterprise leads batch."
+  }
+]
+
+ASSIGNMENT_INSTANCES_DB = [
+  {
+    "id": "inst-101",
+    "batchName": "Hindi_North_Leads_Batch_01.xlsx",
+    "assignedBy": "Sreenivasulu",
+    "assignedToId": "usr-3",
+    "assignedToName": "AJAY",
+    "team": "Team Alpha",
+    "language": "Hindi",
+    "date": "2026-09-15",
+    "totalLeads": 25,
+    "status": "Active",
+    "leadIds": ["ld-101"]
+  },
+  {
+    "id": "inst-102",
+    "batchName": "English_Corporate_Campaign.csv",
+    "assignedBy": "Sreenivasulu",
+    "assignedToId": "usr-4",
+    "assignedToName": "AKSHATA",
+    "team": "Sales Team South",
+    "language": "English",
+    "date": "2026-09-18",
+    "totalLeads": 40,
+    "status": "Active",
+    "leadIds": ["ld-102"]
+  }
+]
+

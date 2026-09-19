@@ -6,10 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 
 try:
-    from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB
+    from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB
     from backend.auth import create_access_token, get_current_user, require_roles
 except ImportError:
-    from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB
+    from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB
     from auth import create_access_token, get_current_user, require_roles
 
 
@@ -338,3 +338,139 @@ def create_custom_role(req: CustomRoleCreate, current_user: dict = Depends(requi
     }
     CUSTOM_ROLES_DB.append(new_role)
     return new_role
+
+# Block 4: Lead Summary & Super Admin Operations Schemas & Routes
+class LeadRequestCreate(BaseModel):
+    language: str
+    quantity: int
+    note: Optional[str] = ""
+
+class BatchFileDeleteRequest(BaseModel):
+    instanceIds: List[str]
+
+class BatchFileReassignRequest(BaseModel):
+    instanceId: str
+    targetUserId: str
+
+class GranularLeadReassignRequest(BaseModel):
+    leadIds: List[str]
+    targetUserId: str
+
+class GranularLeadDeleteRequest(BaseModel):
+    leadIds: List[str]
+
+@app.get("/api/lead-requests")
+def get_lead_requests(current_user: dict = Depends(get_current_user)):
+    # Auto-disappear rule: Return active pending requests
+    return [r for r in LEAD_REQUESTS_DB if r.get("status") == "Pending"]
+
+@app.post("/api/lead-requests")
+def create_lead_request(req: LeadRequestCreate, current_user: dict = Depends(get_current_user)):
+    new_req = {
+        "id": f"req-{int(datetime.utcnow().timestamp())}",
+        "requestedByUserId": current_user["id"],
+        "requestedByName": current_user["name"],
+        "role": current_user["role"],
+        "team": "Sales Team",
+        "language": req.language,
+        "quantity": req.quantity,
+        "date": datetime.utcnow().strftime("%Y-%m-%d"),
+        "status": "Pending",
+        "note": req.note
+    }
+    LEAD_REQUESTS_DB.insert(0, new_req)
+    return new_req
+
+@app.post("/api/lead-requests/{req_id}/fulfill")
+def fulfill_lead_request(req_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    req = next((r for r in LEAD_REQUESTS_DB if r["id"] == req_id), None)
+    if not req:
+        raise HTTPException(status_code=404, detail="Lead request not found")
+    
+    req["status"] = "Fulfilled"
+    # Remove from active list for auto-disappear rule
+    if req in LEAD_REQUESTS_DB:
+        LEAD_REQUESTS_DB.remove(req)
+    return {"message": "Lead request fulfilled and removed from active dashboard."}
+
+@app.get("/api/assignment-instances")
+def get_assignment_instances(current_user: dict = Depends(require_roles(["Super Admin", "Admin"]))):
+    return ASSIGNMENT_INSTANCES_DB
+
+@app.delete("/api/assignment-instances/batch")
+def delete_assignment_files(req: BatchFileDeleteRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    deleted_count = 0
+    for inst_id in req.instanceIds:
+        inst = next((i for i in ASSIGNMENT_INSTANCES_DB if i["id"] == inst_id), None)
+        if inst:
+            # Delete associated leads
+            lead_ids_to_del = inst.get("leadIds", [])
+            for lid in lead_ids_to_del:
+                l_item = next((l for l in LEADS_DB if l["id"] == lid), None)
+                if l_item:
+                    LEADS_DB.remove(l_item)
+            ASSIGNMENT_INSTANCES_DB.remove(inst)
+            deleted_count += 1
+    return {"message": f"Successfully deleted {deleted_count} assignment file instance(s)."}
+
+@app.post("/api/assignment-instances/reassign")
+def reassign_assignment_file(req: BatchFileReassignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    inst = next((i for i in ASSIGNMENT_INSTANCES_DB if i["id"] == req.instanceId), None)
+    if not inst:
+        raise HTTPException(status_code=404, detail="Assignment instance file not found")
+    
+    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    inst["assignedToId"] = target_user["id"]
+    inst["assignedToName"] = target_user["name"]
+
+    # Reassign all leads in this instance
+    count = 0
+    for lid in inst.get("leadIds", []):
+        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
+        if lead:
+            lead["assignedToId"] = target_user["id"]
+            lead["assignedToName"] = target_user["name"]
+            lead["history"].append({
+                "date": now_str,
+                "text": f"Batch file reassigned to {target_user['name']} by Super Admin"
+            })
+            count += 1
+
+    return {"message": f"Reassigned assignment file '{inst['batchName']}' ({count} leads) to {target_user['name']}."}
+
+@app.post("/api/leads/granular-reassign")
+def granular_reassign_leads(req: GranularLeadReassignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    count = 0
+    for lid in req.leadIds:
+        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
+        if lead:
+            lead["assignedToId"] = target_user["id"]
+            lead["assignedToName"] = target_user["name"]
+            lead["history"].append({
+                "date": now_str,
+                "text": f"Granular reassignment to {target_user['name']} by Super Admin"
+            })
+            count += 1
+
+    return {"message": f"Reassigned {count} selected lead(s) to {target_user['name']}."}
+
+@app.delete("/api/leads/granular-delete")
+def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    count = 0
+    for lid in req.leadIds:
+        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
+        if lead:
+            LEADS_DB.remove(lead)
+            count += 1
+
+    return {"message": f"Deleted {count} selected lead(s) permanently."}
+

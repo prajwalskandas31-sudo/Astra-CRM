@@ -1,11 +1,12 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
-  const { simulatedRole, sales } = useCRM();
+  const { simulatedRole, sales, leadRequests } = useCRM();
 
   const pendingSalesCount = sales.filter(s => s.status.includes('Pending')).length;
+  const pendingRequestsCount = leadRequests?.filter(r => r.status === 'Pending').length || 0;
 
   const navItems = [
     {
@@ -31,6 +32,13 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       label: 'Lead Upload & Reports',
       icon: Upload,
       allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+    },
+    {
+      id: 'lead-summary',
+      label: 'Lead Summary (Block 4)',
+      icon: PieChart,
+      badge: pendingRequestsCount > 0 ? pendingRequestsCount : null,
+      allowedRoles: ['Super Admin']
     },
     {
       id: 'team-monitoring',

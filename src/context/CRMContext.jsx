@@ -43,6 +43,75 @@ const DEFAULT_CUSTOM_ROLES = [
   { id: 'cr-2', roleName: 'Compliance Inspector', level: 'Level 2 (Mid)', accessScope: 'Global' }
 ];
 
+const DEFAULT_LEAD_REQUESTS = [
+  {
+    id: 'req-101',
+    requestedByUserId: 'usr-6',
+    requestedByName: 'AJAY',
+    role: 'Executive',
+    team: 'Team Alpha',
+    language: 'Hindi',
+    quantity: 30,
+    date: '2026-09-18',
+    status: 'Pending',
+    note: 'High activity day; need extra Hindi leads.'
+  },
+  {
+    id: 'req-102',
+    requestedByUserId: 'usr-4',
+    requestedByName: 'Priya Nair',
+    role: 'Team Leader',
+    team: 'Sales Team South',
+    language: 'English',
+    quantity: 50,
+    date: '2026-09-19',
+    status: 'Pending',
+    note: 'Inbound requests from new campaign.'
+  }
+];
+
+const DEFAULT_ASSIGNMENT_INSTANCES = [
+  {
+    id: 'inst-101',
+    batchName: 'Hindi_North_Leads_Batch_01.xlsx',
+    assignedBy: 'Srinivas R',
+    assignedToId: 'usr-7',
+    assignedToName: 'AKSHATA',
+    team: 'Sales Team North',
+    language: 'Hindi',
+    date: '2026-09-04',
+    totalLeads: 2,
+    leadIds: ['LD-1001', 'LD-1005'],
+    status: 'Active'
+  },
+  {
+    id: 'inst-102',
+    batchName: 'English_Corporate_Campaign.csv',
+    assignedBy: 'Srinivas R',
+    assignedToId: 'usr-5',
+    assignedToName: 'ABHINAYA M',
+    team: 'Corporate Accounts',
+    language: 'English',
+    date: '2026-09-02',
+    totalLeads: 1,
+    leadIds: ['LD-1002'],
+    status: 'Active'
+  },
+  {
+    id: 'inst-103',
+    batchName: 'Marathi_Regional_Leads.xlsx',
+    assignedBy: 'Srinivas R',
+    assignedToId: 'usr-6',
+    assignedToName: 'AJAY',
+    team: 'West Zone Team',
+    language: 'Marathi',
+    date: '2026-09-03',
+    totalLeads: 1,
+    leadIds: ['LD-1003'],
+    status: 'Active'
+  }
+];
+
 const CRMContext = createContext();
 
 export const CRMProvider = ({ children }) => {
@@ -55,6 +124,8 @@ export const CRMProvider = ({ children }) => {
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
   const [customRoles, setCustomRoles] = useState(DEFAULT_CUSTOM_ROLES);
+  const [leadRequests, setLeadRequests] = useState(DEFAULT_LEAD_REQUESTS);
+  const [assignmentInstances, setAssignmentInstances] = useState(DEFAULT_ASSIGNMENT_INSTANCES);
   const [masterRecords, setMasterRecords] = useState([
     { contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', language: 'Hindi' },
     { contactPerson: 'Kavita Rao', phone: '+91 91234 56790', language: 'English' },
@@ -452,6 +523,100 @@ export const CRMProvider = ({ children }) => {
     setCustomRoles(prev => [...prev, newRole]);
   };
 
+  // Block 4: Lead Requests & File / Granular Operations
+  const submitLeadRequest = (language, quantity, note = '') => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newReq = {
+      id: 'req-' + Math.floor(100 + Math.random() * 900),
+      requestedByUserId: currentUser?.id || 'usr-5',
+      requestedByName: currentUser?.name || 'Executive User',
+      role: currentUser?.role || 'Executive',
+      team: 'Sales Team',
+      language: language || 'English',
+      quantity: parseInt(quantity, 10) || 20,
+      date: todayStr,
+      status: 'Pending',
+      note: note
+    };
+    setLeadRequests(prev => [newReq, ...prev]);
+    return newReq;
+  };
+
+  const fulfillLeadRequest = (requestId, quantity, targetUserId, language) => {
+    // Fulfill request and perform auto-disappear rule
+    setLeadRequests(prev => prev.filter(r => r.id !== requestId));
+    if (targetUserId && language) {
+      assignLeadsByLanguage(language, quantity, targetUserId);
+    }
+  };
+
+  const deleteAssignmentFiles = (instanceIds) => {
+    const idsToDelete = Array.isArray(instanceIds) ? instanceIds : [instanceIds];
+    
+    // Find all lead IDs linked to these instances
+    const targetInstances = assignmentInstances.filter(i => idsToDelete.includes(i.id));
+    const leadIdsToRemove = targetInstances.flatMap(i => i.leadIds || []);
+
+    // Remove instances
+    setAssignmentInstances(prev => prev.filter(i => !idsToDelete.includes(i.id)));
+
+    // Remove associated leads if any
+    if (leadIdsToRemove.length > 0) {
+      setLeads(prev => prev.filter(l => !leadIdsToRemove.includes(l.id)));
+    }
+  };
+
+  const reassignAssignmentFile = (instanceId, targetUserId) => {
+    const targetUser = users.find(u => u.id === targetUserId);
+    if (!targetUser) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    setAssignmentInstances(prev => prev.map(inst => {
+      if (inst.id === instanceId) {
+        // Reassign all leads in this instance
+        if (inst.leadIds && inst.leadIds.length > 0) {
+          setLeads(lPrev => lPrev.map(l => {
+            if (inst.leadIds.includes(l.id)) {
+              return {
+                ...l,
+                assignedToId: targetUser.id,
+                assignedToName: targetUser.name,
+                history: [...(l.history || []), { date: todayStr, text: `Batch assignment file reassigned to ${targetUser.name} by Super Admin` }]
+              };
+            }
+            return l;
+          }));
+        }
+        return { ...inst, assignedToId: targetUser.id, assignedToName: targetUser.name };
+      }
+      return inst;
+    }));
+  };
+
+  const granularReassignLeads = (leadIds, targetUserId) => {
+    const targetUser = users.find(u => u.id === targetUserId);
+    if (!targetUser) return;
+    const ids = Array.isArray(leadIds) ? leadIds : [leadIds];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    setLeads(prev => prev.map(l => {
+      if (ids.includes(l.id)) {
+        return {
+          ...l,
+          assignedToId: targetUser.id,
+          assignedToName: targetUser.name,
+          history: [...(l.history || []), { date: todayStr, text: `Granularly reassigned to ${targetUser.name} by Super Admin` }]
+        };
+      }
+      return l;
+    }));
+  };
+
+  const granularDeleteLeads = (leadIds) => {
+    const ids = Array.isArray(leadIds) ? leadIds : [leadIds];
+    setLeads(prev => prev.filter(l => !ids.includes(l.id)));
+  };
+
   return (
     <CRMContext.Provider value={{
       authToken,
@@ -465,6 +630,8 @@ export const CRMProvider = ({ children }) => {
       sales,
       dispositions,
       customRoles,
+      leadRequests,
+      assignmentInstances,
       themeMode,
       setThemeMode,
       accentColor,
@@ -487,7 +654,13 @@ export const CRMProvider = ({ children }) => {
       addBulkLeads,
       masterRecords,
       addMasterRecords,
-      assignLeadsByLanguage
+      assignLeadsByLanguage,
+      submitLeadRequest,
+      fulfillLeadRequest,
+      deleteAssignmentFiles,
+      reassignAssignmentFile,
+      granularReassignLeads,
+      granularDeleteLeads
     }}>
       {children}
     </CRMContext.Provider>
@@ -495,3 +668,4 @@ export const CRMProvider = ({ children }) => {
 };
 
 export const useCRM = () => useContext(CRMContext);
+

@@ -34,6 +34,7 @@
   --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --text-primary: #16181D;
+  --text-main: #16181D;
   --text-secondary: #6B6B68;
   --text-muted: #9A9A96;
   --text-inverse: #F5F5F4;  /* Crisp light text for dark sidebar */
@@ -85,6 +86,7 @@
   --border-color: #2A2D37;
 
   --text-primary: #F5F5F4;
+  --text-main: #F5F5F4;
   --text-secondary: #A1A1AA;
   --text-muted: #71717A;
   --text-inverse: #16181D;
@@ -550,6 +552,61 @@ button, input, select, textarea {
 .btn-danger:hover {
   background-color: var(--status-danger);
   color: #ffffff;
+}
+
+.btn-success {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-success:hover {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+/* Global Form Control & Select Dark Theme Overrides */
+.form-control,
+.form-select,
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="search"],
+select,
+textarea {
+  background-color: var(--bg-input, #121318) !important;
+  color: var(--text-primary, #F5F5F4) !important;
+  border: 1px solid var(--border-default, #2A2D37) !important;
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  outline: none;
+  transition: var(--transition);
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--border-focus, var(--accent)) !important;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+select option {
+  background-color: var(--bg-surface, #16181D) !important;
+  color: var(--text-primary, #F5F5F4) !important;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
 }
 
 /* Tables & Column Hierarchy */
