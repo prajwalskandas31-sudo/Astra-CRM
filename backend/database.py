@@ -88,7 +88,29 @@ USERS_DB = [
     "ifscCode": "HDFC0000456",
     "bankNameAndBranch": "HDFC Bank, HSR Layout Branch",
     "familyReferenceNumber": "9876543223",
-    "referredBy": "Priya Nair (EMP-080)"
+    "referredBy": "Priya Nair (EMP-080)",
+    "documents": [
+      {
+        "id": "doc-1",
+        "documentTypeId": "doctype-1",
+        "documentName": "Aadhar Card",
+        "fileName": "AJAY_Aadhar_Card.pdf",
+        "fileType": "application/pdf",
+        "fileSize": "245 KB",
+        "fileData": "data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==",
+        "uploadedAt": "2026-09-20 14:30"
+      },
+      {
+        "id": "doc-2",
+        "documentTypeId": "doctype-2",
+        "documentName": "PAN Card",
+        "fileName": "AJAY_PAN_Card.png",
+        "fileType": "image/png",
+        "fileSize": "118 KB",
+        "fileData": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        "uploadedAt": "2026-09-20 14:32"
+      }
+    ]
   },
   {
     "id": "usr-2",
@@ -105,7 +127,29 @@ USERS_DB = [
     "ifscCode": "KKBK0000987",
     "bankNameAndBranch": "Kotak Mahindra Bank, Jayanagar Branch",
     "familyReferenceNumber": "9876543224",
-    "referredBy": "Priya Nair (EMP-080)"
+    "referredBy": "Priya Nair (EMP-080)",
+    "documents": [
+      {
+        "id": "doc-3",
+        "documentTypeId": "doctype-1",
+        "documentName": "Aadhar Card",
+        "fileName": "ABHINAYA_Aadhar_Card.pdf",
+        "fileType": "application/pdf",
+        "fileSize": "310 KB",
+        "fileData": "data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==",
+        "uploadedAt": "2026-09-21 11:15"
+      },
+      {
+        "id": "doc-4",
+        "documentTypeId": "doctype-3",
+        "documentName": "10th Marks Card",
+        "fileName": "ABHINAYA_10th_Marks_Card.pdf",
+        "fileType": "application/pdf",
+        "fileSize": "420 KB",
+        "fileData": "data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==",
+        "uploadedAt": "2026-09-21 11:20"
+      }
+    ]
   },
   {
     "id": "usr-4",
@@ -323,5 +367,14 @@ ASSIGNMENT_INSTANCES_DB = [
     "status": "Active",
     "leadIds": ["ld-102"]
   }
+]
+
+# Configured Employee Document Types (Super Admin custom definitions, max 10 slots)
+DOCUMENT_TYPES_DB = [
+  {"id": "doctype-1", "name": "Aadhar Card", "required": True, "description": "Government issued Aadhaar identification card"},
+  {"id": "doctype-2", "name": "PAN Card", "required": True, "description": "Permanent Account Number card for taxation"},
+  {"id": "doctype-3", "name": "10th Marks Card", "required": True, "description": "Secondary School Leaving Certificate / 10th standard marks memo"},
+  {"id": "doctype-4", "name": "Resume / CV", "required": False, "description": "Updated professional resume or curriculum vitae"},
+  {"id": "doctype-5", "name": "Graduation Certificate", "required": False, "description": "Degree convocation or provisional passing certificate"}
 ]
 

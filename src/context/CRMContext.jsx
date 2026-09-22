@@ -7,11 +7,95 @@ const DEFAULT_USERS = [
   { id: 'usr-2', name: 'Rajesh Kumar', email: 'admin@company.com', mobile: '+91 98765 43211', role: 'Admin', status: 'Active', reportingTo: 'Srinivas R', expiryDate: '27-07-2028', employeeId: 'EMP-002', adminAccessEnabled: true, bankAccountNumber: '91234567890124', ifscCode: 'SBIN0001452', bankNameAndBranch: 'State Bank of India, Indiranagar Branch', familyReferenceNumber: '+91 98765 43220', referredBy: 'Srinivas R (EMP-001)' },
   { id: 'usr-3', name: 'Vikram Seth', email: 'vikram.manager@company.com', mobile: '+91 98765 43212', role: 'Manager', status: 'Active', reportingTo: 'Rajesh Kumar', expiryDate: '15-12-2027', employeeId: 'MGR-101', adminAccessEnabled: false, bankAccountNumber: '91234567890125', ifscCode: 'ICIC0000456', bankNameAndBranch: 'ICICI Bank, Koramangala Branch', familyReferenceNumber: '+91 98765 43221', referredBy: 'Srinivas R (EMP-001)' },
   { id: 'usr-4', name: 'Priya Nair', email: 'priya.tl@company.com', mobile: '+91 98765 43213', role: 'Team Leader', status: 'Active', reportingTo: 'Vikram Seth', expiryDate: '15-12-2027', employeeId: 'TL-201', adminAccessEnabled: false, bankAccountNumber: '91234567890126', ifscCode: 'UTIB0000789', bankNameAndBranch: 'Axis Bank, Whitefield Branch', familyReferenceNumber: '+91 98765 43222', referredBy: 'Vikram Seth (MGR-101)' },
-  { id: 'usr-5', name: 'ABHINAYA M', email: 'abhinaya@company.com', mobile: '+91 98765 43214', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-301', adminAccessEnabled: false, bankAccountNumber: '91234567890127', ifscCode: 'HDFC0000456', bankNameAndBranch: 'HDFC Bank, HSR Layout Branch', familyReferenceNumber: '+91 98765 43223', referredBy: 'Priya Nair (TL-201)' },
-  { id: 'usr-6', name: 'AJAY', email: 'ajay@company.com', mobile: '+91 98765 43215', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-302', adminAccessEnabled: false, bankAccountNumber: '91234567890128', ifscCode: 'KKBK0000987', bankNameAndBranch: 'Kotak Mahindra Bank, Jayanagar Branch', familyReferenceNumber: '+91 98765 43224', referredBy: 'Priya Nair (TL-201)' },
+  { 
+    id: 'usr-5', 
+    name: 'ABHINAYA M', 
+    email: 'abhinaya@company.com', 
+    mobile: '+91 98765 43214', 
+    role: 'Executive', 
+    status: 'Active', 
+    reportingTo: 'Priya Nair', 
+    expiryDate: '10-10-2026', 
+    employeeId: 'EXEC-301', 
+    adminAccessEnabled: false, 
+    bankAccountNumber: '91234567890127', 
+    ifscCode: 'HDFC0000456', 
+    bankNameAndBranch: 'HDFC Bank, HSR Layout Branch', 
+    familyReferenceNumber: '+91 98765 43223', 
+    referredBy: 'Priya Nair (TL-201)',
+    documents: [
+      {
+        id: 'doc-1',
+        documentTypeId: 'doctype-1',
+        documentName: 'Aadhar Card',
+        fileName: 'ABHINAYA_Aadhar_Card.pdf',
+        fileType: 'application/pdf',
+        fileSize: '310 KB',
+        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
+        uploadedAt: '2026-09-21 11:15'
+      },
+      {
+        id: 'doc-2',
+        documentTypeId: 'doctype-3',
+        documentName: '10th Marks Card',
+        fileName: 'ABHINAYA_10th_Marks_Card.pdf',
+        fileType: 'application/pdf',
+        fileSize: '420 KB',
+        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
+        uploadedAt: '2026-09-21 11:20'
+      }
+    ]
+  },
+  { 
+    id: 'usr-6', 
+    name: 'AJAY', 
+    email: 'ajay@company.com', 
+    mobile: '+91 98765 43215', 
+    role: 'Executive', 
+    status: 'Active', 
+    reportingTo: 'Priya Nair', 
+    expiryDate: '10-10-2026', 
+    employeeId: 'EXEC-302', 
+    adminAccessEnabled: false, 
+    bankAccountNumber: '91234567890128', 
+    ifscCode: 'KKBK0000987', 
+    bankNameAndBranch: 'Kotak Mahindra Bank, Jayanagar Branch', 
+    familyReferenceNumber: '+91 98765 43224', 
+    referredBy: 'Priya Nair (TL-201)',
+    documents: [
+      {
+        id: 'doc-3',
+        documentTypeId: 'doctype-1',
+        documentName: 'Aadhar Card',
+        fileName: 'AJAY_Aadhar_Card.pdf',
+        fileType: 'application/pdf',
+        fileSize: '245 KB',
+        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
+        uploadedAt: '2026-09-20 14:30'
+      },
+      {
+        id: 'doc-4',
+        documentTypeId: 'doctype-2',
+        documentName: 'PAN Card',
+        fileName: 'AJAY_PAN_Card.png',
+        fileType: 'image/png',
+        fileSize: '118 KB',
+        fileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        uploadedAt: '2026-09-20 14:32'
+      }
+    ]
+  },
   { id: 'usr-7', name: 'AKSHATA', email: 'tajayvarma76@gmail.com', mobile: '+91 98765 43216', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-303', adminAccessEnabled: false, bankAccountNumber: '91234567890129', ifscCode: 'BARB0KORAMA', bankNameAndBranch: 'Bank of Baroda, Electronic City', familyReferenceNumber: '+91 98765 43225', referredBy: 'Priya Nair (TL-201)' },
   { id: 'usr-8', name: 'ANITHA', email: 'anitha@company.com', mobile: '+91 98765 43217', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-304', adminAccessEnabled: false, bankAccountNumber: '91234567890130', ifscCode: 'PUNB0001234', bankNameAndBranch: 'Punjab National Bank, BTM Layout', familyReferenceNumber: '+91 98765 43226', referredBy: 'Priya Nair (TL-201)' },
   { id: 'usr-9', name: 'Kiran Verma', email: 'kiran.v@company.com', mobile: '+91 98765 43218', role: 'Executive', status: 'Inactive', reportingTo: 'Priya Nair', expiryDate: '01-01-2025', employeeId: 'EXEC-305', adminAccessEnabled: false, bankAccountNumber: '91234567890131', ifscCode: 'HDFC0000999', bankNameAndBranch: 'HDFC Bank, Malleshwaram Branch', familyReferenceNumber: '+91 98765 43227', referredBy: 'Priya Nair (TL-201)' }
+];
+
+const DEFAULT_DOCUMENT_TYPES = [
+  { id: 'doctype-1', name: 'Aadhar Card', required: true, description: 'Government issued Aadhaar identification card' },
+  { id: 'doctype-2', name: 'PAN Card', required: true, description: 'Permanent Account Number card for taxation' },
+  { id: 'doctype-3', name: '10th Marks Card', required: true, description: 'Secondary School Leaving Certificate / 10th standard marks memo' },
+  { id: 'doctype-4', name: 'Resume / CV', required: false, description: 'Updated professional resume or curriculum vitae' },
+  { id: 'doctype-5', name: 'Graduation Certificate', required: false, description: 'Degree convocation or provisional passing certificate' }
 ];
 
 const DEFAULT_DISPOSITIONS = [
@@ -119,7 +203,36 @@ export const CRMProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('crm_user') || 'null'));
   const [loginError, setLoginError] = useState('');
 
-  const [users, setUsers] = useState(DEFAULT_USERS);
+  const [users, setUsers] = useState(() => {
+    const saved = localStorage.getItem('crm_users');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_USERS;
+  });
+
+  const [documentTypes, setDocumentTypes] = useState(() => {
+    const saved = localStorage.getItem('crm_document_types');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_DOCUMENT_TYPES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('crm_document_types', JSON.stringify(documentTypes));
+  }, [documentTypes]);
+
   const [leads, setLeads] = useState(DEFAULT_LEADS);
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
@@ -153,12 +266,13 @@ export const CRMProvider = ({ children }) => {
   const refreshData = async () => {
     if (!authToken) return;
     try {
-      const [uRes, lRes, sRes, dRes, rRes] = await Promise.all([
+      const [uRes, lRes, sRes, dRes, rRes, dtRes] = await Promise.all([
         fetch(`${API_BASE_URL}/users`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/leads`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/sales`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/dispositions`, { headers: authHeaders() }),
-        fetch(`${API_BASE_URL}/custom-roles`, { headers: authHeaders() })
+        fetch(`${API_BASE_URL}/custom-roles`, { headers: authHeaders() }),
+        fetch(`${API_BASE_URL}/document-types`, { headers: authHeaders() })
       ]);
 
       if (uRes.ok) setUsers(await uRes.json());
@@ -166,6 +280,7 @@ export const CRMProvider = ({ children }) => {
       if (sRes.ok) setSales(await sRes.json());
       if (dRes.ok) setDispositions(await dRes.json());
       if (rRes.ok) setCustomRoles(await rRes.json());
+      if (dtRes.ok) setDocumentTypes(await dtRes.json());
     } catch (err) {
       console.log('Operating in standalone interactive mode (FastAPI backend offline).');
     }
@@ -294,6 +409,152 @@ export const CRMProvider = ({ children }) => {
 
     setUsers(prev => prev.filter(u => u.id !== userId));
     return { success: true };
+  };
+
+  // ==========================================
+  // Document Types Configuration (Super Admin, Max 10 slots)
+  // ==========================================
+  const addDocumentType = async (docTypeData) => {
+    if (documentTypes.length >= 10) {
+      return { success: false, message: 'Maximum limit of 10 document types reached.' };
+    }
+    const newDocType = {
+      id: 'doctype-' + Date.now(),
+      name: (docTypeData.name || '').trim(),
+      required: !!docTypeData.required,
+      description: (docTypeData.description || '').trim()
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/document-types`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(newDocType)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setDocumentTypes(prev => [...prev, saved]);
+        return { success: true, docType: saved };
+      }
+    } catch (err) {}
+
+    setDocumentTypes(prev => [...prev, newDocType]);
+    return { success: true, docType: newDocType };
+  };
+
+  const updateDocumentType = async (id, updatedFields) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/document-types/${id}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(updatedFields)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setDocumentTypes(prev => prev.map(dt => dt.id === id ? { ...dt, ...saved } : dt));
+        return { success: true };
+      }
+    } catch (err) {}
+
+    setDocumentTypes(prev => prev.map(dt => dt.id === id ? { ...dt, ...updatedFields } : dt));
+    return { success: true };
+  };
+
+  const deleteDocumentType = async (id) => {
+    try {
+      await fetch(`${API_BASE_URL}/document-types/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+    } catch (err) {}
+
+    setDocumentTypes(prev => prev.filter(dt => dt.id !== id));
+    return { success: true };
+  };
+
+  // ==========================================
+  // Employee Documents Upload & Direct Storage (Owner's DB)
+  // ==========================================
+  const uploadUserDocument = async (userId, docPayload) => {
+    const nowStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const newDoc = {
+      id: 'doc-' + Date.now(),
+      documentTypeId: docPayload.documentTypeId,
+      documentName: docPayload.documentName,
+      fileName: docPayload.fileName,
+      fileType: docPayload.fileType,
+      fileSize: docPayload.fileSize,
+      fileData: docPayload.fileData,
+      uploadedAt: nowStr
+    };
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${userId}/documents`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(docPayload)
+      });
+      if (res.ok) {
+        const savedDoc = await res.json();
+        setUsers(prev => prev.map(u => {
+          if (u.id !== userId) return u;
+          const userDocs = u.documents ? [...u.documents] : [];
+          const existingIdx = userDocs.findIndex(d => d.documentTypeId === savedDoc.documentTypeId);
+          if (existingIdx >= 0) {
+            userDocs[existingIdx] = savedDoc;
+          } else {
+            userDocs.push(savedDoc);
+          }
+          return { ...u, documents: userDocs };
+        }));
+        return { success: true, doc: savedDoc };
+      }
+    } catch (err) {}
+
+    // Standalone fallback
+    setUsers(prev => prev.map(u => {
+      if (u.id !== userId) return u;
+      const userDocs = u.documents ? [...u.documents] : [];
+      const existingIdx = userDocs.findIndex(d => d.documentTypeId === newDoc.documentTypeId);
+      if (existingIdx >= 0) {
+        userDocs[existingIdx] = newDoc;
+      } else {
+        userDocs.push(newDoc);
+      }
+      return { ...u, documents: userDocs };
+    }));
+    return { success: true, doc: newDoc };
+  };
+
+  const deleteUserDocument = async (userId, docId) => {
+    try {
+      await fetch(`${API_BASE_URL}/users/${userId}/documents/${docId}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+    } catch (err) {}
+
+    setUsers(prev => prev.map(u => {
+      if (u.id !== userId) return u;
+      return { ...u, documents: (u.documents || []).filter(d => d.id !== docId) };
+    }));
+    return { success: true };
+  };
+
+  const downloadUserDocument = (doc, userName = '') => {
+    if (!doc || !doc.fileData) return;
+    try {
+      const link = document.createElement('a');
+      link.href = doc.fileData;
+      const ext = doc.fileName ? doc.fileName.split('.').pop() : (doc.fileType?.includes('pdf') ? 'pdf' : 'png');
+      const cleanUser = userName ? `${userName.replace(/[^a-zA-Z0-9]/g, '_')}_` : '';
+      const cleanDoc = (doc.documentName || 'Document').replace(/[^a-zA-Z0-9]/g, '_');
+      link.download = doc.fileName || `${cleanUser}${cleanDoc}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error('Document download failed:', e);
+    }
   };
 
   // Dispositions Management
@@ -660,7 +921,14 @@ export const CRMProvider = ({ children }) => {
       deleteAssignmentFiles,
       reassignAssignmentFile,
       granularReassignLeads,
-      granularDeleteLeads
+      granularDeleteLeads,
+      documentTypes,
+      addDocumentType,
+      updateDocumentType,
+      deleteDocumentType,
+      uploadUserDocument,
+      deleteUserDocument,
+      downloadUserDocument
     }}>
       {children}
     </CRMContext.Provider>

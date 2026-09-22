@@ -3,10 +3,38 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { UserModal } from './UserModal';
 import { LeadReassignmentModal } from './LeadReassignmentModal';
-import { Search, Filter, RefreshCw, UserPlus, MoreVertical, Key, Trash2, Users, ShieldCheck, UserCheck, Clock, X, Landmark, Eye } from 'lucide-react';
+import { EmployeeDocumentsModal } from './EmployeeDocumentsModal';
+import { 
+  Search, 
+  Filter, 
+  RefreshCw, 
+  UserPlus, 
+  MoreVertical, 
+  Key, 
+  Trash2, 
+  Users, 
+  ShieldCheck, 
+  UserCheck, 
+  Clock, 
+  X, 
+  Landmark, 
+  Eye, 
+  FileText, 
+  Download, 
+  UploadCloud, 
+  File 
+} from 'lucide-react';
 
 export const UserDirectory = () => {
-  const { users, simulatedRole, toggleUserStatus, deleteUser, toggleAdminAccess, changeUserPassword } = useCRM();
+  const { 
+    users, 
+    simulatedRole, 
+    toggleUserStatus, 
+    deleteUser, 
+    toggleAdminAccess, 
+    changeUserPassword, 
+    downloadUserDocument 
+  } = useCRM();
   const { showToast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,6 +44,7 @@ export const UserDirectory = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [viewingUserDetails, setViewingUserDetails] = useState(null);
+  const [managingDocsUser, setManagingDocsUser] = useState(null);
   
   const [userToDelete, setUserToDelete] = useState(null);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
@@ -228,7 +257,31 @@ export const UserDirectory = () => {
                     <td style={{ color: 'var(--text-muted)' }}>{index + 1}</td>
                     <td style={{ fontWeight: 600 }}>
                       {u.name}
-                      {u.employeeId && <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>{u.employeeId}</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                        {u.employeeId && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>{u.employeeId}</span>}
+                        {u.documents && u.documents.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setManagingDocsUser(u)}
+                            style={{
+                              background: 'var(--accent-soft)',
+                              border: '1px solid var(--accent-border)',
+                              borderRadius: 'var(--radius-full)',
+                              padding: '1px 6px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '0.68rem',
+                              color: 'var(--accent)',
+                              fontWeight: 500
+                            }}
+                            title="View and download employee documents"
+                          >
+                            <FileText size={10} /> {u.documents.length} docs
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td>{u.mobile}</td>
                     <td>{u.reportingTo || '—'}</td>
@@ -281,7 +334,7 @@ export const UserDirectory = () => {
                             borderRadius: 'var(--radius-md)',
                             boxShadow: 'var(--shadow-md)',
                             zIndex: 20,
-                            minWidth: '160px',
+                            minWidth: '175px',
                             display: 'flex',
                             flexDirection: 'column',
                             padding: '4px'
@@ -292,6 +345,19 @@ export const UserDirectory = () => {
                               onClick={() => { setViewingUserDetails(u); setActiveDropdownId(null); }}
                             >
                               <Eye size={13} /> View Bank & Profile
+                            </button>
+
+                            <button
+                              className="btn-secondary"
+                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
+                              onClick={() => { setManagingDocsUser(u); setActiveDropdownId(null); }}
+                            >
+                              <FileText size={13} style={{ color: 'var(--accent)' }} /> Manage Documents
+                              {u.documents && u.documents.length > 0 && (
+                                <span style={{ marginLeft: 'auto', fontSize: '0.68rem', background: 'var(--accent-soft)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 'var(--radius-full)' }}>
+                                  {u.documents.length}
+                                </span>
+                              )}
                             </button>
 
                             <button
@@ -488,20 +554,112 @@ export const UserDirectory = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Block 3: Employee Documents & Direct Download */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}>
+                    <FileText size={15} />
+                    <span>Employee Documents ({viewingUserDetails.documents?.length || 0})</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => {
+                      setManagingDocsUser(viewingUserDetails);
+                    }}
+                  >
+                    <UploadCloud size={12} /> Manage / Upload
+                  </button>
+                </div>
+
+                {(!viewingUserDetails.documents || viewingUserDetails.documents.length === 0) ? (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px 0' }}>
+                    No documents uploaded yet for this employee. Click 'Manage / Upload' to attach documents.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {viewingUserDetails.documents.map(doc => (
+                      <div
+                        key={doc.id}
+                        style={{
+                          background: 'var(--bg-input)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-sm)',
+                          padding: '8px 12px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                          <span style={{
+                            padding: '2px 6px',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            background: doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            color: doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? '#ef4444' : '#10b981'
+                          }}>
+                            {doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? 'PDF' : 'IMG'}
+                          </span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {doc.documentName}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {doc.fileName} • {doc.fileSize}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                          onClick={() => downloadUserDocument(doc, viewingUserDetails.name)}
+                          title="Download document directly from CRM"
+                        >
+                          <Download size={12} /> Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  setEditingUser(viewingUserDetails);
-                  setIsAddModalOpen(true);
-                  setViewingUserDetails(null);
-                }}
-              >
-                Edit Details
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setEditingUser(viewingUserDetails);
+                    setIsAddModalOpen(true);
+                    setViewingUserDetails(null);
+                  }}
+                >
+                  Edit Details
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  onClick={() => {
+                    setManagingDocsUser(viewingUserDetails);
+                  }}
+                >
+                  <FileText size={13} /> Documents ({viewingUserDetails.documents?.length || 0})
+                </button>
+              </div>
               <button type="button" className="btn-primary" onClick={() => setViewingUserDetails(null)}>
                 Close
               </button>
@@ -509,6 +667,13 @@ export const UserDirectory = () => {
           </div>
         </div>
       )}
+
+      <EmployeeDocumentsModal
+        isOpen={!!managingDocsUser}
+        onClose={() => setManagingDocsUser(null)}
+        user={managingDocsUser ? (users.find(u => u.id === managingDocsUser.id) || managingDocsUser) : null}
+      />
     </div>
   );
 };
+

@@ -609,6 +609,46 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     </div>
                   </div>
                 </div>
+
+                {/* Block 3: Employee Documents Summary */}
+                {userToEdit && (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    padding: '14px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', fontWeight: 600, fontSize: '0.88rem' }}>
+                        <FileText size={16} />
+                        <span>Employee Documents ({userToEdit.documents?.length || 0})</span>
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        Stored directly in Owner's Database
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {userToEdit.documents && userToEdit.documents.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {userToEdit.documents.map(d => (
+                            <span key={d.id} className="badge badge-disposition" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                              <FileText size={12} /> {d.documentName} ({d.fileSize})
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                          No documents uploaded yet. Open 'Manage Documents' from the directory to upload (.pdf, .jpg, .png).
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>

@@ -6,10 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 
 try:
-    from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB
+    from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from backend.auth import create_access_token, get_current_user, require_roles
 except ImportError:
-    from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB
+    from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from auth import create_access_token, get_current_user, require_roles
 
 
@@ -85,6 +85,24 @@ class CustomRoleCreate(BaseModel):
     roleName: str
     level: str = "Level 2"
     accessScope: str = "Departmental"
+
+class DocumentTypeCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    required: Optional[bool] = False
+
+class DocumentTypeUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    required: Optional[bool] = None
+
+class UserDocumentUpload(BaseModel):
+    documentTypeId: str
+    documentName: str
+    fileName: str
+    fileType: str
+    fileSize: str
+    fileData: str
 
 # Health Check
 @app.get("/api/health")
@@ -493,4 +511,99 @@ def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = D
             count += 1
 
     return {"message": f"Deleted {count} selected lead(s) permanently."}
+
+# ==========================================
+# Document Types Endpoints (Super Admin configured, max 10 slots)
+# ==========================================
+@app.get("/api/document-types")
+def get_document_types(current_user: dict = Depends(get_current_user)):
+    return DOCUMENT_TYPES_DB
+
+@app.post("/api/document-types")
+def create_document_type(req: DocumentTypeCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    if len(DOCUMENT_TYPES_DB) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum limit of 10 document types reached.")
+    
+    new_doc_type = {
+        "id": f"doctype-{int(datetime.utcnow().timestamp())}",
+        "name": req.name,
+        "description": req.description or "",
+        "required": req.required or False
+    }
+    DOCUMENT_TYPES_DB.append(new_doc_type)
+    return new_doc_type
+
+@app.put("/api/document-types/{doctype_id}")
+def update_document_type(doctype_id: str, req: DocumentTypeUpdate, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    dt = next((d for d in DOCUMENT_TYPES_DB if d["id"] == doctype_id), None)
+    if not dt:
+        raise HTTPException(status_code=404, detail="Document type not found")
+    if req.name is not None:
+        dt["name"] = req.name
+    if req.description is not None:
+        dt["description"] = req.description
+    if req.required is not None:
+        dt["required"] = req.required
+    return dt
+
+@app.delete("/api/document-types/{doctype_id}")
+def delete_document_type(doctype_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    dt = next((d for d in DOCUMENT_TYPES_DB if d["id"] == doctype_id), None)
+    if not dt:
+        raise HTTPException(status_code=404, detail="Document type not found")
+    DOCUMENT_TYPES_DB.remove(dt)
+    return {"message": "Document type deleted successfully."}
+
+# ==========================================
+# Employee Documents Management Endpoints (Stored directly in Owner's Database)
+# ==========================================
+@app.get("/api/users/{user_id}/documents")
+def get_user_documents(user_id: str, current_user: dict = Depends(get_current_user)):
+    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user.get("documents", [])
+
+@app.post("/api/users/{user_id}/documents")
+def upload_user_document(user_id: str, req: UserDocumentUpload, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if "documents" not in user:
+        user["documents"] = []
+    
+    # If a document for this documentTypeId exists, replace it, else append
+    existing_doc = next((d for d in user["documents"] if d.get("documentTypeId") == req.documentTypeId), None)
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    
+    doc_entry = {
+        "id": existing_doc["id"] if existing_doc else f"doc-{uuid.uuid4().hex[:8]}",
+        "documentTypeId": req.documentTypeId,
+        "documentName": req.documentName,
+        "fileName": req.fileName,
+        "fileType": req.fileType,
+        "fileSize": req.fileSize,
+        "fileData": req.fileData,
+        "uploadedAt": now_str
+    }
+    
+    if existing_doc:
+        idx = user["documents"].index(existing_doc)
+        user["documents"][idx] = doc_entry
+    else:
+        user["documents"].append(doc_entry)
+        
+    return doc_entry
+
+@app.delete("/api/users/{user_id}/documents/{doc_id}")
+def delete_user_document(user_id: str, doc_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    docs = user.get("documents", [])
+    doc = next((d for d in docs if d["id"] == doc_id), None)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    docs.remove(doc)
+    return {"message": "Document deleted successfully."}
 
