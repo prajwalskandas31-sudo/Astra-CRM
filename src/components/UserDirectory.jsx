@@ -3,7 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { UserModal } from './UserModal';
 import { LeadReassignmentModal } from './LeadReassignmentModal';
-import { Search, Filter, RefreshCw, UserPlus, MoreVertical, Key, Trash2, Users, ShieldCheck, UserCheck, Clock } from 'lucide-react';
+import { Search, Filter, RefreshCw, UserPlus, MoreVertical, Key, Trash2, Users, ShieldCheck, UserCheck, Clock, X } from 'lucide-react';
 
 export const UserDirectory = () => {
   const { users, simulatedRole, toggleUserStatus, deleteUser, toggleAdminAccess, changeUserPassword } = useCRM();
@@ -122,13 +122,39 @@ export const UserDirectory = () => {
           <div className="directory-actions">
             {/* Search Box */}
             <div className="search-input-wrapper">
-              <Search className="search-icon" />
+              <Search className="search-icon" size={15} />
               <input
                 type="text"
                 placeholder="Search name, mobile, email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ paddingLeft: '36px', paddingRight: searchTerm ? '30px' : '12px' }}
+                aria-label="Search users"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%'
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
             {/* Status Filter */}

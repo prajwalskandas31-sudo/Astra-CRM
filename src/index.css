@@ -410,12 +410,16 @@ button, input, select, textarea {
 /* Search Box & Controls */
 .search-input-wrapper {
   position: relative;
-  width: 240px;
+  width: 250px;
+  display: flex;
+  align-items: center;
 }
 
-.search-input-wrapper input {
+.search-input-wrapper input,
+.search-input-wrapper input[type="text"],
+.search-input-wrapper input[type="search"] {
   width: 100%;
-  padding: 8px 12px 8px 34px;
+  padding: 8px 30px 8px 36px !important;
   background-color: var(--bg-input);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -437,6 +441,8 @@ button, input, select, textarea {
   color: var(--text-muted);
   width: 15px;
   height: 15px;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .select-filter {
