@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
@@ -84,7 +84,46 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      if (userToEdit) {
+        setFormData({
+          name: userToEdit.name || '',
+          mobile: userToEdit.mobile || '',
+          password: '',
+          role: userToEdit.role || 'Executive',
+          email: userToEdit.email || '',
+          reportingTo: userToEdit.reportingTo || '',
+          employeeId: userToEdit.employeeId || '',
+          bankAccountNumber: userToEdit.bankAccountNumber || '',
+          ifscCode: userToEdit.ifscCode || '',
+          bankNameAndBranch: userToEdit.bankNameAndBranch || '',
+          familyReferenceNumber: userToEdit.familyReferenceNumber || '',
+          referredBy: userToEdit.referredBy || ''
+        });
+      } else {
+        setFormData({
+          name: '',
+          mobile: '',
+          password: '',
+          role: 'Executive',
+          email: '',
+          reportingTo: '',
+          employeeId: '',
+          bankAccountNumber: '',
+          ifscCode: '',
+          bankNameAndBranch: '',
+          familyReferenceNumber: '',
+          referredBy: ''
+        });
+        setBulkText('');
+        setUploadedFileName('');
+        setUploadedFileSize('');
+        setFileError('');
+        setShowPreview(false);
+      }
+    }
+  }, [isOpen, userToEdit]);
 
   const managementUsers = users.filter(u => ['Super Admin', 'Admin', 'Manager', 'Team Leader'].includes(u.role));
 
@@ -323,6 +362,8 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
 
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay">
