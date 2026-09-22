@@ -151,6 +151,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     # Rule check for Executive: must have reporting person selected
     if req.role == "Executive" and not req.reportingTo:
         raise HTTPException(status_code=400, detail="Executive Team Selection Rule: Reporting TL/Manager required.")
+    if req.role in ["Team Leader", "Team Lead"] and not req.reportingTo:
+        raise HTTPException(status_code=400, detail="Team Leader Selection Rule: Reporting Manager required.")
 
     new_user = {
         "id": f"usr-{int(datetime.utcnow().timestamp())}",

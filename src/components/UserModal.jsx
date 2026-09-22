@@ -125,10 +125,37 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     }
   }, [isOpen, userToEdit]);
 
-  const managementUsers = users.filter(u => ['Super Admin', 'Admin', 'Manager', 'Team Leader'].includes(u.role));
+  const managementUsers = useMemo(() => {
+    return users.filter(u => 
+      ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Team Lead'].includes(u.role) &&
+      (!userToEdit || u.id !== userToEdit.id)
+    );
+  }, [users, userToEdit]);
+
+  const dedicatedManagers = useMemo(() => {
+    return users.filter(u => 
+      u.role === 'Manager' &&
+      (!userToEdit || u.id !== userToEdit.id)
+    );
+  }, [users, userToEdit]);
+
+  const seniorLeadership = useMemo(() => {
+    return users.filter(u => 
+      ['Admin', 'Super Admin'].includes(u.role) &&
+      (!userToEdit || u.id !== userToEdit.id)
+    );
+  }, [users, userToEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'role') {
+      setFormData(prev => ({
+        ...prev,
+        role: value,
+        reportingTo: ''
+      }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -336,6 +363,11 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         return;
       }
 
+      if (['Team Leader', 'Team Lead'].includes(formData.role) && !formData.reportingTo) {
+        showToast('Team Leader assignment rule: Please select a Reporting Manager.', 'warning');
+        return;
+      }
+
       if (userToEdit) {
         updateUser(userToEdit.id, formData);
         showToast(`User '${formData.name}' details updated.`, 'success');
@@ -496,10 +528,48 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       style={{ background: 'var(--bg-card)' }}
                       required
                     >
-                      <option value="">-- Select Reporting Manager --</option>
+                      <option value="">-- Select Reporting Team Leader or Manager --</option>
                       {managementUsers.map(m => (
                         <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
                       ))}
+                    </select>
+                  </div>
+                )}
+
+                {['Team Leader', 'Team Lead'].includes(formData.role) && (
+                  <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--accent-soft)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-border)' }}>
+                    <label style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                      <AlertCircle size={15} /> Team Leader Assignment to Manager:
+                    </label>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Selecting Team Leader role requires selecting a Reporting Manager.
+                    </div>
+                    <select
+                      name="reportingTo"
+                      value={formData.reportingTo}
+                      onChange={handleChange}
+                      style={{ background: 'var(--bg-card)' }}
+                      required
+                    >
+                      <option value="">-- Select Reporting Manager --</option>
+                      {dedicatedManagers.length > 0 && (
+                        <optgroup label="Managers">
+                          {dedicatedManagers.map(m => (
+                            <option key={m.id} value={m.name}>
+                              {m.name} ({m.role}{m.employeeId ? ` - ${m.employeeId}` : ''})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {seniorLeadership.length > 0 && (
+                        <optgroup label="Senior Leadership / Admins">
+                          {seniorLeadership.map(m => (
+                            <option key={m.id} value={m.name}>
+                              {m.name} ({m.role}{m.employeeId ? ` - ${m.employeeId}` : ''})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
                 )}
