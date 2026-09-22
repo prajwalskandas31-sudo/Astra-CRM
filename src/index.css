@@ -158,6 +158,53 @@
   padding: 0;
 }
 
+/* ============================================
+   ELITE SCROLLBAR — Theme-aware & Minimal
+   ============================================ */
+
+/* Webkit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-border);
+  border-radius: var(--radius-full);
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-border) transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--accent-primary) transparent;
+}
+
+/* Dark mode — slightly brighter thumb */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(110, 86, 207, 0.3);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg-app);
