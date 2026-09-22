@@ -185,18 +185,18 @@ export const LeadUploadModule = () => {
 
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',').map(p => p.trim());
-      const name = parts[0];
+      const name = parts[0] || ''; // NAME is optional
       const phone = parts[1];
       const lang = parts[2];
 
-      // Failed row check: missing individual row data
-      if (!name || !phone || !lang) {
+      // Failed row check: phone and language are required; name is optional
+      if (!phone || !lang) {
         failed.push({
           row: i,
-          contactPerson: name || '[Missing Name]',
+          contactPerson: name || '[No Name]',
           phone: phone || '[Missing Phone]',
           language: lang || '[Missing Language]',
-          reason: !name ? 'Missing CONTACT NAME' : !phone ? 'Missing CONTACT NUMBER' : 'Missing LANGUAGE'
+          reason: !phone ? 'Missing CONTACT NUMBER' : 'Missing LANGUAGE'
         });
         continue;
       }
@@ -262,8 +262,8 @@ export const LeadUploadModule = () => {
   // ==========================================
   const handleSingleSubmit = (e) => {
     e.preventDefault();
-    if (!singleForm.contactPerson || !singleForm.phone) {
-      showToast('Contact Name and Contact Number are required.', 'warning');
+    if (!singleForm.phone) {
+      showToast('Contact Number is required.', 'warning');
       return;
     }
 
