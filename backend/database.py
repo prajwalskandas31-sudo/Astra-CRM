@@ -13,7 +13,12 @@ USERS_DB = [
     "status": "Active",
     "expiryDate": "31-12-2030",
     "canCreateEmployees": True,
-    "adminAccessEnabled": True
+    "adminAccessEnabled": True,
+    "bankAccountNumber": "91234567890123",
+    "ifscCode": "HDFC0000123",
+    "bankNameAndBranch": "HDFC Bank, MG Road Branch",
+    "familyReferenceNumber": "9876543219",
+    "referredBy": "Board of Directors"
   },
   {
     "id": "usr-11",
@@ -27,7 +32,12 @@ USERS_DB = [
     "status": "Active",
     "expiryDate": "31-12-2030",
     "canCreateEmployees": False,
-    "adminAccessEnabled": True
+    "adminAccessEnabled": True,
+    "bankAccountNumber": "91234567890124",
+    "ifscCode": "SBIN0001452",
+    "bankNameAndBranch": "State Bank of India, Indiranagar Branch",
+    "familyReferenceNumber": "9876543220",
+    "referredBy": "Sreenivasulu (EMP-001)"
   },
   {
     "id": "usr-9",
@@ -39,7 +49,12 @@ USERS_DB = [
     "reportingTo": "Sreenivasulu",
     "employeeId": "EMP-050",
     "status": "Active",
-    "expiryDate": "31-12-2028"
+    "expiryDate": "31-12-2028",
+    "bankAccountNumber": "91234567890125",
+    "ifscCode": "ICIC0000456",
+    "bankNameAndBranch": "ICICI Bank, Koramangala Branch",
+    "familyReferenceNumber": "9876543221",
+    "referredBy": "Sreenivasulu (EMP-001)"
   },
   {
     "id": "usr-10",
@@ -51,7 +66,12 @@ USERS_DB = [
     "reportingTo": "Vikram Sharma",
     "employeeId": "EMP-080",
     "status": "Active",
-    "expiryDate": "31-12-2028"
+    "expiryDate": "31-12-2028",
+    "bankAccountNumber": "91234567890126",
+    "ifscCode": "UTIB0000789",
+    "bankNameAndBranch": "Axis Bank, Whitefield Branch",
+    "familyReferenceNumber": "9876543222",
+    "referredBy": "Vikram Sharma (EMP-050)"
   },
   {
     "id": "usr-3",
@@ -63,7 +83,12 @@ USERS_DB = [
     "reportingTo": "Priya Nair",
     "employeeId": "EMP-103",
     "status": "Active",
-    "expiryDate": "27-07-2027"
+    "expiryDate": "27-07-2027",
+    "bankAccountNumber": "91234567890127",
+    "ifscCode": "HDFC0000456",
+    "bankNameAndBranch": "HDFC Bank, HSR Layout Branch",
+    "familyReferenceNumber": "9876543223",
+    "referredBy": "Priya Nair (EMP-080)"
   },
   {
     "id": "usr-2",
@@ -75,7 +100,12 @@ USERS_DB = [
     "reportingTo": "Priya Nair",
     "employeeId": "EMP-102",
     "status": "Active",
-    "expiryDate": "27-07-2027"
+    "expiryDate": "27-07-2027",
+    "bankAccountNumber": "91234567890128",
+    "ifscCode": "KKBK0000987",
+    "bankNameAndBranch": "Kotak Mahindra Bank, Jayanagar Branch",
+    "familyReferenceNumber": "9876543224",
+    "referredBy": "Priya Nair (EMP-080)"
   },
   {
     "id": "usr-4",
@@ -87,7 +117,12 @@ USERS_DB = [
     "reportingTo": "Priya Nair",
     "employeeId": "EMP-104",
     "status": "Active",
-    "expiryDate": "27-07-2027"
+    "expiryDate": "27-07-2027",
+    "bankAccountNumber": "91234567890129",
+    "ifscCode": "BARB0KORAMA",
+    "bankNameAndBranch": "Bank of Baroda, Electronic City",
+    "familyReferenceNumber": "9876543225",
+    "referredBy": "Priya Nair (EMP-080)"
   },
   {
     "id": "usr-5",

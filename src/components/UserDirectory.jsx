@@ -3,7 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { UserModal } from './UserModal';
 import { LeadReassignmentModal } from './LeadReassignmentModal';
-import { Search, Filter, RefreshCw, UserPlus, MoreVertical, Key, Trash2, Users, ShieldCheck, UserCheck, Clock, X } from 'lucide-react';
+import { Search, Filter, RefreshCw, UserPlus, MoreVertical, Key, Trash2, Users, ShieldCheck, UserCheck, Clock, X, Landmark, Eye } from 'lucide-react';
 
 export const UserDirectory = () => {
   const { users, simulatedRole, toggleUserStatus, deleteUser, toggleAdminAccess, changeUserPassword } = useCRM();
@@ -15,6 +15,7 @@ export const UserDirectory = () => {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [viewingUserDetails, setViewingUserDetails] = useState(null);
   
   const [userToDelete, setUserToDelete] = useState(null);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
@@ -287,6 +288,14 @@ export const UserDirectory = () => {
                           }}>
                             <button
                               className="btn-secondary"
+                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
+                              onClick={() => { setViewingUserDetails(u); setActiveDropdownId(null); }}
+                            >
+                              <Eye size={13} /> View Bank & Profile
+                            </button>
+
+                            <button
+                              className="btn-secondary"
                               style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
                               onClick={() => { setEditingUser(u); setIsAddModalOpen(true); setActiveDropdownId(null); }}
                             >
@@ -372,6 +381,131 @@ export const UserDirectory = () => {
                 <button type="submit" className="btn-primary">Update Password</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User & Bank Details Profile Modal */}
+      {viewingUserDetails && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Landmark size={18} style={{ color: 'var(--accent-primary)' }} />
+                <h3>User & Bank Profile</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setViewingUserDetails(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* User Overview Header */}
+              <div style={{
+                background: 'var(--bg-table-head)',
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                border: '1px solid var(--border-color)'
+              }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>{viewingUserDetails.name}</h4>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '3px' }}>
+                    {viewingUserDetails.employeeId || 'EMP-' + viewingUserDetails.id} • {viewingUserDetails.role}
+                  </div>
+                </div>
+                <span className="badge badge-role">{viewingUserDetails.status}</span>
+              </div>
+
+              {/* Basic Details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Mobile Number:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.mobile || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Email ID:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.email || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Reporting Manager:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.reportingTo || '—'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Account Expiry:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.expiryDate || '27-07-2028'}</strong>
+                </div>
+              </div>
+
+              {/* Block 1: Bank Account Details */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '10px' }}>
+                  <Landmark size={15} />
+                  <span>Bank Account Details</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Account Number:</span>
+                    <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.bankAccountNumber || 'Not Provided'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>IFSC Code:</span>
+                    <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.ifscCode || 'Not Provided'}</strong>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Name & Branch:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.bankNameAndBranch || 'Not Provided'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Block 2: Family Reference & Referral Details */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '10px' }}>
+                  <Users size={15} />
+                  <span>Family Reference & Referral Information</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Family Reference Number:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.familyReferenceNumber || 'Not Provided'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Referred By:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.referredBy || 'Not Provided'}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setEditingUser(viewingUserDetails);
+                  setIsAddModalOpen(true);
+                  setViewingUserDetails(null);
+                }}
+              >
+                Edit Details
+              </button>
+              <button type="button" className="btn-primary" onClick={() => setViewingUserDetails(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

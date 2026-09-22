@@ -37,6 +37,11 @@ class UserCreate(BaseModel):
     email: Optional[str] = ""
     reportingTo: Optional[str] = "Sreenivasulu"
     employeeId: Optional[str] = None
+    bankAccountNumber: Optional[str] = ""
+    ifscCode: Optional[str] = ""
+    bankNameAndBranch: Optional[str] = ""
+    familyReferenceNumber: Optional[str] = ""
+    referredBy: Optional[str] = ""
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -44,6 +49,11 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     email: Optional[str] = None
     reportingTo: Optional[str] = None
+    bankAccountNumber: Optional[str] = None
+    ifscCode: Optional[str] = None
+    bankNameAndBranch: Optional[str] = None
+    familyReferenceNumber: Optional[str] = None
+    referredBy: Optional[str] = None
 
 class PasswordChange(BaseModel):
     newPassword: str
@@ -134,7 +144,12 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "reportingTo": req.reportingTo or "Sreenivasulu",
         "employeeId": req.employeeId or f"EMP-{len(USERS_DB) + 100}",
         "status": "Active",
-        "expiryDate": "27-07-2027"
+        "expiryDate": "27-07-2027",
+        "bankAccountNumber": req.bankAccountNumber or "",
+        "ifscCode": req.ifscCode or "",
+        "bankNameAndBranch": req.bankNameAndBranch or "",
+        "familyReferenceNumber": req.familyReferenceNumber or "",
+        "referredBy": req.referredBy or ""
     }
     USERS_DB.insert(0, new_user)
     return new_user
@@ -145,11 +160,16 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if req.name: user["name"] = req.name
-    if req.mobile: user["mobile"] = req.mobile
-    if req.role: user["role"] = req.role
-    if req.email: user["email"] = req.email
-    if req.reportingTo: user["reportingTo"] = req.reportingTo
+    if req.name is not None: user["name"] = req.name
+    if req.mobile is not None: user["mobile"] = req.mobile
+    if req.role is not None: user["role"] = req.role
+    if req.email is not None: user["email"] = req.email
+    if req.reportingTo is not None: user["reportingTo"] = req.reportingTo
+    if req.bankAccountNumber is not None: user["bankAccountNumber"] = req.bankAccountNumber
+    if req.ifscCode is not None: user["ifscCode"] = req.ifscCode
+    if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch
+    if req.familyReferenceNumber is not None: user["familyReferenceNumber"] = req.familyReferenceNumber
+    if req.referredBy is not None: user["referredBy"] = req.referredBy
 
     return user
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { X, UserPlus, Users, AlertCircle } from 'lucide-react';
+import { X, UserPlus, Users, AlertCircle, Landmark } from 'lucide-react';
 
 export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   const { users, customRoles, addUser, updateUser } = useCRM();
@@ -15,7 +15,12 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     role: userToEdit ? userToEdit.role : 'Executive',
     email: userToEdit ? userToEdit.email : '',
     reportingTo: userToEdit ? userToEdit.reportingTo : '',
-    employeeId: userToEdit ? userToEdit.employeeId : ''
+    employeeId: userToEdit ? userToEdit.employeeId : '',
+    bankAccountNumber: userToEdit ? (userToEdit.bankAccountNumber || '') : '',
+    ifscCode: userToEdit ? (userToEdit.ifscCode || '') : '',
+    bankNameAndBranch: userToEdit ? (userToEdit.bankNameAndBranch || '') : '',
+    familyReferenceNumber: userToEdit ? (userToEdit.familyReferenceNumber || '') : '',
+    referredBy: userToEdit ? (userToEdit.referredBy || '') : ''
   });
 
   const [bulkText, setBulkText] = useState('');
@@ -73,7 +78,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content">
+      <div className="modal-content" style={{ maxWidth: '640px' }}>
         <div className="modal-header">
           <h3>{userToEdit ? 'Edit User Details' : 'Add Users'}</h3>
           <button className="modal-close-btn" onClick={onClose}>
@@ -198,6 +203,112 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
                     </select>
                   </div>
                 )}
+
+                {/* Block 1: Bank Account Details */}
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.88rem' }}>
+                    <Landmark size={16} />
+                    <span>Bank Account Details</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Bank Account Number</label>
+                      <input
+                        type="text"
+                        name="bankAccountNumber"
+                        value={formData.bankAccountNumber}
+                        onChange={handleChange}
+                        placeholder="e.g. 91234567890123"
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>IFSC Code</label>
+                      <input
+                        type="text"
+                        name="ifscCode"
+                        value={formData.ifscCode}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ifscCode: e.target.value.toUpperCase() }))}
+                        placeholder="e.g. HDFC0000123"
+                        style={{ textTransform: 'uppercase' }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                      <label>Bank Name and Branch</label>
+                      <input
+                        type="text"
+                        name="bankNameAndBranch"
+                        value={formData.bankNameAndBranch}
+                        onChange={handleChange}
+                        placeholder="e.g. HDFC Bank, Koramangala Branch"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Block 2: Family Reference & Referral Details */}
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.88rem' }}>
+                    <Users size={16} />
+                    <span>Family Reference & Referral Information</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Family Reference Number</label>
+                      <input
+                        type="text"
+                        name="familyReferenceNumber"
+                        value={formData.familyReferenceNumber}
+                        onChange={handleChange}
+                        placeholder="e.g. +91 98765 43219"
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label>Referred By (Employee Name & Code)</label>
+                      <select
+                        name="referredBy"
+                        value={formData.referredBy}
+                        onChange={handleChange}
+                        style={{ background: 'var(--bg-card)' }}
+                      >
+                        <option value="">-- Select Referring Employee --</option>
+                        {users
+                          .filter(u => !userToEdit || u.id !== userToEdit.id)
+                          .map(u => {
+                            const empCode = u.employeeId || `EMP-${u.id}`;
+                            const optVal = `${u.name} (${empCode})`;
+                            return (
+                              <option key={u.id} value={optVal}>
+                                {u.name} ({empCode})
+                              </option>
+                            );
+                          })}
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="form-group">
