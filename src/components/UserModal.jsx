@@ -78,7 +78,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '640px' }}>
+      <div className="modal-content" style={{ maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header">
           <h3>{userToEdit ? 'Edit User Details' : 'Add Users'}</h3>
           <button className="modal-close-btn" onClick={onClose}>
@@ -87,7 +87,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
         </div>
 
         {!userToEdit && (
-          <div style={{ padding: '10px 20px', background: 'var(--bg-table-head)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px' }}>
+          <div style={{ padding: '10px 20px', background: 'var(--bg-table-head)', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '10px', flexShrink: 0 }}>
             <button
               className={`btn-secondary ${mode === 'single' ? 'active' : ''}`}
               style={{ flex: 1, justifyContent: 'center', borderColor: mode === 'single' ? 'var(--accent-primary)' : 'var(--border-color)' }}
@@ -105,8 +105,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <div className="modal-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px' }}>
             {mode === 'single' ? (
               <div className="form-grid">
                 <div className="form-group">

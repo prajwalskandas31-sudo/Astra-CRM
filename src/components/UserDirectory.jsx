@@ -388,7 +388,7 @@ export const UserDirectory = () => {
       {/* User & Bank Details Profile Modal */}
       {viewingUserDetails && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '560px' }}>
+          <div className="modal-content" style={{ maxWidth: '560px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Landmark size={18} style={{ color: 'var(--accent-primary)' }} />
@@ -399,7 +399,7 @@ export const UserDirectory = () => {
               </button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {/* User Overview Header */}
               <div style={{
                 background: 'var(--bg-table-head)',
