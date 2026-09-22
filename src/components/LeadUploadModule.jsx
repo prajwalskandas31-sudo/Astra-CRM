@@ -53,6 +53,8 @@ export const LeadUploadModule = () => {
   const [bulkInputText, setBulkInputText] = useState('');
   const [bulkError, setBulkError] = useState('');
   const [uploadResult, setUploadResult] = useState(null);
+  const [csvFileName, setCsvFileName] = useState('');
+  const csvFileInputRef = React.useRef(null);
 
   // Dynamic Lead Assignment State (Block 1 Integration)
   const [assignLang, setAssignLang] = useState('Hindi');
@@ -115,6 +117,36 @@ export const LeadUploadModule = () => {
     addMasterRecords(newRecords);
     showToast(`Master Data Database updated with ${newRecords.length} reference records.`, 'success');
     setMasterInputText('');
+  };
+
+  // ==========================================
+  // HANDLER: CSV File Upload for Bulk Upload
+  // ==========================================
+  const handleCsvFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showToast('Invalid file type. Please upload a .csv file only.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target.result;
+      setBulkInputText(text);
+      setBulkError('');
+      showToast(`CSV file "${file.name}" loaded successfully. Review and click Process.`, 'success');
+    };
+    reader.onerror = () => {
+      showToast('Failed to read the CSV file. Please try again.', 'error');
+      setCsvFileName('');
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be re-uploaded
+    e.target.value = '';
   };
 
   // ==========================================
@@ -613,12 +645,43 @@ export const LeadUploadModule = () => {
             )}
 
             <form onSubmit={handleBulkUploadSubmit}>
+              {/* CSV File Upload Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px', padding: '12px 14px', background: 'var(--bg-input)', border: '1px dashed var(--accent-primary)', borderRadius: '8px' }}>
+                <input
+                  ref={csvFileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileUpload}
+                  style={{ display: 'none' }}
+                  id="bulk-csv-file-input"
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => csvFileInputRef.current && csvFileInputRef.current.click()}
+                  style={{ fontSize: '0.82rem', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                >
+                  <Upload size={14} /> Upload .CSV File
+                </button>
+                <div style={{ flex: 1 }}>
+                  {csvFileName ? (
+                    <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <CheckCircle size={14} /> {csvFileName} — loaded into editor below
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Select a <strong>.csv</strong> file with columns: CONTACT NAME, CONTACT NUMBER, LANGUAGE
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="form-group" style={{ marginBottom: '14px' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Paste Excel / CSV Dataset:</label>
+                <label style={{ fontWeight: 600, fontSize: '0.85rem' }}>Preview / Paste CSV Dataset:</label>
                 <textarea
                   rows={5}
                   value={bulkInputText}
-                  onChange={(e) => setBulkInputText(e.target.value)}
+                  onChange={(e) => { setBulkInputText(e.target.value); setCsvFileName(''); }}
                   placeholder="CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;Sunil Varma, +91 98888 11111, Kannada&#10;Meera Sen, +91 98888 22222, Telugu&#10;Deepak Roy, +91 98888 33333, Hindi&#10;Rohan Mehta, +91 91234 56789, Hindi&#10;Incomplete Lead, , Tamil"
                   style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
                 />
@@ -631,7 +694,7 @@ export const LeadUploadModule = () => {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil")}
+                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName(''); }}
                 >
                   Load Sample Bulk Dataset
                 </button>
