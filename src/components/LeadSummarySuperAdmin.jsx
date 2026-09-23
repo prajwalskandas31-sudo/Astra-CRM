@@ -159,21 +159,26 @@ export const LeadSummarySuperAdmin = () => {
   // Handle Fulfill Request
   const handleConfirmFulfillRequest = () => {
     if (!showFulfillModal) return;
-    const targetUser = users.find(u => u.id === fulfillTargetUserId) || users.find(u => u.name === showFulfillModal.requestedByName);
-    
-    const result = fulfillLeadRequest(showFulfillModal.id, fulfillQuantity, targetUser?.id, showFulfillModal.language);
-    const { assigned, requested } = result || {};
+    try {
+      const targetUser = users.find(u => u.id === fulfillTargetUserId) || users.find(u => u.name === showFulfillModal.requestedByName);
+      
+      const result = fulfillLeadRequest(showFulfillModal.id, fulfillQuantity, targetUser?.id, showFulfillModal.language);
+      const { assigned, requested } = result || {};
 
-    if (assigned >= requested) {
-      addToast(`Leads assigned successfully to ${showFulfillModal.requestedByName}.`, 'success');
-    } else {
-      const notAssigned = (requested || 0) - (assigned || 0);
-      addToast(
-        `${assigned} lead(s) assigned to ${showFulfillModal.requestedByName}. ${notAssigned} lead(s) could not be assigned due to insufficient available leads.`,
-        assigned > 0 ? 'warning' : 'error'
-      );
+      if (assigned >= requested) {
+        addToast(`Leads assigned successfully to ${showFulfillModal.requestedByName}.`, 'success');
+      } else {
+        const notAssigned = (requested || 0) - (assigned || 0);
+        addToast(
+          `${assigned} lead(s) assigned to ${showFulfillModal.requestedByName}. ${notAssigned} lead(s) could not be assigned due to insufficient available leads.`,
+          assigned > 0 ? 'warning' : 'error'
+        );
+      }
+    } catch (err) {
+      console.error('Error fulfilling request:', err);
+    } finally {
+      setShowFulfillModal(null);
     }
-    setShowFulfillModal(null);
   };
 
   // Handle Batch Reassign

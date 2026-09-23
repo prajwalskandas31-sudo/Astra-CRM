@@ -379,6 +379,12 @@ def create_custom_role(req: CustomRoleCreate, current_user: dict = Depends(requi
     CUSTOM_ROLES_DB.append(new_role)
     return new_role
 
+@app.delete("/api/custom-roles/{role_id}")
+def delete_custom_role(role_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    global CUSTOM_ROLES_DB
+    CUSTOM_ROLES_DB = [r for r in CUSTOM_ROLES_DB if r.get("id") != role_id]
+    return {"success": True, "message": "Role deleted"}
+
 # Block 4: Lead Summary & Super Admin Operations Schemas & Routes
 class LeadRequestCreate(BaseModel):
     language: str

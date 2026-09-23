@@ -11,6 +11,7 @@ export const SystemSettings = () => {
     setAccentColor, 
     customRoles, 
     addCustomRole, 
+    deleteCustomRole,
     documentTypes,
     addDocumentType,
     deleteDocumentType,
@@ -50,6 +51,13 @@ export const SystemSettings = () => {
     addCustomRole(roleForm);
     showToast(`Custom Role '${roleForm.roleName}' created!`, 'success');
     setRoleForm({ roleName: '' });
+  };
+
+  const handleDeleteCustomRole = (role) => {
+    if (window.confirm(`Are you sure you want to delete custom role '${role.roleName}'?`)) {
+      deleteCustomRole(role.id);
+      showToast(`Custom Role '${role.roleName}' deleted successfully.`, 'info');
+    }
   };
 
   const colors = [
@@ -168,22 +176,47 @@ export const SystemSettings = () => {
           <table className="crm-table">
             <thead>
               <tr>
+                <th style={{ width: '50px' }}>No.</th>
                 <th>Role Name</th>
                 <th>Status</th>
+                {simulatedRole === 'Super Admin' && <th style={{ width: '100px' }}>Action</th>}
               </tr>
             </thead>
             <tbody>
-              {customRoles.map(cr => (
-                <tr key={cr.id}>
-                  <td style={{ fontWeight: 600 }}>{cr.roleName}</td>
-                  <td>
-                    <div className="status-indicator">
-                      <span className="status-dot active" />
-                      <span>Active</span>
-                    </div>
+              {customRoles.length === 0 ? (
+                <tr>
+                  <td colSpan={simulatedRole === 'Super Admin' ? 4 : 3} style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)' }}>
+                    No custom roles configured yet. Use the form above to create one.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                customRoles.map((cr, idx) => (
+                  <tr key={cr.id}>
+                    <td style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
+                    <td style={{ fontWeight: 600 }}>{cr.roleName}</td>
+                    <td>
+                      <div className="status-indicator">
+                        <span className="status-dot active" />
+                        <span>Active</span>
+                      </div>
+                    </td>
+                    {simulatedRole === 'Super Admin' && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => handleDeleteCustomRole(cr)}
+                          title={`Delete Custom Role '${cr.roleName}'`}
+                        >
+                          <Trash2 size={12} />
+                          <span>Delete</span>
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

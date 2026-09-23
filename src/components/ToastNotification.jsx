@@ -20,7 +20,7 @@ export const ToastProvider = ({ children }) => {
   }, []);
 
   return (
-    <ToastContext.Provider value={{ showToast: addToast }}>
+    <ToastContext.Provider value={{ showToast: addToast, addToast }}>
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (
@@ -45,7 +45,8 @@ export const ToastProvider = ({ children }) => {
 export const useToast = () => {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    return { showToast: (msg) => console.log(msg) };
+    const noop = (msg) => console.log(msg);
+    return { showToast: noop, addToast: noop };
   }
   return ctx;
 };

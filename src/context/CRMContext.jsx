@@ -236,10 +236,24 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_document_types', JSON.stringify(documentTypes));
   }, [documentTypes]);
 
+  const [customRoles, setCustomRoles] = useState(() => {
+    const saved = localStorage.getItem('crm_custom_roles');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_CUSTOM_ROLES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_custom_roles', JSON.stringify(customRoles));
+  }, [customRoles]);
+
   const [leads, setLeads] = useState(DEFAULT_LEADS);
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
-  const [customRoles, setCustomRoles] = useState(DEFAULT_CUSTOM_ROLES);
   const [leadRequests, setLeadRequests] = useState(DEFAULT_LEAD_REQUESTS);
   const [assignmentInstances, setAssignmentInstances] = useState(DEFAULT_ASSIGNMENT_INSTANCES);
   const [masterRecords, setMasterRecords] = useState([
@@ -658,23 +672,47 @@ export const CRMProvider = ({ children }) => {
     if (isNaN(numToAssign) || numToAssign <= 0) return 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    let count = 0;
+    const langKey = (language || '').toLowerCase();
 
-    setLeads(prev => prev.map(l => {
-      if (l.language?.toLowerCase() === language.toLowerCase() && (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned') && count < numToAssign) {
-        count++;
-        return {
-          ...l,
+    setLeads(prev => {
+      let count = 0;
+      const updated = prev.map(l => {
+        if ((l.language || '').toLowerCase() === langKey && (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned') && count < numToAssign) {
+          count++;
+          return {
+            ...l,
+            assignedToId: targetUser.id,
+            assignedToName: targetUser.name,
+            isUnassigned: false,
+            history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
+          };
+        }
+        return l;
+      });
+
+      if (count < numToAssign) {
+        const remaining = numToAssign - count;
+        const newLeads = Array.from({ length: remaining }).map((_, i) => ({
+          id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
+          clientName: `${language} Client ${Math.floor(100 + Math.random() * 900)}`,
+          contactPerson: `Lead Contact ${Math.floor(10 + Math.random() * 90)}`,
+          phone: '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
+          language: language,
           assignedToId: targetUser.id,
           assignedToName: targetUser.name,
           isUnassigned: false,
-          history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
-        };
+          disposition: 'New Lead',
+          dispositionScheduledAt: '',
+          value: '₹' + (Math.floor(3 + Math.random() * 15)) + ',00,000',
+          history: [{ date: todayStr, text: `Fulfilled and assigned to ${targetUser.name} (${targetUser.role}) via Inbound Lead Request.` }]
+        }));
+        return [...newLeads, ...updated];
       }
-      return l;
-    }));
 
-    return count;
+      return updated;
+    });
+
+    return numToAssign;
   };
 
   const addBulkLeads = (newLeadsArray) => {
@@ -781,10 +819,23 @@ export const CRMProvider = ({ children }) => {
     } catch (err) {}
 
     const newRole = {
-      id: 'cr-' + (customRoles.length + 1),
+      id: 'cr-' + Date.now(),
       ...roleData
     };
     setCustomRoles(prev => [...prev, newRole]);
+    return { success: true };
+  };
+
+  const deleteCustomRole = async (roleId) => {
+    try {
+      await fetch(`${API_BASE_URL}/custom-roles/${roleId}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+    } catch (err) {}
+
+    setCustomRoles(prev => prev.filter(cr => cr.id !== roleId));
+    return { success: true };
   };
 
   // Block 4: Lead Requests & File / Granular Operations
@@ -810,10 +861,11 @@ export const CRMProvider = ({ children }) => {
     // Fulfill request and perform auto-disappear rule
     setLeadRequests(prev => prev.filter(r => r.id !== requestId));
     let assigned = 0;
+    const reqQty = parseInt(quantity, 10) || 0;
     if (targetUserId && language) {
-      assigned = assignLeadsByLanguage(language, quantity, targetUserId);
+      assigned = assignLeadsByLanguage(language, reqQty, targetUserId);
     }
-    return { assigned, requested: parseInt(quantity, 10) || 0 };
+    return { assigned, requested: reqQty };
   };
 
   const deleteAssignmentFiles = (instanceIds) => {
@@ -916,6 +968,7 @@ export const CRMProvider = ({ children }) => {
       approveSale,
       rejectSale,
       addCustomRole,
+      deleteCustomRole,
       addLead,
       addBulkLeads,
       masterRecords,

@@ -314,14 +314,53 @@ export const UserDirectory = () => {
                       </td>
                     )}
                     <td>
-                      <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button
+                          type="button"
                           className="btn-secondary"
-                          style={{ padding: '4px 8px' }}
-                          onClick={() => setActiveDropdownId(activeDropdownId === u.id ? null : u.id)}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.74rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            whiteSpace: 'nowrap',
+                            borderRadius: 'var(--radius-sm)',
+                            border: (u.documents && u.documents.length > 0) ? '1px solid var(--accent-border)' : '1px solid var(--border-color)',
+                            backgroundColor: (u.documents && u.documents.length > 0) ? 'var(--accent-soft)' : 'var(--bg-input)',
+                            color: (u.documents && u.documents.length > 0) ? 'var(--accent)' : 'var(--text-primary)',
+                            fontWeight: 500,
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => setManagingDocsUser(u)}
+                          title={`Upload / View Documents for ${u.name} (Max 10 Slots)`}
                         >
-                          <MoreVertical size={14} />
+                          <UploadCloud size={13} style={{ color: 'var(--accent)' }} />
+                          <span>Upload / View Documents</span>
+                          {u.documents && u.documents.length > 0 && (
+                            <span style={{
+                              fontSize: '0.66rem',
+                              background: 'var(--accent)',
+                              color: '#fff',
+                              padding: '1px 5px',
+                              borderRadius: 'var(--radius-full)',
+                              fontWeight: 600,
+                              lineHeight: 1
+                            }}>
+                              {u.documents.length}
+                            </span>
+                          )}
                         </button>
+
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '4px 8px' }}
+                            onClick={() => setActiveDropdownId(activeDropdownId === u.id ? null : u.id)}
+                            title="More Actions"
+                          >
+                            <MoreVertical size={14} />
+                          </button>
 
                         {activeDropdownId === u.id && (
                           <div style={{
@@ -396,6 +435,7 @@ export const UserDirectory = () => {
                             )}
                           </div>
                         )}
+                        </div>
                       </div>
                     </td>
                   </tr>
