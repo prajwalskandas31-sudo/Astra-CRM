@@ -473,13 +473,6 @@ export const LeadUploadModule = () => {
             {isSuperAdmin && (
               <>
                 <button
-                  className={`btn-secondary ${activeSubBlock === 'master' ? 'active' : ''}`}
-                  onClick={() => setActiveSubBlock('master')}
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                >
-                  <FileSpreadsheet size={13} /> Data Record Upload
-                </button>
-                <button
                   className={`btn-secondary ${activeSubBlock === 'bulk' ? 'active' : ''}`}
                   onClick={() => setActiveSubBlock('bulk')}
                   style={{ fontSize: '0.8rem', padding: '6px 12px' }}

@@ -18,7 +18,7 @@ export const SystemSettings = () => {
   } = useCRM();
   const { showToast } = useToast();
 
-  const [roleForm, setRoleForm] = useState({ roleName: '', level: 'Level 2', accessScope: 'Departmental' });
+  const [roleForm, setRoleForm] = useState({ roleName: '' });
   const [docTypeForm, setDocTypeForm] = useState({ name: '', required: false, description: '' });
 
   const handleAddDocType = async (e) => {
@@ -49,7 +49,7 @@ export const SystemSettings = () => {
     if (!roleForm.roleName) return;
     addCustomRole(roleForm);
     showToast(`Custom Role '${roleForm.roleName}' created!`, 'success');
-    setRoleForm({ roleName: '', level: 'Level 2', accessScope: 'Departmental' });
+    setRoleForm({ roleName: '' });
   };
 
   const colors = [
@@ -150,31 +150,6 @@ export const SystemSettings = () => {
                 />
               </div>
 
-              <div className="form-group">
-                <label>Hierarchy Level</label>
-                <select
-                  value={roleForm.level}
-                  onChange={(e) => setRoleForm({ ...roleForm, level: e.target.value })}
-                >
-                  <option value="Level 1 (Top)">Level 1 (Top Level)</option>
-                  <option value="Level 2 (Mid)">Level 2 (Mid Level)</option>
-                  <option value="Level 3 (Operational)">Level 3 (Operational Level)</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Access Scope</label>
-                <select
-                  value={roleForm.accessScope}
-                  onChange={(e) => setRoleForm({ ...roleForm, accessScope: e.target.value })}
-                >
-                  <option value="Global">Global Enterprise</option>
-                  <option value="Departmental">Departmental</option>
-                  <option value="Regional">Regional / Branch</option>
-                  <option value="Team Only">Team Only</option>
-                </select>
-              </div>
-
               <div className="form-group" style={{ justifyContent: 'flex-end' }}>
                 <button type="submit" className="btn-primary" style={{ marginTop: 'auto' }}>
                   <Plus size={15} /> Create Role
@@ -194,8 +169,6 @@ export const SystemSettings = () => {
             <thead>
               <tr>
                 <th>Role Name</th>
-                <th>Hierarchy Level</th>
-                <th>Access Scope</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -203,8 +176,6 @@ export const SystemSettings = () => {
               {customRoles.map(cr => (
                 <tr key={cr.id}>
                   <td style={{ fontWeight: 600 }}>{cr.roleName}</td>
-                  <td>{cr.level}</td>
-                  <td>{cr.accessScope}</td>
                   <td>
                     <div className="status-indicator">
                       <span className="status-dot active" />

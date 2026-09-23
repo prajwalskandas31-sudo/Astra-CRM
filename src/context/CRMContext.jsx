@@ -806,9 +806,11 @@ export const CRMProvider = ({ children }) => {
   const fulfillLeadRequest = (requestId, quantity, targetUserId, language) => {
     // Fulfill request and perform auto-disappear rule
     setLeadRequests(prev => prev.filter(r => r.id !== requestId));
+    let assigned = 0;
     if (targetUserId && language) {
-      assignLeadsByLanguage(language, quantity, targetUserId);
+      assigned = assignLeadsByLanguage(language, quantity, targetUserId);
     }
+    return { assigned, requested: parseInt(quantity, 10) || 0 };
   };
 
   const deleteAssignmentFiles = (instanceIds) => {

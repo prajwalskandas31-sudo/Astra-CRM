@@ -161,8 +161,18 @@ export const LeadSummarySuperAdmin = () => {
     if (!showFulfillModal) return;
     const targetUser = users.find(u => u.id === fulfillTargetUserId) || users.find(u => u.name === showFulfillModal.requestedByName);
     
-    fulfillLeadRequest(showFulfillModal.id, fulfillQuantity, targetUser?.id, showFulfillModal.language);
-    addToast(`Fulfilled request for ${showFulfillModal.requestedByName}. Request auto-disappeared from panel.`, 'success');
+    const result = fulfillLeadRequest(showFulfillModal.id, fulfillQuantity, targetUser?.id, showFulfillModal.language);
+    const { assigned, requested } = result || {};
+
+    if (assigned >= requested) {
+      addToast(`Leads assigned successfully to ${showFulfillModal.requestedByName}.`, 'success');
+    } else {
+      const notAssigned = (requested || 0) - (assigned || 0);
+      addToast(
+        `${assigned} lead(s) assigned to ${showFulfillModal.requestedByName}. ${notAssigned} lead(s) could not be assigned due to insufficient available leads.`,
+        assigned > 0 ? 'warning' : 'error'
+      );
+    }
     setShowFulfillModal(null);
   };
 
@@ -483,6 +493,7 @@ export const LeadSummarySuperAdmin = () => {
                     onChange={toggleSelectAllInstances}
                   />
                 </th>
+                <th>Source File</th>
                 <th>Instance File / Batch</th>
                 <th>Assigned To</th>
                 <th>Language</th>
@@ -509,6 +520,12 @@ export const LeadSummarySuperAdmin = () => {
                         checked={isSelected}
                         onChange={() => toggleInstanceSelection(inst.id)}
                       />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: 'var(--accent)' }}>
+                        <FileSpreadsheet size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600 }}>{inst.batchName}</span>
+                      </div>
                     </td>
                     <td>
                       <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

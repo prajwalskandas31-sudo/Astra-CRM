@@ -87,9 +87,7 @@ export const LeadReassignmentView = () => {
           <table className="crm-table">
             <thead>
               <tr>
-                <th>Lead ID</th>
-                <th>Client Name</th>
-                <th>Contact Person</th>
+                <th>Contact Name</th>
                 <th>Phone Number</th>
                 <th>Owner</th>
                 <th>Value</th>
@@ -99,9 +97,7 @@ export const LeadReassignmentView = () => {
             <tbody>
               {leads.map(l => (
                 <tr key={l.id}>
-                  <td style={{ color: 'var(--text-muted)' }}>{l.id}</td>
-                  <td style={{ fontWeight: 600 }}>{l.clientName}</td>
-                  <td>{l.contactPerson}</td>
+                  <td style={{ fontWeight: 600 }}>{l.contactPerson}</td>
                   <td>{l.phone}</td>
                   <td><span className="badge badge-role">{l.assignedToName}</span></td>
                   <td style={{ fontWeight: 700 }}>{l.value}</td>
