@@ -332,46 +332,55 @@ export const LeadSummarySuperAdmin = () => {
 
       {/* Sub-Block 3 & 4: Lead Assignment History, Advanced Filtering & Real-time Disposition Tracking */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        {/* Section Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)' }}>
-              Lead Assignment History & Advanced Multi-Criteria Filtering
-            </h3>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Filter history datewise, language wise, teamwise, user wise, or by disposition (individually or in combination).
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+              <div style={{ background: 'rgba(110, 86, 207, 0.12)', color: 'var(--accent)', padding: '0.4rem', borderRadius: '8px', display: 'flex' }}>
+                <Filter size={16} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                Assignment History & Multi-Criteria Filtering
+              </h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', paddingLeft: '2rem' }}>
+              Filter by user, date, language, team, or disposition — individually or in combination.
+            </p>
           </div>
 
-          {/* View Density / Pagination Control */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>View Density:</span>
+          {/* View Density */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--bg-app)', padding: '0.35rem 0.6rem 0.35rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <Layers size={13} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Rows per page</span>
             <select
               className="form-select"
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              style={{ width: '110px', padding: '0.35rem 0.6rem', fontSize: '0.8rem', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ width: '100px', padding: '0.3rem 0.5rem', fontSize: '0.78rem', border: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', fontWeight: 600, color: 'var(--text-main)' }}
             >
-              <option value={10}>10 / page</option>
-              <option value={20}>20 / page</option>
-              <option value={50}>50 / page</option>
-              <option value={100}>100 / page</option>
-              <option value={500}>500 / page</option>
-              <option value={1000}>1000 / page</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
             </select>
           </div>
         </div>
 
         {/* Multi-Criteria Filters Bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', background: 'var(--bg-card)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-          
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+
           {/* User Filter */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Filter by User</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Users size={11} /> Assigned User
+            </label>
             <select
               className="form-select"
               value={selectedUserFilter}
               onChange={(e) => { setSelectedUserFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.8rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedUserFilter !== 'ALL' ? 600 : 400 }}
             >
               <option value="ALL">All Users</option>
               {users.map(u => (
@@ -381,25 +390,29 @@ export const LeadSummarySuperAdmin = () => {
           </div>
 
           {/* Date Lookup */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Date Lookup</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Calendar size={11} /> Date Lookup
+            </label>
             <input
               type="date"
               className="form-control"
               value={selectedDateFilter}
               onChange={(e) => { setSelectedDateFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.8rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedDateFilter ? 600 : 400 }}
             />
           </div>
 
           {/* Language Filter */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Language Wise</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Sparkles size={11} /> Language
+            </label>
             <select
               className="form-select"
               value={selectedLanguageFilter}
               onChange={(e) => { setSelectedLanguageFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.8rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedLanguageFilter !== 'ALL' ? 600 : 400 }}
             >
               <option value="ALL">All Languages</option>
               {availableLanguages.map(l => (
@@ -409,13 +422,15 @@ export const LeadSummarySuperAdmin = () => {
           </div>
 
           {/* Teamwise Filter */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Teamwise</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Users size={11} /> Team
+            </label>
             <select
               className="form-select"
               value={selectedTeamFilter}
               onChange={(e) => { setSelectedTeamFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.8rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedTeamFilter !== 'ALL' ? 600 : 400 }}
             >
               {availableTeams.map(t => (
                 <option key={t} value={t}>{t === 'ALL' ? 'All Teams' : t}</option>
@@ -424,13 +439,15 @@ export const LeadSummarySuperAdmin = () => {
           </div>
 
           {/* Disposition Filter */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>User Disposition</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <CheckCircle2 size={11} /> Disposition
+            </label>
             <select
               className="form-select"
               value={selectedDispositionFilter}
               onChange={(e) => { setSelectedDispositionFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.8rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedDispositionFilter !== 'ALL' ? 600 : 400 }}
             >
               <option value="ALL">All Dispositions</option>
               {dispositions.map(d => (
@@ -440,30 +457,37 @@ export const LeadSummarySuperAdmin = () => {
           </div>
 
           {/* Search Query */}
-          <div>
-            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Search Lead / Batch</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Search size={11} /> Search
+            </label>
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Search name/phone..."
+                placeholder="Name, phone, ID…"
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                style={{ fontSize: '0.8rem', paddingLeft: '2rem', width: '100%', background: '#121318', color: '#F5F5F4', border: '1px solid #2A2D37' }}
+                style={{ fontSize: '0.82rem', paddingLeft: '2.1rem', width: '100%', fontWeight: searchQuery ? 600 : 400 }}
               />
-              <Search size={14} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Search size={13} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
             </div>
           </div>
         </div>
 
-        {/* File Level Batch Operations Toolbar (Sub-block 5) */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileSpreadsheet size={16} style={{ color: 'var(--accent)' }} />
-            <span>Assignment Instance Files ({assignmentInstances.length})</span>
+        {/* File Level Batch Operations Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, rgba(110, 86, 207, 0.06) 0%, rgba(59, 130, 246, 0.04) 100%)', padding: '0.7rem 1rem', borderRadius: '10px', border: '1px solid rgba(110, 86, 207, 0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ background: 'rgba(110, 86, 207, 0.15)', color: 'var(--accent)', padding: '0.35rem', borderRadius: '7px', display: 'flex' }}>
+              <FileSpreadsheet size={15} />
+            </div>
+            <div>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>Assignment Instance Files</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({assignmentInstances.length} total)</span>
+            </div>
             {selectedInstanceIds.length > 0 && (
-              <span className="badge badge-purple" style={{ marginLeft: '0.5rem' }}>
-                {selectedInstanceIds.length} Selected
+              <span className="badge badge-purple">
+                {selectedInstanceIds.length} selected
               </span>
             )}
           </div>
@@ -475,7 +499,7 @@ export const LeadSummarySuperAdmin = () => {
                 onClick={handleDeleteSelectedInstances}
                 style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
               >
-                <Trash2 size={14} /> Delete Selected File(s)
+                <Trash2 size={13} /> Delete Selected
               </button>
             )}
           </div>
@@ -483,25 +507,26 @@ export const LeadSummarySuperAdmin = () => {
 
         {/* Assignment Instance Files Table */}
         <div className="table-container">
-          <table className="table">
+          <table className="table" style={{ fontSize: '0.84rem' }}>
             <thead>
-              <tr>
-                <th style={{ width: '40px' }}>
+              <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                <th style={{ width: '40px', textAlign: 'center', padding: '0.75rem 0.5rem' }}>
                   <input
                     type="checkbox"
                     checked={selectedInstanceIds.length === assignmentInstances.length && assignmentInstances.length > 0}
                     onChange={toggleSelectAllInstances}
+                    style={{ accentColor: 'var(--accent)', width: '14px', height: '14px', cursor: 'pointer' }}
                   />
                 </th>
-                <th>Source File</th>
-                <th>Instance File / Batch</th>
-                <th>Assigned To</th>
-                <th>Language</th>
-                <th>Team</th>
-                <th>Date Assigned</th>
-                <th>Total Leads</th>
-                <th>Dialed / Uncontacted</th>
-                <th>Actions (File Level)</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Source File</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Instance / Batch</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Assigned To</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Language</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Team</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Date Assigned</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', textAlign: 'center' }}>Leads</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Dialed / Remaining</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -513,62 +538,69 @@ export const LeadSummarySuperAdmin = () => {
                 const isSelected = selectedInstanceIds.includes(inst.id);
 
                 return (
-                  <tr key={inst.id} style={{ background: isSelected ? 'rgba(147, 51, 234, 0.08)' : 'transparent' }}>
-                    <td>
+                  <tr key={inst.id} style={{ background: isSelected ? 'rgba(110, 86, 207, 0.07)' : 'transparent', transition: 'background 0.15s ease', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}>
+                    <td style={{ textAlign: 'center', padding: '0.85rem 0.5rem' }}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleInstanceSelection(inst.id)}
+                        style={{ accentColor: 'var(--accent)', width: '14px', height: '14px', cursor: 'pointer' }}
                       />
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', color: 'var(--accent)' }}>
-                        <FileSpreadsheet size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                        <span style={{ fontWeight: 600 }}>{inst.batchName}</span>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <FileSpreadsheet size={14} style={{ color: 'var(--accent)', flexShrink: 0, opacity: 0.8 }} />
+                        <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '0.82rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.batchName}</span>
                       </div>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <FileSpreadsheet size={15} style={{ color: '#10b981' }} />
-                        {inst.batchName}
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+                        <FileSpreadsheet size={14} style={{ color: '#10b981', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.82rem' }}>{inst.batchName}</span>
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Assigned by: {inst.assignedBy}</span>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', paddingLeft: '1.3rem' }}>by {inst.assignedBy}</div>
                     </td>
-                    <td>
-                      <strong style={{ color: 'var(--text-main)' }}>{inst.assignedToName}</strong>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-main)' }}>{inst.assignedToName}</div>
                     </td>
-                    <td>
-                      <span className="badge badge-purple">{inst.language}</span>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <span className="badge badge-purple" style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}>{inst.language}</span>
                     </td>
-                    <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{inst.team}</td>
-                    <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{inst.date}</td>
-                    <td>
-                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{total}</span>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', maxWidth: '140px' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.team}</div>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.78rem' }}>
-                        <span style={{ color: '#10b981', fontWeight: 600 }}>{dialed} Dialed</span>
-                        <span style={{ color: 'var(--text-muted)' }}>/</span>
-                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>{uncontacted} Left</span>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>{inst.date}</td>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                      <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{total}</span>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 700, background: 'rgba(16,185,129,0.1)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
+                          {dialed}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>/</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.1)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
+                          {uncontacted}
+                        </span>
                       </div>
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
                         <button
                           className="btn btn-sm btn-secondary"
                           onClick={() => setActiveInstanceModal(inst)}
-                          title="Open Real-time Disposition Tracking & Granular Operations"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          title="View Real-time Disposition Tracking"
+                          style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
                         >
-                          <Eye size={13} /> View Instance
+                          <Eye size={12} /> View
                         </button>
                         <button
                           className="btn btn-sm btn-secondary"
                           onClick={() => { setShowReassignFileModal(inst); setReassignFileTargetUserId(inst.assignedToId); }}
-                          title="Reassign entire file of leads to another user"
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          title="Reassign entire file to another user"
+                          style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}
                         >
-                          Reassign File
+                          Reassign
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
@@ -578,10 +610,10 @@ export const LeadSummarySuperAdmin = () => {
                               addToast(`Deleted assignment file '${inst.batchName}'`, 'success');
                             }
                           }}
-                          title="Delete file level instance"
-                          style={{ padding: '0.25rem 0.4rem' }}
+                          title="Delete this file"
+                          style={{ padding: '0.28rem 0.45rem' }}
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </td>
@@ -593,49 +625,66 @@ export const LeadSummarySuperAdmin = () => {
         </div>
 
         {/* Master Leads & Advanced Filtered Table */}
-        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-main)' }}>
-              Filtered Leads Audit Table ({filteredLeads.length} total matched)
-            </h4>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Page {currentPage} of {totalPages}
+        <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '0.35rem', borderRadius: '7px', display: 'flex' }}>
+                <AlertCircle size={15} />
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+                  Filtered Leads Audit Table
+                </h4>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{filteredLeads.length} leads matched current filters</span>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
+              Page {currentPage} / {totalPages}
             </span>
           </div>
 
           <div className="table-container">
-            <table className="table">
+            <table className="table" style={{ fontSize: '0.84rem' }}>
               <thead>
-                <tr>
-                  <th>Lead ID</th>
-                  <th>Client / Contact</th>
-                  <th>Phone Number</th>
-                  <th>Language</th>
-                  <th>Assigned Owner</th>
-                  <th>Current Disposition</th>
-                  <th>Last Logged History</th>
+                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Lead ID</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Client / Contact</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Phone Number</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Language</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Assigned Owner</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Disposition</th>
+                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Last Activity</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedLeads.map(lead => (
-                  <tr key={lead.id}>
-                    <td>
-                      <code style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{lead.id}</code>
+                  <tr key={lead.id} style={{ transition: 'background 0.12s ease' }}>
+                    <td style={{ padding: '0.9rem 1rem' }}>
+                      <code style={{ fontSize: '0.78rem', color: 'var(--accent)', background: 'var(--accent-soft)', padding: '0.15rem 0.45rem', borderRadius: '5px', fontWeight: 600 }}>{lead.id}</code>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{lead.clientName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{lead.contactPerson}</div>
+                    <td style={{ padding: '0.9rem 1rem' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.86rem' }}>{lead.clientName}</div>
+                      <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>{lead.contactPerson}</div>
                     </td>
-                    <td style={{ fontSize: '0.85rem' }}>{lead.phone}</td>
-                    <td><span className="badge badge-purple">{lead.language}</span></td>
-                    <td><strong style={{ color: 'var(--text-main)' }}>{lead.assignedToName}</strong></td>
-                    <td>
-                      <span className={`badge ${lead.disposition === 'Paid / Converted' || lead.disposition === 'Interested' ? 'badge-success' : lead.disposition === 'Not Interested' ? 'badge-danger' : lead.disposition === 'New Lead' ? 'badge-info' : 'badge-warning'}`}>
+                    <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', padding: '0.9rem 1rem', whiteSpace: 'nowrap' }}>{lead.phone}</td>
+                    <td style={{ padding: '0.9rem 1rem' }}><span className="badge badge-purple" style={{ fontSize: '0.71rem' }}>{lead.language}</span></td>
+                    <td style={{ padding: '0.9rem 1rem' }}><span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.85rem' }}>{lead.assignedToName}</span></td>
+                    <td style={{ padding: '0.9rem 1rem' }}>
+                      <span className={`badge ${
+                        lead.disposition === 'Paid / Converted' ? 'badge-success' :
+                        lead.disposition === 'Interested' ? 'badge-success' :
+                        lead.disposition === 'Not Interested' ? 'badge-danger' :
+                        lead.disposition === 'New Lead' ? 'badge-info' :
+                        lead.disposition === 'Call Back Later' ? 'badge-warning' :
+                        'badge-warning'
+                      }`} style={{ fontSize: '0.72rem', fontWeight: 600 }}>
                         {lead.disposition}
                       </span>
                     </td>
-                    <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)', maxWidth: '280px' }}>
-                      {lead.history && lead.history.length > 0 ? lead.history[lead.history.length - 1].text : 'No activity logged'}
+                    <td style={{ fontSize: '0.77rem', color: 'var(--text-muted)', maxWidth: '260px', padding: '0.9rem 1rem' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lead.history && lead.history.length > 0 ? lead.history[lead.history.length - 1].text : <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No activity logged</span>}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -644,28 +693,30 @@ export const LeadSummarySuperAdmin = () => {
           </div>
 
           {/* Pagination Controls Footer */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Showing {Math.min((currentPage - 1) * pageSize + 1, filteredLeads.length)} to {Math.min(currentPage * pageSize, filteredLeads.length)} of {filteredLeads.length} leads
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Showing <strong style={{ color: 'var(--text-main)' }}>{Math.min((currentPage - 1) * pageSize + 1, filteredLeads.length)}</strong> – <strong style={{ color: 'var(--text-main)' }}>{Math.min(currentPage * pageSize, filteredLeads.length)}</strong> of <strong style={{ color: 'var(--text-main)' }}>{filteredLeads.length}</strong> leads
             </span>
 
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
               <button
                 className="btn btn-sm btn-secondary"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}
               >
-                <ChevronLeft size={14} /> Prev
+                <ChevronLeft size={13} /> Prev
               </button>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-main)', padding: '0 0.5rem' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-main)', padding: '0.3rem 0.75rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 600, minWidth: '60px', textAlign: 'center' }}>
                 {currentPage} / {totalPages}
               </span>
               <button
                 className="btn btn-sm btn-secondary"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}
               >
-                Next <ChevronRight size={14} />
+                Next <ChevronRight size={13} />
               </button>
             </div>
           </div>
