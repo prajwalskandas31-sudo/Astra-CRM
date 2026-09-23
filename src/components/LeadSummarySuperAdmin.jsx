@@ -510,23 +510,26 @@ export const LeadSummarySuperAdmin = () => {
           <table className="table" style={{ fontSize: '0.84rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                <th style={{ width: '40px', textAlign: 'center', padding: '0.75rem 0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedInstanceIds.length === assignmentInstances.length && assignmentInstances.length > 0}
-                    onChange={toggleSelectAllInstances}
-                    style={{ accentColor: 'var(--accent)', width: '14px', height: '14px', cursor: 'pointer' }}
-                  />
+                <th style={{ width: '44px', textAlign: 'center', padding: '0.85rem 0.5rem', verticalAlign: 'middle' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedInstanceIds.length === assignmentInstances.length && assignmentInstances.length > 0}
+                      onChange={toggleSelectAllInstances}
+                      title="Select all assignment instance files"
+                      aria-label="Select all"
+                    />
+                  </div>
                 </th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Source File</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Instance / Batch</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Assigned To</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Language</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Team</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Date Assigned</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', textAlign: 'center' }}>Leads</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Dialed / Remaining</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Source File</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Instance / Batch</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Assigned To</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', verticalAlign: 'middle' }}>Language</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', verticalAlign: 'middle' }}>Team</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Date Assigned</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>Leads</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Dialed / Remaining</th>
+                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', textAlign: 'right', verticalAlign: 'middle' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -538,54 +541,126 @@ export const LeadSummarySuperAdmin = () => {
                 const isSelected = selectedInstanceIds.includes(inst.id);
 
                 return (
-                  <tr key={inst.id} style={{ background: isSelected ? 'rgba(110, 86, 207, 0.07)' : 'transparent', transition: 'background 0.15s ease', borderLeft: isSelected ? '2px solid var(--accent)' : '2px solid transparent' }}>
-                    <td style={{ textAlign: 'center', padding: '0.85rem 0.5rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleInstanceSelection(inst.id)}
-                        style={{ accentColor: 'var(--accent)', width: '14px', height: '14px', cursor: 'pointer' }}
-                      />
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <FileSpreadsheet size={14} style={{ color: 'var(--accent)', flexShrink: 0, opacity: 0.8 }} />
-                        <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '0.82rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.batchName}</span>
+                  <tr key={inst.id} style={{ background: isSelected ? 'rgba(110, 86, 207, 0.08)' : 'transparent', transition: 'background 0.15s ease', borderLeft: isSelected ? '3px solid var(--accent)' : '3px solid transparent' }}>
+                    <td style={{ textAlign: 'center', padding: '0.85rem 0.5rem', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleInstanceSelection(inst.id)}
+                          title={`Select ${inst.batchName}`}
+                          aria-label={`Select ${inst.batchName}`}
+                        />
                       </div>
                     </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
-                        <FileSpreadsheet size={14} style={{ color: '#10b981', flexShrink: 0 }} />
-                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.82rem' }}>{inst.batchName}</span>
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', paddingLeft: '1.3rem' }}>by {inst.assignedBy}</div>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-main)' }}>{inst.assignedToName}</div>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <span className="badge badge-purple" style={{ fontSize: '0.72rem', letterSpacing: '0.03em' }}>{inst.language}</span>
-                    </td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', maxWidth: '140px' }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.team}</div>
-                    </td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>{inst.date}</td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                      <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>{total}</span>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#10b981', fontWeight: 700, background: 'rgba(16,185,129,0.1)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
-                          {dialed}
-                        </span>
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>/</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.1)', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>
-                          {uncontacted}
+                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.28rem 0.65rem', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.22)', maxWidth: '210px' }}>
+                        <FileSpreadsheet size={13} style={{ color: '#818cf8', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inst.sourceFileName || inst.batchName}>
+                          {inst.sourceFileName || inst.batchName}
                         </span>
                       </div>
                     </td>
-                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <FileSpreadsheet size={13} style={{ color: '#10b981', flexShrink: 0 }} />
+                          <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.82rem' }}>{inst.batchName}</span>
+                        </div>
+                        <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', paddingLeft: '1.25rem' }}>
+                          <span>by <strong style={{ color: 'var(--text-secondary)' }}>{inst.assignedBy}</strong></span>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%)',
+                          color: '#fff',
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          letterSpacing: '0.02em'
+                        }}>
+                          {inst.assignedToName?.slice(0, 2).toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: '0.83rem', color: 'var(--text-main)', letterSpacing: '0.01em' }}>
+                          {inst.assignedToName}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                      <span className="badge badge-purple" style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem' }}>
+                        {inst.language}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: '0.79rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', maxWidth: '140px', verticalAlign: 'middle' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Users size={12} style={{ opacity: 0.6 }} />
+                        {inst.team}
+                      </div>
+                    </td>
+                    <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle', fontFamily: 'monospace' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <Calendar size={12} style={{ opacity: 0.6 }} />
+                        {inst.date}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '32px',
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: '12px',
+                        background: 'var(--bg-app)',
+                        border: '1px solid var(--border-color)',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: 'var(--text-main)'
+                      }}>
+                        {total}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                          color: '#10b981',
+                          fontWeight: 700,
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          padding: '0.18rem 0.5rem',
+                          borderRadius: '20px'
+                        }} title="Dialed / Contacted">
+                          ✓ {dialed}
+                        </span>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.2rem',
+                          color: '#f59e0b',
+                          fontWeight: 700,
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          border: '1px solid rgba(245, 158, 11, 0.25)',
+                          padding: '0.18rem 0.5rem',
+                          borderRadius: '20px'
+                        }} title="Remaining / Uncontacted">
+                          ⏳ {uncontacted}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                         <button
                           className="btn btn-sm btn-secondary"
                           onClick={() => setActiveInstanceModal(inst)}
@@ -598,9 +673,9 @@ export const LeadSummarySuperAdmin = () => {
                           className="btn btn-sm btn-secondary"
                           onClick={() => { setShowReassignFileModal(inst); setReassignFileTargetUserId(inst.assignedToId); }}
                           title="Reassign entire file to another user"
-                          style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}
+                          style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
                         >
-                          Reassign
+                          <UserCheck size={12} /> Reassign
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
@@ -611,7 +686,7 @@ export const LeadSummarySuperAdmin = () => {
                             }
                           }}
                           title="Delete this file"
-                          style={{ padding: '0.28rem 0.45rem' }}
+                          style={{ padding: '0.28rem 0.45rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -818,42 +893,48 @@ export const LeadSummarySuperAdmin = () => {
 
             {/* Instance Leads List Table */}
             <div className="table-container">
-              <table className="table">
+              <table className="table" style={{ fontSize: '0.84rem' }}>
                 <thead>
-                  <tr>
-                    <th style={{ width: '40px' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedGranularLeadIds.length === instanceStats.instLeads.length && instanceStats.instLeads.length > 0}
-                        onChange={() => {
-                          if (selectedGranularLeadIds.length === instanceStats.instLeads.length) {
-                            setSelectedGranularLeadIds([]);
-                          } else {
-                            setSelectedGranularLeadIds(instanceStats.instLeads.map(l => l.id));
-                          }
-                        }}
-                      />
+                  <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                    <th style={{ width: '44px', textAlign: 'center', padding: '0.8rem 0.5rem', verticalAlign: 'middle' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedGranularLeadIds.length === instanceStats.instLeads.length && instanceStats.instLeads.length > 0}
+                          onChange={() => {
+                            if (selectedGranularLeadIds.length === instanceStats.instLeads.length) {
+                              setSelectedGranularLeadIds([]);
+                            } else {
+                              setSelectedGranularLeadIds(instanceStats.instLeads.map(l => l.id));
+                            }
+                          }}
+                          aria-label="Select all granular leads"
+                        />
+                      </div>
                     </th>
-                    <th>Lead ID</th>
-                    <th>Client Name</th>
-                    <th>Contact Person</th>
-                    <th>Phone</th>
-                    <th>Disposition Status</th>
+                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Lead ID</th>
+                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Client Name</th>
+                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Contact Person</th>
+                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Phone</th>
+                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Disposition Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {instanceStats.instLeads.map(l => (
-                    <tr key={l.id}>
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selectedGranularLeadIds.includes(l.id)}
-                          onChange={() => toggleGranularLeadSelection(l.id)}
-                        />
+                    <tr key={l.id} style={{ transition: 'background 0.15s ease' }}>
+                      <td style={{ textAlign: 'center', padding: '0.8rem 0.5rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedGranularLeadIds.includes(l.id)}
+                            onChange={() => toggleGranularLeadSelection(l.id)}
+                            aria-label={`Select lead ${l.id}`}
+                          />
+                        </div>
                       </td>
-                      <td><code>{l.id}</code></td>
-                      <td><strong>{l.clientName}</strong></td>
-                      <td>{l.contactPerson}</td>
+                      <td style={{ padding: '0.8rem 1rem' }}><code style={{ fontSize: '0.78rem', color: 'var(--accent)', background: 'var(--accent-soft)', padding: '0.15rem 0.45rem', borderRadius: '5px', fontWeight: 600 }}>{l.id}</code></td>
+                      <td style={{ padding: '0.8rem 1rem' }}><strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{l.clientName}</strong></td>
+                      <td style={{ padding: '0.8rem 1rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{l.contactPerson}</td>
                       <td>{l.phone}</td>
                       <td>
                         <span className={`badge ${l.disposition === 'New Lead' ? 'badge-info' : 'badge-success'}`}>
