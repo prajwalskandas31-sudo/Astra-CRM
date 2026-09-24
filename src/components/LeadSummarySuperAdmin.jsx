@@ -35,6 +35,7 @@ export const LeadSummarySuperAdmin = () => {
     assignmentInstances,
     submitLeadRequest,
     fulfillLeadRequest,
+    discardLeadRequest,
     deleteAssignmentFiles,
     reassignAssignmentFile,
     granularReassignLeads,
@@ -46,9 +47,9 @@ export const LeadSummarySuperAdmin = () => {
 
   // Filters State
   const [selectedUserFilter, setSelectedUserFilter] = useState('ALL');
-  const [selectedDateFilter, setSelectedDateFilter] = useState('');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [selectedLanguageFilter, setSelectedLanguageFilter] = useState('ALL');
-  const [selectedTeamFilter, setSelectedTeamFilter] = useState('ALL');
   const [selectedDispositionFilter, setSelectedDispositionFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -72,11 +73,6 @@ export const LeadSummarySuperAdmin = () => {
 
   const [showGranularReassignModal, setShowGranularReassignModal] = useState(false);
   const [granularTargetUserId, setGranularTargetUserId] = useState('');
-
-  const [showNewRequestModal, setShowNewRequestModal] = useState(false);
-  const [newReqLanguage, setNewReqLanguage] = useState('English');
-  const [newReqQty, setNewReqQty] = useState(25);
-  const [newReqNote, setNewReqNote] = useState('');
 
   // Role Security Check
   if (simulatedRole !== 'Super Admin') {
@@ -102,19 +98,31 @@ export const LeadSummarySuperAdmin = () => {
     return Array.from(langs);
   }, [leads]);
 
-  const availableTeams = ['ALL', 'Sales Team North', 'Corporate Accounts', 'West Zone Team', 'Team Alpha', 'Sales Team South'];
-
   // All leads combined with assignment history filtering
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       if (selectedUserFilter !== 'ALL' && lead.assignedToId !== selectedUserFilter) return false;
       if (selectedLanguageFilter !== 'ALL' && lead.language?.toLowerCase() !== selectedLanguageFilter.toLowerCase()) return false;
       if (selectedDispositionFilter !== 'ALL' && lead.disposition !== selectedDispositionFilter) return false;
-      if (selectedDateFilter) {
-        const leadHistoryDates = (lead.history || []).map(h => h.date);
-        const matchesDate = leadHistoryDates.some(d => d.includes(selectedDateFilter));
-        if (!matchesDate) return false;
+      
+      // Date Range Filter
+      if (startDateFilter || endDateFilter) {
+        const dates = [];
+        if (lead.assignedDate) dates.push(lead.assignedDate);
+        if (lead.date) dates.push(lead.date);
+        (lead.history || []).forEach(h => {
+          if (h.date) dates.push(h.date);
+        });
+        if (dates.length === 0) return false;
+        const matchesRange = dates.some(d => {
+          const dStr = String(d).slice(0, 10);
+          if (startDateFilter && dStr < startDateFilter) return false;
+          if (endDateFilter && dStr > endDateFilter) return false;
+          return true;
+        });
+        if (!matchesRange) return false;
       }
+
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchName = lead.clientName?.toLowerCase().includes(q) || lead.contactPerson?.toLowerCase().includes(q) || lead.phone?.includes(q) || lead.id?.toLowerCase().includes(q);
@@ -122,7 +130,7 @@ export const LeadSummarySuperAdmin = () => {
       }
       return true;
     });
-  }, [leads, selectedUserFilter, selectedLanguageFilter, selectedDispositionFilter, selectedDateFilter, searchQuery]);
+  }, [leads, selectedUserFilter, selectedLanguageFilter, selectedDispositionFilter, startDateFilter, endDateFilter, searchQuery]);
 
   // Paginated Leads
   const totalPages = Math.ceil(filteredLeads.length / pageSize) || 1;
@@ -215,14 +223,6 @@ export const LeadSummarySuperAdmin = () => {
     }
   };
 
-  const handleCreateNewRequest = (e) => {
-    e.preventDefault();
-    submitLeadRequest(newReqLanguage, newReqQty, newReqNote);
-    addToast(`Submitted inbound request for ${newReqQty} ${newReqLanguage} leads`, 'info');
-    setShowNewRequestModal(false);
-    setNewReqNote('');
-  };
-
   // Helper stats for active instance modal
   const instanceStats = useMemo(() => {
     if (!activeInstanceModal) return null;
@@ -258,14 +258,6 @@ export const LeadSummarySuperAdmin = () => {
               Track inbound lead requests, monitor real-time disposition metrics, and perform batch or granular lead reassignments & deletions.
             </p>
           </div>
-
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowNewRequestModal(true)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <Send size={15} /> Simulate Inbound Lead Request
-          </button>
         </div>
       </div>
 
@@ -314,20 +306,34 @@ export const LeadSummarySuperAdmin = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Requested: {req.date}</span>
-                  <button
-                    className="btn btn-sm btn-success"
-                    onClick={() => {
-                      setShowFulfillModal(req);
-                      const defaultTarget = users.find(u => u.name === req.requestedByName)?.id || users[0]?.id;
-                      setFulfillTargetUserId(defaultTarget);
-                      setFulfillQuantity(req.quantity);
-                    }}
-                    style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    <UserCheck size={14} /> Fulfill & Assign
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to discard the lead request for ${req.quantity} (${req.language}) leads from ${req.requestedByName}?`)) {
+                          discardLeadRequest(req.id);
+                          addToast('Lead request discarded.', 'info');
+                        }
+                      }}
+                      style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                    >
+                      <X size={14} /> Discard
+                    </button>
+                    <button
+                      className="btn btn-sm btn-success"
+                      onClick={() => {
+                        setShowFulfillModal(req);
+                        const defaultTarget = users.find(u => u.name === req.requestedByName)?.id || users[0]?.id;
+                        setFulfillTargetUserId(defaultTarget);
+                        setFulfillQuantity(req.quantity);
+                      }}
+                      style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <UserCheck size={14} /> Fulfill & Assign
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -394,17 +400,30 @@ export const LeadSummarySuperAdmin = () => {
             </select>
           </div>
 
-          {/* Date Lookup */}
+          {/* Date Range: From Date & To Date */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <Calendar size={11} /> Date Lookup
+              <Calendar size={11} /> From Date
             </label>
             <input
               type="date"
               className="form-control"
-              value={selectedDateFilter}
-              onChange={(e) => { setSelectedDateFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedDateFilter ? 600 : 400 }}
+              value={startDateFilter}
+              onChange={(e) => { setStartDateFilter(e.target.value); setCurrentPage(1); }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: startDateFilter ? 600 : 400 }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Calendar size={11} /> To Date
+            </label>
+            <input
+              type="date"
+              className="form-control"
+              value={endDateFilter}
+              onChange={(e) => { setEndDateFilter(e.target.value); setCurrentPage(1); }}
+              style={{ fontSize: '0.82rem', width: '100%', fontWeight: endDateFilter ? 600 : 400 }}
             />
           </div>
 
@@ -422,23 +441,6 @@ export const LeadSummarySuperAdmin = () => {
               <option value="ALL">All Languages</option>
               {availableLanguages.map(l => (
                 <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Teamwise Filter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <Users size={11} /> Team
-            </label>
-            <select
-              className="form-select"
-              value={selectedTeamFilter}
-              onChange={(e) => { setSelectedTeamFilter(e.target.value); setCurrentPage(1); }}
-              style={{ fontSize: '0.82rem', width: '100%', fontWeight: selectedTeamFilter !== 'ALL' ? 600 : 400 }}
-            >
-              {availableTeams.map(t => (
-                <option key={t} value={t}>{t === 'ALL' ? 'All Teams' : t}</option>
               ))}
             </select>
           </div>
@@ -527,7 +529,6 @@ export const LeadSummarySuperAdmin = () => {
                   </div>
                 </th>
                 <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Source File</th>
-                <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Instance / Batch</th>
                 <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>Assigned To</th>
                 <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', verticalAlign: 'middle' }}>Language</th>
                 <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.85rem 1rem', verticalAlign: 'middle' }}>Team</th>
@@ -564,17 +565,6 @@ export const LeadSummarySuperAdmin = () => {
                         <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inst.sourceFileName || inst.batchName}>
                           {inst.sourceFileName || inst.batchName}
                         </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <FileSpreadsheet size={13} style={{ color: '#10b981', flexShrink: 0 }} />
-                          <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.82rem' }}>{inst.batchName}</span>
-                        </div>
-                        <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', paddingLeft: '1.25rem' }}>
-                          <span>by <strong style={{ color: 'var(--text-secondary)' }}>{inst.assignedBy}</strong></span>
-                        </div>
                       </div>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
@@ -918,7 +908,6 @@ export const LeadSummarySuperAdmin = () => {
                       </div>
                     </th>
                     <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Lead ID</th>
-                    <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Client Name</th>
                     <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Contact Person</th>
                     <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Phone</th>
                     <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.8rem 1rem' }}>Disposition Status</th>
@@ -938,7 +927,6 @@ export const LeadSummarySuperAdmin = () => {
                         </div>
                       </td>
                       <td style={{ padding: '0.8rem 1rem' }}><code style={{ fontSize: '0.78rem', color: 'var(--accent)', background: 'var(--accent-soft)', padding: '0.15rem 0.45rem', borderRadius: '5px', fontWeight: 600 }}>{l.id}</code></td>
-                      <td style={{ padding: '0.8rem 1rem' }}><strong style={{ color: 'var(--text-main)', fontSize: '0.85rem' }}>{l.clientName}</strong></td>
                       <td style={{ padding: '0.8rem 1rem', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{l.contactPerson}</td>
                       <td>{l.phone}</td>
                       <td>
@@ -1053,38 +1041,6 @@ export const LeadSummarySuperAdmin = () => {
               <button className="btn btn-secondary" onClick={() => setShowGranularReassignModal(false)}>Cancel</button>
               <button className="btn btn-primary" disabled={!granularTargetUserId} onClick={handleGranularReassign}>Confirm Reassign</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Simulate New Request Modal */}
-      {showNewRequestModal && (
-        <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }}>
-          <div className="card" style={{ width: '100%', maxWidth: '440px', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>Submit Inbound Lead Request</h3>
-            <form onSubmit={handleCreateNewRequest}>
-              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Language Requested</label>
-                <select className="form-select" value={newReqLanguage} onChange={(e) => setNewReqLanguage(e.target.value)}>
-                  {availableLanguages.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Lead Quantity</label>
-                <input type="number" className="form-control" value={newReqQty} onChange={(e) => setNewReqQty(e.target.value)} min={1} max={1000} />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Note / Context</label>
-                <textarea className="form-control" rows={2} value={newReqNote} onChange={(e) => setNewReqNote(e.target.value)} placeholder="e.g. Campaign request..." />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowNewRequestModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Submit Request</button>
-              </div>
-            </form>
           </div>
         </div>
       )}

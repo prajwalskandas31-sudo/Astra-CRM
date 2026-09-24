@@ -3,7 +3,6 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { UserModal } from './UserModal';
 import { LeadReassignmentModal } from './LeadReassignmentModal';
-import { EmployeeDocumentsModal } from './EmployeeDocumentsModal';
 import { 
   Search, 
   Filter, 
@@ -22,7 +21,11 @@ import {
   FileText, 
   Download, 
   UploadCloud, 
-  File 
+  File,
+  Edit2,
+  Save,
+  Check,
+  Plus
 } from 'lucide-react';
 
 export const UserDirectory = () => {
@@ -33,7 +36,11 @@ export const UserDirectory = () => {
     deleteUser, 
     toggleAdminAccess, 
     changeUserPassword, 
-    downloadUserDocument 
+    downloadUserDocument,
+    updateUser,
+    uploadUserDocument,
+    deleteUserDocument,
+    documentTypes
   } = useCRM();
   const { showToast } = useToast();
 
@@ -44,7 +51,22 @@ export const UserDirectory = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [viewingUserDetails, setViewingUserDetails] = useState(null);
-  const [managingDocsUser, setManagingDocsUser] = useState(null);
+  
+  // User & Bank Profile inline editing state
+  const [isEditingBankDetails, setIsEditingBankDetails] = useState(false);
+  const [bankFormData, setBankFormData] = useState({
+    bankAccountNumber: '',
+    ifscCode: '',
+    bankNameAndBranch: '',
+    familyReferenceNumber: '',
+    referredBy: ''
+  });
+
+  // User & Bank Profile inline document upload state
+  const [showUploadDocForm, setShowUploadDocForm] = useState(false);
+  const [selectedDocTypeId, setSelectedDocTypeId] = useState('');
+  const [docFileToUpload, setDocFileToUpload] = useState(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   
   const [userToDelete, setUserToDelete] = useState(null);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
@@ -52,6 +74,91 @@ export const UserDirectory = () => {
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [passwordResetUser, setPasswordResetUser] = useState(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
+
+  const handleOpenBankProfile = (u) => {
+    // Pick the freshest record from users list if present
+    const freshUser = users.find(user => user.id === u.id) || u;
+    setViewingUserDetails(freshUser);
+    setIsEditingBankDetails(false);
+    setShowUploadDocForm(false);
+    setBankFormData({
+      bankAccountNumber: freshUser.bankAccountNumber || '',
+      ifscCode: freshUser.ifscCode || '',
+      bankNameAndBranch: freshUser.bankNameAndBranch || '',
+      familyReferenceNumber: freshUser.familyReferenceNumber || '',
+      referredBy: freshUser.referredBy || ''
+    });
+    setSelectedDocTypeId(documentTypes[0]?.id || '');
+    setDocFileToUpload(null);
+  };
+
+  const handleSaveBankDetails = async (e) => {
+    e.preventDefault();
+    if (!viewingUserDetails) return;
+    await updateUser(viewingUserDetails.id, bankFormData);
+    setViewingUserDetails(prev => ({ ...prev, ...bankFormData }));
+    setIsEditingBankDetails(false);
+    showToast('Bank details updated successfully.', 'success');
+  };
+
+  const handleDirectDocUpload = async (e) => {
+    e.preventDefault();
+    if (!viewingUserDetails || !docFileToUpload || !selectedDocTypeId) {
+      showToast('Please select a document type and file to upload.', 'warning');
+      return;
+    }
+    const docType = documentTypes.find(dt => dt.id === selectedDocTypeId);
+    setIsUploadingDoc(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const fileData = event.target.result;
+      const sizeStr = (docFileToUpload.size / 1024).toFixed(0) + ' KB';
+      const docPayload = {
+        documentTypeId: selectedDocTypeId,
+        documentName: docType ? docType.name : 'Document',
+        fileName: docFileToUpload.name,
+        fileType: docFileToUpload.type,
+        fileSize: sizeStr,
+        fileData: fileData
+      };
+
+      const res = await uploadUserDocument(viewingUserDetails.id, docPayload);
+      setIsUploadingDoc(false);
+      if (res && res.success) {
+        const updatedDocs = [...(viewingUserDetails.documents || [])];
+        const existingIdx = updatedDocs.findIndex(d => d.documentTypeId === selectedDocTypeId);
+        if (existingIdx >= 0) {
+          updatedDocs[existingIdx] = res.doc;
+        } else {
+          updatedDocs.push(res.doc);
+        }
+        setViewingUserDetails(prev => ({ ...prev, documents: updatedDocs }));
+        setShowUploadDocForm(false);
+        setDocFileToUpload(null);
+        showToast(`Document '${docPayload.documentName}' uploaded successfully.`, 'success');
+      } else {
+        showToast('Failed to upload document.', 'error');
+      }
+    };
+    reader.onerror = () => {
+      setIsUploadingDoc(false);
+      showToast('Error reading file.', 'error');
+    };
+    reader.readAsDataURL(docFileToUpload);
+  };
+
+  const handleDirectDocDelete = async (docId, docName) => {
+    if (!viewingUserDetails) return;
+    if (window.confirm(`Are you sure you want to delete ${docName}?`)) {
+      await deleteUserDocument(viewingUserDetails.id, docId);
+      setViewingUserDetails(prev => ({
+        ...prev,
+        documents: (prev.documents || []).filter(d => d.id !== docId)
+      }));
+      showToast(`Document '${docName}' deleted.`, 'info');
+    }
+  };
 
   const activeCount = users.filter(u => u.status === 'Active').length;
   const inactiveCount = users.filter(u => u.status === 'Inactive').length;
@@ -315,126 +422,76 @@ export const UserDirectory = () => {
                     )}
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '0.74rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            whiteSpace: 'nowrap',
-                            borderRadius: 'var(--radius-sm)',
-                            border: (u.documents && u.documents.length > 0) ? '1px solid var(--accent-border)' : '1px solid var(--border-color)',
-                            backgroundColor: (u.documents && u.documents.length > 0) ? 'var(--accent-soft)' : 'var(--bg-input)',
-                            color: (u.documents && u.documents.length > 0) ? 'var(--accent)' : 'var(--text-primary)',
-                            fontWeight: 500,
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => setManagingDocsUser(u)}
-                          title={`Upload / View Documents for ${u.name} (Max 10 Slots)`}
-                        >
-                          <UploadCloud size={13} style={{ color: 'var(--accent)' }} />
-                          <span>Upload / View Documents</span>
-                          {u.documents && u.documents.length > 0 && (
-                            <span style={{
-                              fontSize: '0.66rem',
-                              background: 'var(--accent)',
-                              color: '#fff',
-                              padding: '1px 5px',
-                              borderRadius: 'var(--radius-full)',
-                              fontWeight: 600,
-                              lineHeight: 1
-                            }}>
-                              {u.documents.length}
-                            </span>
-                          )}
-                        </button>
-
                         <div style={{ position: 'relative' }}>
                           <button
                             className="btn-secondary"
-                            style={{ padding: '4px 8px' }}
+                            style={{ padding: '5px 9px', display: 'flex', alignItems: 'center', gap: '4px' }}
                             onClick={() => setActiveDropdownId(activeDropdownId === u.id ? null : u.id)}
                             title="More Actions"
                           >
                             <MoreVertical size={14} />
                           </button>
 
-                        {activeDropdownId === u.id && (
-                          <div style={{
-                            position: 'absolute',
-                            right: 0,
-                            top: '100%',
-                            marginTop: '4px',
-                            backgroundColor: 'var(--bg-modal)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-md)',
-                            zIndex: 20,
-                            minWidth: '175px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            padding: '4px'
-                          }}>
-                            <button
-                              className="btn-secondary"
-                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
-                              onClick={() => { setViewingUserDetails(u); setActiveDropdownId(null); }}
-                            >
-                              <Eye size={13} /> View Bank & Profile
-                            </button>
+                          {activeDropdownId === u.id && (
+                            <div style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: '100%',
+                              marginTop: '4px',
+                              backgroundColor: 'var(--bg-modal)',
+                              border: '1px solid var(--border-color)',
+                              borderRadius: 'var(--radius-md)',
+                              boxShadow: 'var(--shadow-md)',
+                              zIndex: 20,
+                              minWidth: '175px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              padding: '4px'
+                            }}>
+                              <button
+                                className="btn-secondary"
+                                style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
+                                onClick={() => { handleOpenBankProfile(u); setActiveDropdownId(null); }}
+                              >
+                                <Eye size={13} /> View Bank & Profile
+                              </button>
 
-                            <button
-                              className="btn-secondary"
-                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
-                              onClick={() => { setManagingDocsUser(u); setActiveDropdownId(null); }}
-                            >
-                              <FileText size={13} style={{ color: 'var(--accent)' }} /> Manage Documents
-                              {u.documents && u.documents.length > 0 && (
-                                <span style={{ marginLeft: 'auto', fontSize: '0.68rem', background: 'var(--accent-soft)', color: 'var(--accent)', padding: '1px 6px', borderRadius: 'var(--radius-full)' }}>
-                                  {u.documents.length}
-                                </span>
+                              <button
+                                className="btn-secondary"
+                                style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
+                                onClick={() => { setEditingUser(u); setIsAddModalOpen(true); setActiveDropdownId(null); }}
+                              >
+                                Edit Details
+                              </button>
+
+                              <button
+                                className="btn-secondary"
+                                style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
+                                onClick={() => { toggleUserStatus(u.id); showToast(`User status toggled for '${u.name}'`, 'info'); setActiveDropdownId(null); }}
+                              >
+                                {u.status === 'Active' ? 'Set Inactive' : 'Set Active'}
+                              </button>
+
+                              {simulatedRole === 'Super Admin' && (
+                                <>
+                                  <button
+                                    className="btn-secondary"
+                                    style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
+                                    onClick={() => { setPasswordResetUser(u); setActiveDropdownId(null); }}
+                                  >
+                                    <Key size={13} /> Change Password
+                                  </button>
+                                  <button
+                                    className="btn-danger"
+                                    style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
+                                    onClick={() => { handleDeleteAttempt(u); setActiveDropdownId(null); }}
+                                  >
+                                    <Trash2 size={13} /> Delete Account
+                                  </button>
+                                </>
                               )}
-                            </button>
-
-                            <button
-                              className="btn-secondary"
-                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
-                              onClick={() => { setEditingUser(u); setIsAddModalOpen(true); setActiveDropdownId(null); }}
-                            >
-                              Edit Details
-                            </button>
-
-                            <button
-                              className="btn-secondary"
-                              style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
-                              onClick={() => { toggleUserStatus(u.id); showToast(`User status toggled for '${u.name}'`, 'info'); setActiveDropdownId(null); }}
-                            >
-                              {u.status === 'Active' ? 'Set Inactive' : 'Set Active'}
-                            </button>
-
-                            {simulatedRole === 'Super Admin' && (
-                              <>
-                                <button
-                                  className="btn-secondary"
-                                  style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
-                                  onClick={() => { setPasswordResetUser(u); setActiveDropdownId(null); }}
-                                >
-                                  <Key size={13} /> Change Password
-                                </button>
-                                <button
-                                  className="btn-danger"
-                                  style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
-                                  onClick={() => { handleDeleteAttempt(u); setActiveDropdownId(null); }}
-                                >
-                                  <Trash2 size={13} /> Delete Account
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -545,57 +602,161 @@ export const UserDirectory = () => {
                 </div>
               </div>
 
-              {/* Block 1: Bank Account Details */}
+              {/* Block 1: Bank Account Details (With Inline Edit Feature) */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid var(--border-color)',
                 borderRadius: 'var(--radius-md)',
                 padding: '14px 16px'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '10px' }}>
-                  <Landmark size={15} />
-                  <span>Bank Account Details</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem' }}>
+                    <Landmark size={15} />
+                    <span>Bank Account Details</span>
+                  </div>
+
+                  {!isEditingBankDetails ? (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      onClick={() => setIsEditingBankDetails(true)}
+                    >
+                      <Edit2 size={12} /> Edit Bank Details
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 'var(--radius-sm)' }}
+                      onClick={() => setIsEditingBankDetails(false)}
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Account Number:</span>
-                    <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.bankAccountNumber || 'Not Provided'}</strong>
+
+                {!isEditingBankDetails ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Account Number:</span>
+                      <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.bankAccountNumber || 'Not Provided'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>IFSC Code:</span>
+                      <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.ifscCode || 'Not Provided'}</strong>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Name & Branch:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.bankNameAndBranch || 'Not Provided'}</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>IFSC Code:</span>
-                    <strong style={{ letterSpacing: '0.5px', color: 'var(--text-primary)' }}>{viewingUserDetails.ifscCode || 'Not Provided'}</strong>
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Bank Name & Branch:</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.bankNameAndBranch || 'Not Provided'}</strong>
-                  </div>
-                </div>
+                ) : (
+                  <form onSubmit={handleSaveBankDetails} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.74rem' }}>Bank Account Number</label>
+                        <input
+                          type="text"
+                          value={bankFormData.bankAccountNumber}
+                          onChange={(e) => setBankFormData({ ...bankFormData, bankAccountNumber: e.target.value })}
+                          placeholder="e.g. 91234567890123"
+                          style={{ fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.74rem' }}>IFSC Code</label>
+                        <input
+                          type="text"
+                          value={bankFormData.ifscCode}
+                          onChange={(e) => setBankFormData({ ...bankFormData, ifscCode: e.target.value })}
+                          placeholder="e.g. HDFC0000123"
+                          style={{ fontSize: '0.8rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.74rem' }}>Bank Name & Branch</label>
+                      <input
+                        type="text"
+                        value={bankFormData.bankNameAndBranch}
+                        onChange={(e) => setBankFormData({ ...bankFormData, bankNameAndBranch: e.target.value })}
+                        placeholder="e.g. HDFC Bank, MG Road Branch"
+                        style={{ fontSize: '0.8rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.74rem' }}>Family Reference Number</label>
+                        <input
+                          type="text"
+                          value={bankFormData.familyReferenceNumber}
+                          onChange={(e) => setBankFormData({ ...bankFormData, familyReferenceNumber: e.target.value })}
+                          placeholder="e.g. +91 98765 43219"
+                          style={{ fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.74rem' }}>Referred By</label>
+                        <input
+                          type="text"
+                          value={bankFormData.referredBy}
+                          onChange={(e) => setBankFormData({ ...bankFormData, referredBy: e.target.value })}
+                          placeholder="e.g. Board of Directors"
+                          style={{ fontSize: '0.8rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setIsEditingBankDetails(false)}
+                        style={{ fontSize: '0.76rem', padding: '4px 10px' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        style={{ fontSize: '0.76rem', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Save size={12} /> Save Bank Details
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
 
-              {/* Block 2: Family Reference & Referral Details */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '14px 16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '10px' }}>
-                  <Users size={15} />
-                  <span>Family Reference & Referral Information</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Family Reference Number:</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.familyReferenceNumber || 'Not Provided'}</strong>
+              {/* Block 2: Family Reference & Referral Details (View mode when not editing bank details) */}
+              {!isEditingBankDetails && (
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px 16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem', marginBottom: '10px' }}>
+                    <Users size={15} />
+                    <span>Family Reference & Referral Information</span>
                   </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Referred By:</span>
-                    <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.referredBy || 'Not Provided'}</strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '0.82rem' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Family Reference Number:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.familyReferenceNumber || 'Not Provided'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Referred By:</span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{viewingUserDetails.referredBy || 'Not Provided'}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Block 3: Employee Documents & Direct Download */}
+              {/* Block 3: Employee Documents (With Direct Upload & Delete) */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid var(--border-color)',
@@ -611,17 +772,79 @@ export const UserDirectory = () => {
                     type="button"
                     className="btn-secondary"
                     style={{ fontSize: '0.74rem', padding: '3px 8px', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                    onClick={() => {
-                      setManagingDocsUser(viewingUserDetails);
-                    }}
+                    onClick={() => setShowUploadDocForm(!showUploadDocForm)}
                   >
-                    <UploadCloud size={12} /> Manage / Upload
+                    <Plus size={12} /> {showUploadDocForm ? 'Cancel Upload' : 'Upload Document'}
                   </button>
                 </div>
 
+                {/* Direct Upload Form inside User & Bank Profile */}
+                {showUploadDocForm && (
+                  <form onSubmit={handleDirectDocUpload} style={{
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--accent-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '12px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Upload Document for {viewingUserDetails.name}
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.74rem' }}>Select Document Type *</label>
+                      <select
+                        value={selectedDocTypeId}
+                        onChange={(e) => setSelectedDocTypeId(e.target.value)}
+                        required
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        {documentTypes.map(dt => (
+                          <option key={dt.id} value={dt.id}>
+                            {dt.name} {dt.required ? '(Mandatory)' : '(Optional)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.74rem' }}>Select Document File (PDF, PNG, JPG) *</label>
+                      <input
+                        type="file"
+                        accept=".pdf,.png,.jpg,.jpeg"
+                        onChange={(e) => setDocFileToUpload(e.target.files[0] || null)}
+                        required
+                        style={{ fontSize: '0.8rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => { setShowUploadDocForm(false); setDocFileToUpload(null); }}
+                        style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        disabled={isUploadingDoc || !docFileToUpload}
+                        style={{ fontSize: '0.75rem', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <UploadCloud size={12} /> {isUploadingDoc ? 'Uploading...' : 'Save & Attach'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
                 {(!viewingUserDetails.documents || viewingUserDetails.documents.length === 0) ? (
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px 0' }}>
-                    No documents uploaded yet for this employee. Click 'Manage / Upload' to attach documents.
+                    No documents uploaded yet for this employee. Click 'Upload Document' above to attach documents.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -660,15 +883,26 @@ export const UserDirectory = () => {
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
-                          onClick={() => downloadUserDocument(doc, viewingUserDetails.name)}
-                          title="Download document directly from CRM"
-                        >
-                          <Download size={12} /> Download
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            style={{ padding: '4px 8px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                            onClick={() => downloadUserDocument(doc, viewingUserDetails.name)}
+                            title="Download document directly from CRM"
+                          >
+                            <Download size={12} /> Download
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-danger"
+                            style={{ padding: '4px 8px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                            onClick={() => handleDirectDocDelete(doc.id, doc.documentName)}
+                            title="Delete this document"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -677,29 +911,17 @@ export const UserDirectory = () => {
             </div>
 
             <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    setEditingUser(viewingUserDetails);
-                    setIsAddModalOpen(true);
-                    setViewingUserDetails(null);
-                  }}
-                >
-                  Edit Details
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                  onClick={() => {
-                    setManagingDocsUser(viewingUserDetails);
-                  }}
-                >
-                  <FileText size={13} /> Documents ({viewingUserDetails.documents?.length || 0})
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setEditingUser(viewingUserDetails);
+                  setIsAddModalOpen(true);
+                  setViewingUserDetails(null);
+                }}
+              >
+                Edit Account Details
+              </button>
               <button type="button" className="btn-primary" onClick={() => setViewingUserDetails(null)}>
                 Close
               </button>
@@ -707,12 +929,6 @@ export const UserDirectory = () => {
           </div>
         </div>
       )}
-
-      <EmployeeDocumentsModal
-        isOpen={!!managingDocsUser}
-        onClose={() => setManagingDocsUser(null)}
-        user={managingDocsUser ? (users.find(u => u.id === managingDocsUser.id) || managingDocsUser) : null}
-      />
     </div>
   );
 };

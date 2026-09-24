@@ -251,6 +251,46 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_custom_roles', JSON.stringify(customRoles));
   }, [customRoles]);
 
+  // User_Shortcut_Settings relational mapping table: [{ userId, dispositionId, isEnabled }]
+  const [userShortcutSettings, setUserShortcutSettings] = useState(() => {
+    const saved = localStorage.getItem('crm_user_shortcut_settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
+  }, [userShortcutSettings]);
+
+  const isShortcutEnabled = (userId, dispositionId) => {
+    if (!userId) return true;
+    const entry = userShortcutSettings.find(s => s.userId === userId && s.dispositionId === dispositionId);
+    return entry ? entry.isEnabled : true;
+  };
+
+  const setUserShortcut = (userId, dispositionId, isEnabled) => {
+    if (!userId) return;
+    setUserShortcutSettings(prev => {
+      const idx = prev.findIndex(s => s.userId === userId && s.dispositionId === dispositionId);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], isEnabled };
+        return updated;
+      }
+      return [...prev, { userId, dispositionId, isEnabled }];
+    });
+  };
+
+  const toggleUserShortcut = (userId, dispositionId) => {
+    const current = isShortcutEnabled(userId, dispositionId);
+    setUserShortcut(userId, dispositionId, !current);
+  };
+
   const [leads, setLeads] = useState(DEFAULT_LEADS);
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
@@ -761,6 +801,40 @@ export const CRMProvider = ({ children }) => {
     }));
   };
 
+  const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, date }) => {
+    const targetUser = users.find(u => u.id === toUserId);
+    if (!targetUser) return 0;
+    const numToAssign = quantity ? parseInt(quantity, 10) : Infinity;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    let count = 0;
+    setLeads(prev => prev.map(l => {
+      if (count >= numToAssign) return l;
+      if (fromUserId && fromUserId !== 'ALL' && l.assignedToId !== fromUserId) return l;
+      if (language && language !== 'ALL' && (l.language || '').toLowerCase() !== language.toLowerCase()) return l;
+      if (date) {
+        const hasMatchingDate = (l.history || []).some(h => (h.date || '').includes(date)) || 
+                                (l.date && String(l.date).includes(date)) ||
+                                (l.assignedDate && String(l.assignedDate).includes(date));
+        if (!hasMatchingDate) return l;
+      }
+
+      count++;
+      const newHistory = [
+        ...(l.history || []),
+        { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${date || 'Any'}].` }
+      ];
+      return {
+        ...l,
+        assignedToId: targetUser.id,
+        assignedToName: targetUser.name,
+        history: newHistory
+      };
+    }));
+
+    return count;
+  };
+
   // Sales Workflow
   const registerSale = async (saleData) => {
     try {
@@ -868,6 +942,10 @@ export const CRMProvider = ({ children }) => {
     return { assigned, requested: reqQty };
   };
 
+  const discardLeadRequest = (requestId) => {
+    setLeadRequests(prev => prev.filter(r => r.id !== requestId));
+  };
+
   const deleteAssignmentFiles = (instanceIds) => {
     const idsToDelete = Array.isArray(instanceIds) ? instanceIds : [instanceIds];
     
@@ -963,6 +1041,7 @@ export const CRMProvider = ({ children }) => {
       deleteDisposition,
       updateLeadDisposition,
       reassignLeads,
+      reassignLeadsFiltered,
       deleteUser,
       registerSale,
       approveSale,
@@ -976,6 +1055,7 @@ export const CRMProvider = ({ children }) => {
       assignLeadsByLanguage,
       submitLeadRequest,
       fulfillLeadRequest,
+      discardLeadRequest,
       deleteAssignmentFiles,
       reassignAssignmentFile,
       granularReassignLeads,
@@ -986,7 +1066,11 @@ export const CRMProvider = ({ children }) => {
       deleteDocumentType,
       uploadUserDocument,
       deleteUserDocument,
-      downloadUserDocument
+      downloadUserDocument,
+      userShortcutSettings,
+      isShortcutEnabled,
+      setUserShortcut,
+      toggleUserShortcut
     }}>
       {children}
     </CRMContext.Provider>

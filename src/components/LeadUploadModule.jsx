@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
@@ -54,7 +55,9 @@ export const LeadUploadModule = () => {
   const [bulkError, setBulkError] = useState('');
   const [uploadResult, setUploadResult] = useState(null);
   const [csvFileName, setCsvFileName] = useState('');
+  const [excelFileName, setExcelFileName] = useState('');
   const csvFileInputRef = React.useRef(null);
+  const excelFileInputRef = React.useRef(null);
 
   // Dynamic Lead Assignment State (Block 1 Integration)
   const [assignLang, setAssignLang] = useState('Hindi');
@@ -146,6 +149,55 @@ export const LeadUploadModule = () => {
     };
     reader.readAsText(file);
     // Reset file input so same file can be re-uploaded
+    e.target.value = '';
+  };
+
+  // ==========================================
+  // HANDLER: Excel (.xlxs, .xlsx, .xls) File Upload for Bulk Upload
+  // ==========================================
+  const handleExcelFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const lowerName = file.name.toLowerCase();
+    const isValid = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlxs') || lowerName.endsWith('.xls');
+    if (!isValid) {
+      showToast('Invalid file format. Please upload an Excel (.xlxs or .xlsx) file.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    setExcelFileName(file.name);
+    setCsvFileName('');
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          showToast('Workbook contains no readable sheets.', 'error');
+          return;
+        }
+        const worksheet = workbook.Sheets[firstSheetName];
+        const csvContent = XLSX.utils.sheet_to_csv(worksheet, { blankrows: false });
+        if (!csvContent || !csvContent.trim()) {
+          showToast('Uploaded spreadsheet is empty.', 'warning');
+          return;
+        }
+        setBulkInputText(csvContent.trim());
+        setBulkError('');
+        showToast(`Excel file "${file.name}" loaded successfully. Review and click Process.`, 'success');
+      } catch (err) {
+        console.error('Error reading Excel file:', err);
+        showToast('Failed to parse Excel file. Please ensure it is a valid spreadsheet.', 'error');
+      }
+    };
+    reader.onerror = () => {
+      showToast('Failed to read the Excel file.', 'error');
+      setExcelFileName('');
+    };
+    reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
 
@@ -638,8 +690,8 @@ export const LeadUploadModule = () => {
             )}
 
             <form onSubmit={handleBulkUploadSubmit}>
-              {/* CSV File Upload Row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px', padding: '12px 14px', background: 'var(--bg-input)', border: '1px dashed var(--accent-primary)', borderRadius: '8px' }}>
+              {/* File Upload Row: CSV & Excel (.xlsx, .xlxs) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px', padding: '12px 14px', background: 'var(--bg-input)', border: '1px dashed var(--accent-primary)', borderRadius: '8px' }}>
                 <input
                   ref={csvFileInputRef}
                   type="file"
@@ -648,24 +700,49 @@ export const LeadUploadModule = () => {
                   style={{ display: 'none' }}
                   id="bulk-csv-file-input"
                 />
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => csvFileInputRef.current && csvFileInputRef.current.click()}
-                  style={{ fontSize: '0.82rem', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
-                >
-                  <Upload size={14} /> Upload .CSV File
-                </button>
-                <div style={{ flex: 1 }}>
-                  {csvFileName ? (
-                    <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle size={14} /> {csvFileName} — loaded into editor below
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Select a <strong>.csv</strong> file with columns: CONTACT NAME, CONTACT NUMBER, LANGUAGE
-                    </span>
-                  )}
+                <input
+                  ref={excelFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xlxs,.xls"
+                  onChange={handleExcelFileUpload}
+                  style={{ display: 'none' }}
+                  id="bulk-excel-file-input"
+                />
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => csvFileInputRef.current && csvFileInputRef.current.click()}
+                    style={{ fontSize: '0.82rem', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                  >
+                    <Upload size={14} /> Upload .CSV File
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => excelFileInputRef.current && excelFileInputRef.current.click()}
+                    style={{ fontSize: '0.82rem', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', borderColor: '#10b981', color: '#10b981' }}
+                  >
+                    <FileSpreadsheet size={14} /> Upload .XLXS / .XLSX File
+                  </button>
+
+                  <div style={{ flex: 1, minWidth: '200px' }}>
+                    {csvFileName ? (
+                      <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle size={14} /> CSV: {csvFileName} — loaded into editor below
+                      </span>
+                    ) : excelFileName ? (
+                      <span style={{ fontSize: '0.82rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CheckCircle size={14} /> Excel: {excelFileName} — converted & loaded below
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Select a <strong>.csv</strong> or <strong>.xlsx / .xlxs</strong> file (Columns: CONTACT NAME, CONTACT NUMBER, LANGUAGE)
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -674,7 +751,7 @@ export const LeadUploadModule = () => {
                 <textarea
                   rows={5}
                   value={bulkInputText}
-                  onChange={(e) => { setBulkInputText(e.target.value); setCsvFileName(''); }}
+                  onChange={(e) => { setBulkInputText(e.target.value); setCsvFileName(''); setExcelFileName(''); }}
                   placeholder="CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;Sunil Varma, +91 98888 11111, Kannada&#10;Meera Sen, +91 98888 22222, Telugu&#10;Deepak Roy, +91 98888 33333, Hindi&#10;Rohan Mehta, +91 91234 56789, Hindi&#10;Incomplete Lead, , Tamil"
                   style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
                 />
@@ -687,7 +764,7 @@ export const LeadUploadModule = () => {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName(''); }}
+                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName(''); setExcelFileName(''); }}
                 >
                   Load Sample Bulk Dataset
                 </button>
@@ -696,150 +773,130 @@ export const LeadUploadModule = () => {
           </div>
 
           {/* BULK UPLOAD ANALYTICS & EXPORT DASHBOARD */}
-          {uploadResult && (
-            <div className="directory-card" style={{ padding: '20px 24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h4 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                    <BarChart3 size={16} color="var(--accent-primary)" /> Bulk Upload Analytics & Data Export Summary
-                  </h4>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                    Categorized breakdown of processed records against central master records.
-                  </p>
-                </div>
+          {uploadResult && (() => {
+            const total = uploadResult.totalProcessed || 1;
+            const successPct = uploadResult.totalProcessed > 0 ? ((uploadResult.successCount / total) * 100).toFixed(1) : '0.0';
+            const duplicatePct = uploadResult.totalProcessed > 0 ? ((uploadResult.duplicateCount / total) * 100).toFixed(1) : '0.0';
+            const failedPct = uploadResult.totalProcessed > 0 ? ((uploadResult.failedCount / total) * 100).toFixed(1) : '0.0';
 
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Total Rows Processed: <strong>{uploadResult.totalProcessed}</strong>
-                </div>
-              </div>
-
-              {/* 3 Analytics Metric Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
-                <div style={{ padding: '14px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700, textTransform: 'uppercase' }}>
-                    SUCCESSFUL LEADS
-                  </span>
-                  <h2 style={{ color: '#10b981', margin: '4px 0 0 0', fontSize: '1.6rem' }}>{uploadResult.successCount}</h2>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Added with status 'New Lead'</p>
-                </div>
-
-                <div style={{ padding: '14px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>
-                    DUPLICATE LEADS
-                  </span>
-                  <h2 style={{ color: '#f59e0b', margin: '4px 0 0 0', fontSize: '1.6rem' }}>{uploadResult.duplicateCount}</h2>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Merged/Deleted from upload</p>
-                </div>
-
-                <div style={{ padding: '14px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px' }}>
-                  <span style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 700, textTransform: 'uppercase' }}>
-                    FAILED LEADS
-                  </span>
-                  <h2 style={{ color: '#ef4444', margin: '4px 0 0 0', fontSize: '1.6rem' }}>{uploadResult.failedCount}</h2>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>Missing required row data</p>
-                </div>
-              </div>
-
-              {/* Visual SVG Bar Chart Representation */}
-              <div style={{ background: 'var(--bg-input)', padding: '16px 20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
-                <h5 style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '12px', margin: '0 0 12px 0' }}>
-                  Lead Validation Categorization Distribution
-                </h5>
-
-                {uploadResult.totalProcessed > 0 && (
-                  <div style={{ display: 'flex', height: '24px', width: '100%', borderRadius: '6px', overflow: 'hidden', gap: '2px' }}>
-                    <div 
-                      style={{ 
-                        width: `${(uploadResult.successCount / uploadResult.totalProcessed) * 100}%`, 
-                        background: '#10b981', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '0.7rem',
-                        fontWeight: 700
-                      }}
-                      title={`Successful Leads: ${uploadResult.successCount}`}
-                    >
-                      {uploadResult.successCount > 0 && `${((uploadResult.successCount / uploadResult.totalProcessed) * 100).toFixed(0)}%`}
-                    </div>
-                    <div 
-                      style={{ 
-                        width: `${(uploadResult.duplicateCount / uploadResult.totalProcessed) * 100}%`, 
-                        background: '#f59e0b', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '0.7rem',
-                        fontWeight: 700
-                      }}
-                      title={`Duplicate Leads: ${uploadResult.duplicateCount}`}
-                    >
-                      {uploadResult.duplicateCount > 0 && `${((uploadResult.duplicateCount / uploadResult.totalProcessed) * 100).toFixed(0)}%`}
-                    </div>
-                    <div 
-                      style={{ 
-                        width: `${(uploadResult.failedCount / uploadResult.totalProcessed) * 100}%`, 
-                        background: '#ef4444', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: '0.7rem',
-                        fontWeight: 700
-                      }}
-                      title={`Failed Leads: ${uploadResult.failedCount}`}
-                    >
-                      {uploadResult.failedCount > 0 && `${((uploadResult.failedCount / uploadResult.totalProcessed) * 100).toFixed(0)}%`}
-                    </div>
+            return (
+              <div className="directory-card" style={{ padding: '20px 24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <div>
+                    <h4 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                      <BarChart3 size={16} color="var(--accent-primary)" /> Bulk Upload Analytics & Data Export Summary
+                    </h4>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                      Categorized breakdown of processed records against central master records with direct export options.
+                    </p>
                   </div>
-                )}
+
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Total Rows Processed: <strong>{uploadResult.totalProcessed}</strong>
+                  </div>
+                </div>
+
+                {/* 3 Analytics Metric Cards with percentage and direct download buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                  {/* SUCCESSFUL LEADS */}
+                  <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 700, textTransform: 'uppercase' }}>
+                          SUCCESSFUL LEADS
+                        </span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '12px' }}>
+                          {successPct}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+                        <h2 style={{ color: '#10b981', margin: 0, fontSize: '1.8rem' }}>{uploadResult.successCount}</h2>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>/ {uploadResult.totalProcessed}</span>
+                      </div>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 14px 0' }}>Added with status 'New Lead'</p>
+                    </div>
+
+                    <button
+                      className="btn-secondary"
+                      disabled={uploadResult.successCount === 0}
+                      onClick={() => downloadCSV(
+                        'Successful_Leads.csv',
+                        ['CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'DISPOSITION'],
+                        uploadResult.successful.map(s => [s.contactPerson, s.phone, s.language, 'New Lead'])
+                      )}
+                      style={{ fontSize: '0.78rem', width: '100%', justifyContent: 'center', color: uploadResult.successCount > 0 ? '#10b981' : 'inherit', borderColor: uploadResult.successCount > 0 ? 'rgba(16, 185, 129, 0.4)' : undefined }}
+                    >
+                      <Download size={13} /> Download ({uploadResult.successCount})
+                    </button>
+                  </div>
+
+                  {/* DUPLICATE LEADS */}
+                  <div style={{ padding: '16px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase' }}>
+                          DUPLICATE LEADS
+                        </span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '12px' }}>
+                          {duplicatePct}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+                        <h2 style={{ color: '#f59e0b', margin: 0, fontSize: '1.8rem' }}>{uploadResult.duplicateCount}</h2>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>/ {uploadResult.totalProcessed}</span>
+                      </div>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 14px 0' }}>Merged/Deleted from upload</p>
+                    </div>
+
+                    <button
+                      className="btn-secondary"
+                      disabled={uploadResult.duplicateCount === 0}
+                      onClick={() => downloadCSV(
+                        'Duplicate_Leads.csv',
+                        ['CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'REASON'],
+                        uploadResult.duplicates.map(d => [d.contactPerson, d.phone, d.language, d.reason])
+                      )}
+                      style={{ fontSize: '0.78rem', width: '100%', justifyContent: 'center', color: uploadResult.duplicateCount > 0 ? '#f59e0b' : 'inherit', borderColor: uploadResult.duplicateCount > 0 ? 'rgba(245, 158, 11, 0.4)' : undefined }}
+                    >
+                      <Download size={13} /> Download ({uploadResult.duplicateCount})
+                    </button>
+                  </div>
+
+                  {/* FAILED LEADS */}
+                  <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#ef4444', fontWeight: 700, textTransform: 'uppercase' }}>
+                          FAILED LEADS
+                        </span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ef4444', background: 'rgba(239, 68, 68, 0.15)', padding: '2px 8px', borderRadius: '12px' }}>
+                          {failedPct}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+                        <h2 style={{ color: '#ef4444', margin: 0, fontSize: '1.8rem' }}>{uploadResult.failedCount}</h2>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>/ {uploadResult.totalProcessed}</span>
+                      </div>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '4px 0 14px 0' }}>Missing required row data</p>
+                    </div>
+
+                    <button
+                      className="btn-secondary"
+                      disabled={uploadResult.failedCount === 0}
+                      onClick={() => downloadCSV(
+                        'Failed_Leads.csv',
+                        ['ROW', 'CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'FAILURE REASON'],
+                        uploadResult.failed.map(f => [f.row, f.contactPerson, f.phone, f.language, f.reason])
+                      )}
+                      style={{ fontSize: '0.78rem', width: '100%', justifyContent: 'center', color: uploadResult.failedCount > 0 ? '#ef4444' : 'inherit', borderColor: uploadResult.failedCount > 0 ? 'rgba(239, 68, 68, 0.4)' : undefined }}
+                    >
+                      <Download size={13} /> Download ({uploadResult.failedCount})
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              {/* Single-Click Excel/CSV Export Buttons */}
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button
-                  className="btn-secondary"
-                  disabled={uploadResult.successCount === 0}
-                  onClick={() => downloadCSV(
-                    'Successful_Leads.csv',
-                    ['CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'DISPOSITION'],
-                    uploadResult.successful.map(s => [s.contactPerson, s.phone, s.language, 'New Lead'])
-                  )}
-                  style={{ fontSize: '0.8rem', color: uploadResult.successCount > 0 ? '#10b981' : 'inherit' }}
-                >
-                  <Download size={14} /> Download Successful Leads ({uploadResult.successCount})
-                </button>
-
-                <button
-                  className="btn-secondary"
-                  disabled={uploadResult.duplicateCount === 0}
-                  onClick={() => downloadCSV(
-                    'Duplicate_Leads.csv',
-                    ['CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'REASON'],
-                    uploadResult.duplicates.map(d => [d.contactPerson, d.phone, d.language, d.reason])
-                  )}
-                  style={{ fontSize: '0.8rem', color: uploadResult.duplicateCount > 0 ? '#f59e0b' : 'inherit' }}
-                >
-                  <Download size={14} /> Download Duplicate Leads ({uploadResult.duplicateCount})
-                </button>
-
-                <button
-                  className="btn-secondary"
-                  disabled={uploadResult.failedCount === 0}
-                  onClick={() => downloadCSV(
-                    'Failed_Leads.csv',
-                    ['ROW', 'CONTACT NAME', 'CONTACT NUMBER', 'LANGUAGE', 'FAILURE REASON'],
-                    uploadResult.failed.map(f => [f.row, f.contactPerson, f.phone, f.language, f.reason])
-                  )}
-                  style={{ fontSize: '0.8rem', color: uploadResult.failedCount > 0 ? '#ef4444' : 'inherit' }}
-                >
-                  <Download size={14} /> Download Failed Leads ({uploadResult.failedCount})
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* DYNAMIC LEAD ASSIGNMENT ENGINE BY LANGUAGE (BLOCK 1 INTEGRATION) */}
           <div className="directory-card" style={{ padding: '20px 24px' }}>
