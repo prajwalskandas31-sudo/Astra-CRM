@@ -22,6 +22,9 @@ export const CRMDashboard = () => {
   const [selectedOutcomeDisp, setSelectedOutcomeDisp] = useState('');
   const [postCallDate, setPostCallDate] = useState('');
   const [postCallTime, setPostCallTime] = useState('');
+  const [timeHour, setTimeHour] = useState('10');
+  const [timeMinute, setTimeMinute] = useState('00');
+  const [timeAmPm, setTimeAmPm] = useState('AM');
 
   // Manage Shortcuts & Request Leads Modals
   const [showManageShortcuts, setShowManageShortcuts] = useState(false);
@@ -57,10 +60,30 @@ export const CRMDashboard = () => {
     if (lead.dispositionScheduledAt) {
       const parts = lead.dispositionScheduledAt.split(' ');
       setPostCallDate(parts[0] || '');
-      setPostCallTime(parts[1] || '');
+      if (parts[1]) {
+        const timeParts = parts[1].split(':');
+        let hr = parseInt(timeParts[0], 10) || 10;
+        const mn = timeParts[1] ? String(timeParts[1]).padStart(2, '0').slice(0, 2) : '00';
+        let ampm = parts[2] || (hr >= 12 ? 'PM' : 'AM');
+        if (hr > 12) hr -= 12;
+        if (hr === 0) hr = 12;
+        const hrStr = String(hr).padStart(2, '0');
+        setTimeHour(hrStr);
+        setTimeMinute(mn);
+        setTimeAmPm(ampm.toUpperCase());
+        setPostCallTime(`${hrStr}:${mn} ${ampm.toUpperCase()}`);
+      } else {
+        setTimeHour('10');
+        setTimeMinute('00');
+        setTimeAmPm('AM');
+        setPostCallTime('10:00 AM');
+      }
     } else {
       setPostCallDate('');
-      setPostCallTime('');
+      setTimeHour('10');
+      setTimeMinute('00');
+      setTimeAmPm('AM');
+      setPostCallTime('10:00 AM');
     }
     setCallNotes('');
   };
@@ -69,14 +92,16 @@ export const CRMDashboard = () => {
     e.preventDefault();
     if (!activeCallLead || !selectedOutcomeDisp) return;
 
+    const selectedTime = (timeHour && timeMinute && timeAmPm) ? `${timeHour}:${timeMinute} ${timeAmPm}` : postCallTime;
+
     if (requiresDateTime) {
-      if (!postCallDate || !postCallTime) {
+      if (!postCallDate || !selectedTime) {
         showToast('Both Date and Time are mandatory for this disposition outcome.', 'warning');
         return;
       }
     }
 
-    const formattedDateTime = (postCallDate && postCallTime) ? `${postCallDate} ${postCallTime}` : (postCallDate || '');
+    const formattedDateTime = (postCallDate && selectedTime) ? `${postCallDate} ${selectedTime}` : (postCallDate || '');
 
     updateLeadDisposition(activeCallLead.id, selectedOutcomeDisp, callNotes, formattedDateTime);
     showToast(`Lead '${activeCallLead.contactPerson}' updated to disposition [${selectedOutcomeDisp}].`, 'success');
@@ -392,18 +417,68 @@ export const CRMDashboard = () => {
                         />
                       </div>
 
-                      {/* 2. Time Picker Input */}
+                      {/* 2. Time Picker Input (Dropdown box of hrs, minutes, am, pm) */}
                       <div>
                         <label style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
-                          <Clock size={13} color="var(--accent-primary)" /> Time Picker Input (HH:MM AM/PM) *
+                          <Clock size={13} color="var(--accent-primary)" /> Time Picker Input *
                         </label>
-                        <input
-                          type="time"
-                          value={postCallTime}
-                          onChange={(e) => setPostCallTime(e.target.value)}
-                          required
-                          style={{ width: '100%', fontSize: '0.82rem' }}
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                          {/* Hours Dropdown */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600 }}>HRS</span>
+                            <select
+                              value={timeHour}
+                              onChange={(e) => {
+                                const h = e.target.value;
+                                setTimeHour(h);
+                                setPostCallTime(`${h}:${timeMinute} ${timeAmPm}`);
+                              }}
+                              style={{ width: '100%', fontSize: '0.82rem', padding: '6px 8px', borderRadius: 'var(--radius-md)' }}
+                              title="Hours"
+                            >
+                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(h => (
+                                <option key={h} value={h}>{h}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Minutes Dropdown */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600 }}>MIN</span>
+                            <select
+                              value={timeMinute}
+                              onChange={(e) => {
+                                const m = e.target.value;
+                                setTimeMinute(m);
+                                setPostCallTime(`${timeHour}:${m} ${timeAmPm}`);
+                              }}
+                              style={{ width: '100%', fontSize: '0.82rem', padding: '6px 8px', borderRadius: 'var(--radius-md)' }}
+                              title="Minutes"
+                            >
+                              {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(m => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* AM / PM Dropdown */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', fontWeight: 600 }}>AM / PM</span>
+                            <select
+                              value={timeAmPm}
+                              onChange={(e) => {
+                                const ap = e.target.value;
+                                setTimeAmPm(ap);
+                                setPostCallTime(`${timeHour}:${timeMinute} ${ap}`);
+                              }}
+                              style={{ width: '100%', fontSize: '0.82rem', padding: '6px 8px', borderRadius: 'var(--radius-md)', fontWeight: 700 }}
+                              title="AM or PM"
+                            >
+                              <option value="AM">AM</option>
+                              <option value="PM">PM</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -425,7 +500,7 @@ export const CRMDashboard = () => {
                 <button 
                   type="submit" 
                   className="btn-primary"
-                  disabled={requiresDateTime && (!postCallDate || !postCallTime)}
+                  disabled={requiresDateTime && (!postCallDate || !timeHour || !timeMinute || !timeAmPm)}
                 >
                   Save Disposition Log
                 </button>
