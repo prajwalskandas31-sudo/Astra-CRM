@@ -97,6 +97,29 @@ export const LeadReassignmentView = () => {
     setReassignEndDate('');
   };
 
+  const setPresetRange = (preset) => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    if (preset === 'today') {
+      setReassignStartDate(todayStr);
+      setReassignEndDate(todayStr);
+    } else if (preset === 'last7') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      setReassignStartDate(d.toISOString().split('T')[0]);
+      setReassignEndDate(todayStr);
+    } else if (preset === 'last30') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      setReassignStartDate(d.toISOString().split('T')[0]);
+      setReassignEndDate(todayStr);
+    } else if (preset === 'thisMonth') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      setReassignStartDate(firstDay);
+      setReassignEndDate(todayStr);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Reassignment Panel */}
@@ -162,20 +185,22 @@ export const LeadReassignmentView = () => {
               </div>
 
               {/* Date Filter (Calendar Picker) */}
-              <div className="form-group">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
-                    <Calendar size={13} /> Date Filter (Calendar Picker)
+              <div className="form-group" style={{ gridColumn: 'span 2', background: 'var(--bg-card, rgba(255,255,255,0.02))', padding: '14px', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, color: 'var(--text-primary)' }}>
+                    <Calendar size={15} color="var(--accent-primary)" /> Date Filter (Calendar Picker)
                   </label>
-                  <div style={{ display: 'inline-flex', background: 'var(--bg-app)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)', gap: '2px' }}>
+                  
+                  {/* Mode Selector Tabs */}
+                  <div style={{ display: 'inline-flex', background: 'var(--bg-app)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-color)', gap: '4px' }}>
                     <button
                       type="button"
                       onClick={() => setDateMode('single')}
                       style={{
-                        padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: dateMode === 'single' ? 600 : 400,
-                        borderRadius: '4px',
+                        padding: '4px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: dateMode === 'single' ? 600 : 500,
+                        borderRadius: '6px',
                         border: 'none',
                         cursor: 'pointer',
                         background: dateMode === 'single' ? 'var(--accent-primary)' : 'transparent',
@@ -183,16 +208,16 @@ export const LeadReassignmentView = () => {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      Single Date
+                      📅 Single Date
                     </button>
                     <button
                       type="button"
                       onClick={() => setDateMode('range')}
                       style={{
-                        padding: '2px 8px',
-                        fontSize: '0.72rem',
-                        fontWeight: dateMode === 'range' ? 600 : 400,
-                        borderRadius: '4px',
+                        padding: '4px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: dateMode === 'range' ? 600 : 500,
+                        borderRadius: '6px',
                         border: 'none',
                         cursor: 'pointer',
                         background: dateMode === 'range' ? 'var(--accent-primary)' : 'transparent',
@@ -200,72 +225,83 @@ export const LeadReassignmentView = () => {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      Date Range
+                      📆 Range of Dates (From - To)
                     </button>
                   </div>
                 </div>
 
                 {dateMode === 'single' ? (
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <input
-                      type="date"
-                      value={reassignDate}
-                      onChange={(e) => setReassignDate(e.target.value)}
-                      style={{ width: '100%' }}
-                    />
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="date"
+                        value={reassignDate}
+                        onChange={(e) => setReassignDate(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem' }}
+                      />
+                    </div>
                     {reassignDate && (
                       <button
                         type="button"
                         onClick={() => setReassignDate('')}
                         className="btn-secondary"
-                        style={{ padding: '6px 10px', fontSize: '0.72rem', whiteSpace: 'nowrap' }}
+                        style={{ padding: '8px 14px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
                         title="Clear Date"
                       >
-                        Clear
+                        Clear Date
                       </button>
                     )}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Start Date:</span>
+                        <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '3px', fontWeight: 600 }}>From (Start Date):</label>
                         <input
                           type="date"
                           value={reassignStartDate}
                           onChange={(e) => setReassignStartDate(e.target.value)}
-                          style={{ width: '100%' }}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem' }}
                         />
                       </div>
                       <div>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>End Date:</span>
+                        <label style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '3px', fontWeight: 600 }}>To (End Date):</label>
                         <input
                           type="date"
                           value={reassignEndDate}
                           onChange={(e) => setReassignEndDate(e.target.value)}
-                          style={{ width: '100%' }}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem' }}
                         />
                       </div>
                     </div>
-                    {(reassignStartDate || reassignEndDate) && (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    
+                    {/* Quick Preset Range Filters */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', paddingTop: '4px' }}>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Quick Presets:</span>
+                        <button type="button" onClick={() => setPresetRange('today')} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '4px' }}>Today</button>
+                        <button type="button" onClick={() => setPresetRange('last7')} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '4px' }}>Last 7 Days</button>
+                        <button type="button" onClick={() => setPresetRange('last30')} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '4px' }}>Last 30 Days</button>
+                        <button type="button" onClick={() => setPresetRange('thisMonth')} className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: '4px' }}>This Month</button>
+                      </div>
+                      {(reassignStartDate || reassignEndDate) && (
                         <button
                           type="button"
                           onClick={() => { setReassignStartDate(''); setReassignEndDate(''); }}
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: 'var(--accent-primary)',
-                            fontSize: '0.72rem',
+                            color: '#f87171',
+                            fontSize: '0.75rem',
                             cursor: 'pointer',
                             textDecoration: 'underline',
-                            padding: 0
+                            padding: '2px 6px'
                           }}
                         >
                           Clear Date Range
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
