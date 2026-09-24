@@ -53,7 +53,11 @@ export const CRMDashboard = () => {
 
   const handleSimulateCallDisconnect = (lead) => {
     setActiveCallLead(lead);
-    const initialDisp = lead.disposition || dispositions[0]?.name || 'New Lead';
+    const enabledDisps = dispositions.filter(d => isShortcutEnabled(currentUser?.id, d.id));
+    const isLeadDispEnabled = lead.disposition && enabledDisps.some(d => d.name === lead.disposition);
+    const initialDisp = isLeadDispEnabled 
+      ? lead.disposition 
+      : (enabledDisps[0]?.name || dispositions[0]?.name || 'New Lead');
     setSelectedOutcomeDisp(initialDisp);
     
     // Parse existing scheduled time if present
@@ -91,6 +95,12 @@ export const CRMDashboard = () => {
   const handlePostCallSubmit = (e) => {
     e.preventDefault();
     if (!activeCallLead || !selectedOutcomeDisp) return;
+
+    const selectedOutcomeObj = dispositions.find(d => d.name === selectedOutcomeDisp);
+    if (selectedOutcomeObj && !isShortcutEnabled(currentUser?.id, selectedOutcomeObj.id)) {
+      showToast(`Disposition '${selectedOutcomeDisp}' is disabled in your shortcuts settings.`, 'warning');
+      return;
+    }
 
     const selectedTime = (timeHour && timeMinute && timeAmPm) ? `${timeHour}:${timeMinute} ${timeAmPm}` : postCallTime;
 
@@ -354,35 +364,53 @@ export const CRMDashboard = () => {
                 <div className="form-group" style={{ marginBottom: '16px' }}>
                   <label style={{ fontWeight: 600 }}>Select Disposition Outcome:</label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '6px' }}>
-                    {dispositions.map(d => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => setSelectedOutcomeDisp(d.name)}
-                        style={{
-                          padding: '9px 12px',
-                          borderRadius: 'var(--radius-md)',
-                          border: selectedOutcomeDisp === d.name ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                          backgroundColor: selectedOutcomeDisp === d.name ? 'var(--accent-soft)' : 'var(--bg-input)',
-                          color: selectedOutcomeDisp === d.name ? 'var(--accent-primary)' : 'var(--text-primary)',
-                          fontWeight: selectedOutcomeDisp === d.name ? 600 : 400,
-                          textAlign: 'left',
-                          fontSize: '0.82rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justify: 'space-between',
-                          gap: '6px'
-                        }}
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Tag size={12} /> {d.name}
-                        </span>
-                        {d.requiresDateTimePicker && (
-                          <Calendar size={12} color="var(--warning-color, #f59e0b)" title="Requires Date & Time Picker" />
-                        )}
-                      </button>
-                    ))}
+                    {dispositions.map(d => {
+                      const isEnabled = isShortcutEnabled(currentUser?.id, d.id);
+                      const isSelected = selectedOutcomeDisp === d.name;
+
+                      return (
+                        <button
+                          key={d.id}
+                          type="button"
+                          disabled={!isEnabled}
+                          onClick={() => {
+                            if (!isEnabled) return;
+                            setSelectedOutcomeDisp(d.name);
+                          }}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                            backgroundColor: isSelected ? 'var(--accent-soft)' : (isEnabled ? 'var(--bg-input)' : 'rgba(255, 255, 255, 0.02)'),
+                            color: isSelected ? 'var(--accent-primary)' : (isEnabled ? 'var(--text-primary)' : 'var(--text-muted)'),
+                            fontWeight: isSelected ? 600 : 400,
+                            textAlign: 'left',
+                            fontSize: '0.82rem',
+                            cursor: isEnabled ? 'pointer' : 'not-allowed',
+                            opacity: isEnabled ? 1 : 0.45,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '6px'
+                          }}
+                          title={isEnabled ? d.name : `${d.name} (Disabled in Manage Shortcuts)`}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Tag size={12} /> {d.name}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {!isEnabled && (
+                              <span style={{ fontSize: '0.64rem', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                Disabled
+                              </span>
+                            )}
+                            {d.requiresDateTimePicker && (
+                              <Calendar size={12} color={isEnabled ? "var(--warning-color, #f59e0b)" : "var(--text-muted)"} title="Requires Date & Time Picker" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -500,7 +528,10 @@ export const CRMDashboard = () => {
                 <button 
                   type="submit" 
                   className="btn-primary"
-                  disabled={requiresDateTime && (!postCallDate || !timeHour || !timeMinute || !timeAmPm)}
+                  disabled={
+                    (selectedDispObj && !isShortcutEnabled(currentUser?.id, selectedDispObj.id)) ||
+                    (requiresDateTime && (!postCallDate || !timeHour || !timeMinute || !timeAmPm))
+                  }
                 >
                   Save Disposition Log
                 </button>
