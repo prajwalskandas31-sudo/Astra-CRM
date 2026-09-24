@@ -12,6 +12,7 @@ export const CRMDashboard = () => {
     currentUser, 
     isShortcutEnabled, 
     toggleUserShortcut, 
+    userShortcutSettings,
     submitLeadRequest 
   } = useCRM();
   const { showToast } = useToast();
