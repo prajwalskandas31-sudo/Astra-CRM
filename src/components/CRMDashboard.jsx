@@ -57,7 +57,7 @@ export const CRMDashboard = () => {
     const isLeadDispEnabled = lead.disposition && enabledDisps.some(d => d.name === lead.disposition);
     const initialDisp = isLeadDispEnabled 
       ? lead.disposition 
-      : (enabledDisps[0]?.name || dispositions[0]?.name || 'New Lead');
+      : (enabledDisps[0]?.name || '');
     setSelectedOutcomeDisp(initialDisp);
     
     // Parse existing scheduled time if present
@@ -364,53 +364,55 @@ export const CRMDashboard = () => {
                 <div className="form-group" style={{ marginBottom: '16px' }}>
                   <label style={{ fontWeight: 600 }}>Select Disposition Outcome:</label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '6px' }}>
-                    {dispositions.map(d => {
-                      const isEnabled = isShortcutEnabled(currentUser?.id, d.id);
+                    {visibleDispositions.map(d => {
                       const isSelected = selectedOutcomeDisp === d.name;
 
                       return (
                         <button
                           key={d.id}
                           type="button"
-                          disabled={!isEnabled}
-                          onClick={() => {
-                            if (!isEnabled) return;
-                            setSelectedOutcomeDisp(d.name);
-                          }}
+                          onClick={() => setSelectedOutcomeDisp(d.name)}
                           style={{
                             padding: '9px 12px',
                             borderRadius: 'var(--radius-md)',
                             border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                            backgroundColor: isSelected ? 'var(--accent-soft)' : (isEnabled ? 'var(--bg-input)' : 'rgba(255, 255, 255, 0.02)'),
-                            color: isSelected ? 'var(--accent-primary)' : (isEnabled ? 'var(--text-primary)' : 'var(--text-muted)'),
+                            backgroundColor: isSelected ? 'var(--accent-soft)' : 'var(--bg-input)',
+                            color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
                             fontWeight: isSelected ? 600 : 400,
                             textAlign: 'left',
                             fontSize: '0.82rem',
-                            cursor: isEnabled ? 'pointer' : 'not-allowed',
-                            opacity: isEnabled ? 1 : 0.45,
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            gap: '6px'
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
                           }}
-                          title={isEnabled ? d.name : `${d.name} (Disabled in Manage Shortcuts)`}
+                          title={d.name}
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Tag size={12} /> {d.name}
                           </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            {!isEnabled && (
-                              <span style={{ fontSize: '0.64rem', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
-                                Disabled
-                              </span>
-                            )}
-                            {d.requiresDateTimePicker && (
-                              <Calendar size={12} color={isEnabled ? "var(--warning-color, #f59e0b)" : "var(--text-muted)"} title="Requires Date & Time Picker" />
-                            )}
-                          </div>
+                          {d.requiresDateTimePicker && (
+                            <Calendar size={12} color="var(--warning-color, #f59e0b)" title="Requires Date & Time Picker" />
+                          )}
                         </button>
                       );
                     })}
+                    {visibleDispositions.length === 0 && (
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        padding: '14px',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.82rem',
+                        background: 'var(--bg-input)',
+                        border: '1px dashed var(--border-color)',
+                        borderRadius: 'var(--radius-md)'
+                      }}>
+                        All disposition shortcuts are currently disabled in Manage Shortcuts. Please enable at least one shortcut to select an outcome.
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -557,7 +559,7 @@ export const CRMDashboard = () => {
 
             <div className="modal-body">
               <div className="alert-box alert-info" style={{ marginBottom: '14px', fontSize: '0.78rem' }}>
-                <strong>Workspace Configuration ({simulatedRole}):</strong> Toggling off a shortcut removes that quick-action button from your bar and automatically disables that disposition in the Post-Call Outcome modal ({currentUser?.name || simulatedRole}). This applies across all role levels without altering central master dispositions.
+                <strong>Workspace Configuration ({simulatedRole}):</strong> Toggling off a shortcut removes that quick-action button from your bar and hides that disposition completely from the Post-Call Outcome modal ({currentUser?.name || simulatedRole}). This applies across all profiles and role levels without altering central master dispositions.
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
