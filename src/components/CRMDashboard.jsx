@@ -557,7 +557,7 @@ export const CRMDashboard = () => {
 
             <div className="modal-body">
               <div className="alert-box alert-info" style={{ marginBottom: '14px', fontSize: '0.78rem' }}>
-                <strong>Personal Workspace Configuration:</strong> Toggling off a shortcut removes that quick-action button exclusively from your screen ({currentUser?.name}). It does not alter central master data or affect any other user's workspace.
+                <strong>Workspace Configuration ({simulatedRole}):</strong> Toggling off a shortcut removes that quick-action button from your bar and automatically disables that disposition in the Post-Call Outcome modal ({currentUser?.name || simulatedRole}). This applies across all role levels without altering central master dispositions.
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

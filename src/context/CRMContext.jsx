@@ -203,7 +203,19 @@ const CRMContext = createContext();
 
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
-  const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('crm_user') || 'null'));
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('crm_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_USERS[0];
+  });
+  const [simulatedRole, setSimulatedRoleState] = useState(() => {
+    return currentUser?.role || 'Super Admin';
+  });
   const [loginError, setLoginError] = useState('');
 
   const [users, setUsers] = useState(() => {
@@ -267,28 +279,38 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
   }, [userShortcutSettings]);
 
+  const setSimulatedRole = (newRole) => {
+    setSimulatedRoleState(newRole);
+    const matchedUser = users.find(u => u.role === newRole) || DEFAULT_USERS.find(u => u.role === newRole);
+    if (matchedUser) {
+      setCurrentUser(matchedUser);
+      localStorage.setItem('crm_user', JSON.stringify(matchedUser));
+    }
+  };
+
   const isShortcutEnabled = (userId, dispositionId) => {
-    if (!userId) return true;
-    const entry = userShortcutSettings.find(s => s.userId === userId && s.dispositionId === dispositionId);
+    const effectiveUserId = userId || currentUser?.id || 'usr-1';
+    const entry = userShortcutSettings.find(s => s.userId === effectiveUserId && s.dispositionId === dispositionId);
     return entry ? entry.isEnabled : true;
   };
 
   const setUserShortcut = (userId, dispositionId, isEnabled) => {
-    if (!userId) return;
+    const effectiveUserId = userId || currentUser?.id || 'usr-1';
     setUserShortcutSettings(prev => {
-      const idx = prev.findIndex(s => s.userId === userId && s.dispositionId === dispositionId);
+      const idx = prev.findIndex(s => s.userId === effectiveUserId && s.dispositionId === dispositionId);
       if (idx >= 0) {
         const updated = [...prev];
         updated[idx] = { ...updated[idx], isEnabled };
         return updated;
       }
-      return [...prev, { userId, dispositionId, isEnabled }];
+      return [...prev, { userId: effectiveUserId, dispositionId, isEnabled }];
     });
   };
 
   const toggleUserShortcut = (userId, dispositionId) => {
-    const current = isShortcutEnabled(userId, dispositionId);
-    setUserShortcut(userId, dispositionId, !current);
+    const effectiveUserId = userId || currentUser?.id || 'usr-1';
+    const current = isShortcutEnabled(effectiveUserId, dispositionId);
+    setUserShortcut(effectiveUserId, dispositionId, !current);
   };
 
   const [leads, setLeads] = useState(DEFAULT_LEADS);
@@ -1017,7 +1039,8 @@ export const CRMProvider = ({ children }) => {
     <CRMContext.Provider value={{
       authToken,
       currentUser,
-      simulatedRole: currentUser?.role || 'Executive',
+      simulatedRole,
+      setSimulatedRole,
       loginError,
       handleLogin,
       handleLogout,
