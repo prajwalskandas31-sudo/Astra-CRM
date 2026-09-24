@@ -823,7 +823,7 @@ export const CRMProvider = ({ children }) => {
     }));
   };
 
-  const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, date }) => {
+  const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, date, dateMode = 'single', startDate, endDate }) => {
     const targetUser = users.find(u => u.id === toUserId);
     if (!targetUser) return 0;
     const numToAssign = quantity ? parseInt(quantity, 10) : Infinity;
@@ -834,7 +834,26 @@ export const CRMProvider = ({ children }) => {
       if (count >= numToAssign) return l;
       if (fromUserId && fromUserId !== 'ALL' && l.assignedToId !== fromUserId) return l;
       if (language && language !== 'ALL' && (l.language || '').toLowerCase() !== language.toLowerCase()) return l;
-      if (date) {
+      
+      // Date filtering: single date or date range
+      if (dateMode === 'range' || (!date && (startDate || endDate))) {
+        if (startDate || endDate) {
+          const dates = [];
+          if (l.assignedDate) dates.push(l.assignedDate);
+          if (l.date) dates.push(l.date);
+          (l.history || []).forEach(h => {
+            if (h.date) dates.push(h.date);
+          });
+          if (dates.length === 0) return l;
+          const matchesRange = dates.some(d => {
+            const dStr = String(d).slice(0, 10);
+            if (startDate && dStr < startDate) return false;
+            if (endDate && dStr > endDate) return false;
+            return true;
+          });
+          if (!matchesRange) return l;
+        }
+      } else if (date) {
         const hasMatchingDate = (l.history || []).some(h => (h.date || '').includes(date)) || 
                                 (l.date && String(l.date).includes(date)) ||
                                 (l.assignedDate && String(l.assignedDate).includes(date));
@@ -842,9 +861,18 @@ export const CRMProvider = ({ children }) => {
       }
 
       count++;
+      let dateDesc = 'Any';
+      if (dateMode === 'range' && (startDate || endDate)) {
+        if (startDate && endDate) dateDesc = `${startDate} to ${endDate}`;
+        else if (startDate) dateDesc = `From ${startDate}`;
+        else if (endDate) dateDesc = `Until ${endDate}`;
+      } else if (date) {
+        dateDesc = date;
+      }
+
       const newHistory = [
         ...(l.history || []),
-        { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${date || 'Any'}].` }
+        { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${dateDesc}].` }
       ];
       return {
         ...l,

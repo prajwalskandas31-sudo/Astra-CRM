@@ -85,3 +85,7 @@ in super admin panel , in Assignment Instance Files , remove Instance / Batch ro
 
 
 In Block 4 (Lead Summary) of the Super Admin Panel, remove the "Simulate Inbound Lead Request" action button. Rename this feature to "Request Leads" (retaining its core underlying request logic) and relocate the "Request Leads" block and functionality directly into the CRM Dashboard & Dynamic Dispositions Bar for all users created by the Super Admin. This grants non-admin users direct access from their primary interface to send inbound lead requests to the Super Admin for processing and allocation.
+
+
+
+in super admin panel , in Lead Reassignment & Audit Protocol , in Lead Reassignment Protocol , in Date Filter (Calendar Picker) give option to choose range of dates also, along side the current option to pick a single date

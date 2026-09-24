@@ -11,7 +11,10 @@ export const LeadReassignmentView = () => {
   const [toUser, setToUser] = useState('');
   const [reassignQty, setReassignQty] = useState('');
   const [reassignLang, setReassignLang] = useState('ALL');
+  const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
   const [reassignDate, setReassignDate] = useState('');
+  const [reassignStartDate, setReassignStartDate] = useState('');
+  const [reassignEndDate, setReassignEndDate] = useState('');
 
   // Extract available languages from leads
   const availableLanguages = useMemo(() => {
@@ -26,15 +29,35 @@ export const LeadReassignmentView = () => {
     return leads.filter(l => {
       if (fromUser !== 'ALL' && l.assignedToId !== fromUser) return false;
       if (reassignLang !== 'ALL' && (l.language || '').toLowerCase() !== reassignLang.toLowerCase()) return false;
-      if (reassignDate) {
-        const hasMatchingDate = (l.history || []).some(h => (h.date || '').includes(reassignDate)) || 
-                                (l.date && String(l.date).includes(reassignDate)) ||
-                                (l.assignedDate && String(l.assignedDate).includes(reassignDate));
-        if (!hasMatchingDate) return false;
+      
+      if (dateMode === 'single') {
+        if (reassignDate) {
+          const hasMatchingDate = (l.history || []).some(h => (h.date || '').includes(reassignDate)) || 
+                                  (l.date && String(l.date).includes(reassignDate)) ||
+                                  (l.assignedDate && String(l.assignedDate).includes(reassignDate));
+          if (!hasMatchingDate) return false;
+        }
+      } else {
+        if (reassignStartDate || reassignEndDate) {
+          const dates = [];
+          if (l.assignedDate) dates.push(l.assignedDate);
+          if (l.date) dates.push(l.date);
+          (l.history || []).forEach(h => {
+            if (h.date) dates.push(h.date);
+          });
+          if (dates.length === 0) return false;
+          const matchesRange = dates.some(d => {
+            const dStr = String(d).slice(0, 10);
+            if (reassignStartDate && dStr < reassignStartDate) return false;
+            if (reassignEndDate && dStr > reassignEndDate) return false;
+            return true;
+          });
+          if (!matchesRange) return false;
+        }
       }
       return true;
     }).length;
-  }, [leads, fromUser, reassignLang, reassignDate]);
+  }, [leads, fromUser, reassignLang, dateMode, reassignDate, reassignStartDate, reassignEndDate]);
 
   const handleManualReassignment = (e) => {
     e.preventDefault();
@@ -57,7 +80,10 @@ export const LeadReassignmentView = () => {
       toUserId: toUser,
       quantity: reassignQty ? parseInt(reassignQty, 10) : undefined,
       language: reassignLang,
-      date: reassignDate
+      dateMode,
+      date: dateMode === 'single' ? reassignDate : undefined,
+      startDate: dateMode === 'range' ? reassignStartDate : undefined,
+      endDate: dateMode === 'range' ? reassignEndDate : undefined
     });
 
     const target = users.find(u => u.id === toUser);
@@ -67,6 +93,8 @@ export const LeadReassignmentView = () => {
     setReassignQty('');
     setReassignLang('ALL');
     setReassignDate('');
+    setReassignStartDate('');
+    setReassignEndDate('');
   };
 
   return (
@@ -77,7 +105,7 @@ export const LeadReassignmentView = () => {
           <Layers size={18} color="var(--accent-primary)" /> Lead Reassignment Protocol
         </h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Super Admin and Admin can reassign leads based on <strong>Quantity</strong>, <strong>Language</strong>, and <strong>Date</strong> filters.
+          Super Admin and Admin can reassign leads based on <strong>Quantity</strong>, <strong>Language</strong>, and <strong>Date</strong> (Single Date or Date Range) filters.
         </p>
 
         {simulatedRole === 'Super Admin' || simulatedRole === 'Admin' ? (
@@ -133,17 +161,113 @@ export const LeadReassignmentView = () => {
                 </select>
               </div>
 
-              {/* Date (Calendar Input) */}
+              {/* Date Filter (Calendar Picker) */}
               <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Calendar size={13} /> Date Filter (Calendar Picker)
-                </label>
-                <input
-                  type="date"
-                  value={reassignDate}
-                  onChange={(e) => setReassignDate(e.target.value)}
-                  style={{ width: '100%' }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}>
+                    <Calendar size={13} /> Date Filter (Calendar Picker)
+                  </label>
+                  <div style={{ display: 'inline-flex', background: 'var(--bg-app)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-color)', gap: '2px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setDateMode('single')}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: dateMode === 'single' ? 600 : 400,
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: dateMode === 'single' ? 'var(--accent-primary)' : 'transparent',
+                        color: dateMode === 'single' ? '#fff' : 'var(--text-secondary)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Single Date
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDateMode('range')}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: dateMode === 'range' ? 600 : 400,
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: dateMode === 'range' ? 'var(--accent-primary)' : 'transparent',
+                        color: dateMode === 'range' ? '#fff' : 'var(--text-secondary)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      Date Range
+                    </button>
+                  </div>
+                </div>
+
+                {dateMode === 'single' ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="date"
+                      value={reassignDate}
+                      onChange={(e) => setReassignDate(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                    {reassignDate && (
+                      <button
+                        type="button"
+                        onClick={() => setReassignDate('')}
+                        className="btn-secondary"
+                        style={{ padding: '6px 10px', fontSize: '0.72rem', whiteSpace: 'nowrap' }}
+                        title="Clear Date"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Start Date:</span>
+                        <input
+                          type="date"
+                          value={reassignStartDate}
+                          onChange={(e) => setReassignStartDate(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>End Date:</span>
+                        <input
+                          type="date"
+                          value={reassignEndDate}
+                          onChange={(e) => setReassignEndDate(e.target.value)}
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                    </div>
+                    {(reassignStartDate || reassignEndDate) && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          onClick={() => { setReassignStartDate(''); setReassignEndDate(''); }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--accent-primary)',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                            padding: 0
+                          }}
+                        >
+                          Clear Date Range
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Matching leads live badge */}

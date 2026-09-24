@@ -73,6 +73,12 @@ class LeadDispositionUpdate(BaseModel):
 class LeadReassignRequest(BaseModel):
     fromUserId: str
     toUserId: str
+    quantity: Optional[int] = None
+    language: Optional[str] = None
+    date: Optional[str] = None
+    dateMode: Optional[str] = "single"
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
 
 class SaleRegister(BaseModel):
     clientName: str
@@ -309,16 +315,53 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     reassigned_count = 0
+    max_count = req.quantity if (req.quantity and req.quantity > 0) else float('inf')
 
     for lead in LEADS_DB:
-        if lead["assignedToId"] == req.fromUserId:
-            lead["assignedToId"] = target_user["id"]
-            lead["assignedToName"] = target_user["name"]
-            lead["history"].append({
-                "date": now_str,
-                "text": f"Lead reassigned to {target_user['name']} by {current_user['name']}"
-            })
-            reassigned_count += 1
+        if reassigned_count >= max_count:
+            break
+        if req.fromUserId != "ALL" and lead["assignedToId"] != req.fromUserId:
+            continue
+        if req.language and req.language != "ALL" and lead.get("language", "").lower() != req.language.lower():
+            continue
+        
+        # Date filter: single or range
+        if req.dateMode == "range" or (req.startDate or req.endDate):
+            if req.startDate or req.endDate:
+                dates = [lead.get("assignedDate"), lead.get("date")]
+                dates.extend([h.get("date") for h in lead.get("history", []) if isinstance(h, dict) and h.get("date")])
+                dates = [str(d)[:10] for d in dates if d]
+                if not dates:
+                    continue
+                matches = any((not req.startDate or d >= req.startDate) and (not req.endDate or d <= req.endDate) for d in dates)
+                if not matches:
+                    continue
+        elif req.date:
+            dates = [lead.get("assignedDate"), lead.get("date")]
+            dates.extend([h.get("date") for h in lead.get("history", []) if isinstance(h, dict) and h.get("date")])
+            dates = [str(d) for d in dates if d]
+            if not any(req.date in d for d in dates):
+                continue
+
+        lead["assignedToId"] = target_user["id"]
+        lead["assignedToName"] = target_user["name"]
+        
+        date_desc = "Any"
+        if req.dateMode == "range" and (req.startDate or req.endDate):
+            if req.startDate and req.endDate:
+                date_desc = f"{req.startDate} to {req.endDate}"
+            elif req.startDate:
+                date_desc = f"From {req.startDate}"
+            elif req.endDate:
+                date_desc = f"Until {req.endDate}"
+        elif req.date:
+            date_desc = req.date
+
+        lead["history"].append({
+            "date": now_str,
+            "text": f"Lead reassigned to {target_user['name']} by {current_user['name']} via Protocol [Qty: {req.quantity or 'All'}, Lang: {req.language or 'All'}, Date: {date_desc}]"
+        })
+        reassigned_count += 1
 
     return {"message": f"Reassigned {reassigned_count} leads to {target_user['name']}."}
 
