@@ -22,29 +22,7 @@ const DEFAULT_USERS = [
     ifscCode: 'HDFC0000456', 
     bankNameAndBranch: 'HDFC Bank, HSR Layout Branch', 
     familyReferenceNumber: '+91 98765 43223', 
-    referredBy: 'Priya Nair (TL-201)',
-    documents: [
-      {
-        id: 'doc-1',
-        documentTypeId: 'doctype-1',
-        documentName: 'Aadhar Card',
-        fileName: 'ABHINAYA_Aadhar_Card.pdf',
-        fileType: 'application/pdf',
-        fileSize: '310 KB',
-        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
-        uploadedAt: '2026-09-21 11:15'
-      },
-      {
-        id: 'doc-2',
-        documentTypeId: 'doctype-3',
-        documentName: '10th Marks Card',
-        fileName: 'ABHINAYA_10th_Marks_Card.pdf',
-        fileType: 'application/pdf',
-        fileSize: '420 KB',
-        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
-        uploadedAt: '2026-09-21 11:20'
-      }
-    ]
+    referredBy: 'Priya Nair (TL-201)'
   },
   { 
     id: 'usr-6', 
@@ -61,29 +39,7 @@ const DEFAULT_USERS = [
     ifscCode: 'KKBK0000987', 
     bankNameAndBranch: 'Kotak Mahindra Bank, Jayanagar Branch', 
     familyReferenceNumber: '+91 98765 43224', 
-    referredBy: 'Priya Nair (TL-201)',
-    documents: [
-      {
-        id: 'doc-3',
-        documentTypeId: 'doctype-1',
-        documentName: 'Aadhar Card',
-        fileName: 'AJAY_Aadhar_Card.pdf',
-        fileType: 'application/pdf',
-        fileSize: '245 KB',
-        fileData: 'data:application/pdf;base64,JVBERi0xLjQKJcOkw7zDtsOfCjIgMCBvYmoKPDwvTGVuZ3RoIDM4L0ZpbHRlci9GbGF0ZURlY29kZT4+c3RyZWFtCnicK8nILFZwSSxJVSjJSFXILU5N1csq1ncNCnAN1HMNAABl/Ag8CmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PC9UeXBlL1BhZ2UvTWVkaWFCb3hbMCAwIDU5NS4yOCAxMDAuMDBdL1Jlc291cmNlczw8L1Byb2NTZXRbL1BERi9UZXh0XT4+L0NvbnRlbnRzIDIgMCBSPj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9DYXRhbG9nL1BhZ2VzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlcy9LaWRzWzEgMCBSXS9Db3VudCAxPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDEzNCAwMDAwMCBuIAowMDAwMDAwMDE2IDAwMDAwIG4gCjAwMDAwMDAyNTIgMDAwMDAgbiAKMDAwMDAwMDI5NyAwMDAwMCBuIAp0cmFpbGVyCjw8L1NpemUgNS9Sb290IDMgMCBSPj4Kc3RhcnR4cmVmCjM1OQolJUVPRg==',
-        uploadedAt: '2026-09-20 14:30'
-      },
-      {
-        id: 'doc-4',
-        documentTypeId: 'doctype-2',
-        documentName: 'PAN Card',
-        fileName: 'AJAY_PAN_Card.png',
-        fileType: 'image/png',
-        fileSize: '118 KB',
-        fileData: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-        uploadedAt: '2026-09-20 14:32'
-      }
-    ]
+    referredBy: 'Priya Nair (TL-201)'
   },
   { id: 'usr-7', name: 'AKSHATA', email: 'tajayvarma76@gmail.com', mobile: '+91 98765 43216', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-303', adminAccessEnabled: false, bankAccountNumber: '91234567890129', ifscCode: 'BARB0KORAMA', bankNameAndBranch: 'Bank of Baroda, Electronic City', familyReferenceNumber: '+91 98765 43225', referredBy: 'Priya Nair (TL-201)' },
   { id: 'usr-8', name: 'ANITHA', email: 'anitha@company.com', mobile: '+91 98765 43217', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-304', adminAccessEnabled: false, bankAccountNumber: '91234567890130', ifscCode: 'PUNB0001234', bankNameAndBranch: 'Punjab National Bank, BTM Layout', familyReferenceNumber: '+91 98765 43226', referredBy: 'Priya Nair (TL-201)' },
@@ -109,95 +65,18 @@ const DEFAULT_DISPOSITIONS = [
   { id: 'disp-8', name: 'Paid / Converted', requiresDateTimePicker: false, color: 'emerald', isDefault: false }
 ];
 
-const DEFAULT_LEADS = [
-  { id: 'LD-1001', clientName: 'Apex Financial Services', contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', language: 'Hindi', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'New Lead', value: '₹4,50,000', history: [{ date: '2026-09-01', text: 'Initial lead assigned.' }] },
-  { id: 'LD-1002', clientName: 'Zenith Logistics', contactPerson: 'Kavita Rao', phone: '+91 91234 56790', language: 'English', assignedToId: 'usr-5', assignedToName: 'ABHINAYA M', disposition: 'Give Demo Call', dispositionScheduledAt: '2026-09-10 11:00', value: '₹12,00,000', history: [{ date: '2026-09-02', text: 'Product demo call scheduled.' }] },
-  { id: 'LD-1003', clientName: 'Vanguard Healthcare', contactPerson: 'Dr. Suresh Patil', phone: '+91 91234 56791', language: 'Marathi', assignedToId: 'usr-6', assignedToName: 'AJAY', disposition: 'Call Back Later', dispositionScheduledAt: '2026-09-09 15:30', value: '₹8,20,000', history: [{ date: '2026-09-03', text: 'Callback requested after board review.' }] },
-  { id: 'LD-1004', clientName: 'Nexus Digital Media', contactPerson: 'Neha Sharma', phone: '+91 91234 56792', language: 'Hindi', assignedToId: 'usr-8', assignedToName: 'ANITHA', disposition: 'New Lead', value: '₹3,00,000', history: [{ date: '2026-09-04', text: 'Inbound website lead assigned.' }] },
-  { id: 'LD-1005', clientName: 'Starlight Tech Ltd', contactPerson: 'Amit Gupta', phone: '+91 91234 56793', language: 'English', assignedToId: 'usr-7', assignedToName: 'AKSHATA', disposition: 'Interested', value: '₹15,00,000', history: [{ date: '2026-09-04', text: 'Interested after demo.' }] }
-];
+const DEFAULT_LEADS = [];
 
-const DEFAULT_SALES = [
-  { id: 'SL-501', date: '2026-09-04', clientName: 'Starlight Tech Ltd', amount: '₹15,00,000', employeeName: 'AKSHATA', employeeId: 'usr-7', mitcStatus: 'Verified', complianceStatus: 'Compliant', status: 'Pending Super Admin Approval', stage: 'Sale Submitted' },
-  { id: 'SL-502', date: '2026-09-03', clientName: 'Orbital Cloud Solutions', amount: '₹7,50,000', employeeName: 'ABHINAYA M', employeeId: 'usr-5', mitcStatus: 'Verified', complianceStatus: 'Compliant', status: 'Approved (eKYC Stage)', stage: 'eKYC Approved' }
-];
+const DEFAULT_SALES = [];
 
 const DEFAULT_CUSTOM_ROLES = [
   { id: 'cr-1', roleName: 'Senior Regional Manager', level: 'Level 1 (Top)', accessScope: 'Regional' },
   { id: 'cr-2', roleName: 'Compliance Inspector', level: 'Level 2 (Mid)', accessScope: 'Global' }
 ];
 
-const DEFAULT_LEAD_REQUESTS = [
-  {
-    id: 'req-101',
-    requestedByUserId: 'usr-6',
-    requestedByName: 'AJAY',
-    role: 'Executive',
-    team: 'Team Alpha',
-    language: 'Hindi',
-    quantity: 30,
-    date: '2026-09-18',
-    status: 'Pending',
-    note: 'High activity day; need extra Hindi leads.'
-  },
-  {
-    id: 'req-102',
-    requestedByUserId: 'usr-4',
-    requestedByName: 'Priya Nair',
-    role: 'Team Leader',
-    team: 'Sales Team South',
-    language: 'English',
-    quantity: 50,
-    date: '2026-09-19',
-    status: 'Pending',
-    note: 'Inbound requests from new campaign.'
-  }
-];
+const DEFAULT_LEAD_REQUESTS = [];
 
-const DEFAULT_ASSIGNMENT_INSTANCES = [
-  {
-    id: 'inst-101',
-    sourceFileName: 'Pan_India_Master_Leads_Sept.xlsx',
-    batchName: 'Hindi_North_Leads_Batch_01.xlsx',
-    assignedBy: 'Srinivas R',
-    assignedToId: 'usr-7',
-    assignedToName: 'AKSHATA',
-    team: 'Sales Team North',
-    language: 'Hindi',
-    date: '2026-09-04',
-    totalLeads: 2,
-    leadIds: ['LD-1001', 'LD-1005'],
-    status: 'Active'
-  },
-  {
-    id: 'inst-102',
-    sourceFileName: 'Q3_Corporate_MultiLang_Dump.csv',
-    batchName: 'English_Corporate_Campaign.csv',
-    assignedBy: 'Srinivas R',
-    assignedToId: 'usr-5',
-    assignedToName: 'ABHINAYA M',
-    team: 'Corporate Accounts',
-    language: 'English',
-    date: '2026-09-02',
-    totalLeads: 1,
-    leadIds: ['LD-1002'],
-    status: 'Active'
-  },
-  {
-    id: 'inst-103',
-    sourceFileName: 'Western_State_Consolidated.xlsx',
-    batchName: 'Marathi_Regional_Leads.xlsx',
-    assignedBy: 'Srinivas R',
-    assignedToId: 'usr-6',
-    assignedToName: 'AJAY',
-    team: 'West Zone Team',
-    language: 'Marathi',
-    date: '2026-09-03',
-    totalLeads: 1,
-    leadIds: ['LD-1003'],
-    status: 'Active'
-  }
-];
+const DEFAULT_ASSIGNMENT_INSTANCES = [];
 
 const CRMContext = createContext();
 
@@ -318,13 +197,7 @@ export const CRMProvider = ({ children }) => {
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
   const [leadRequests, setLeadRequests] = useState(DEFAULT_LEAD_REQUESTS);
   const [assignmentInstances, setAssignmentInstances] = useState(DEFAULT_ASSIGNMENT_INSTANCES);
-  const [masterRecords, setMasterRecords] = useState([
-    { contactPerson: 'Rohan Mehta', phone: '+91 91234 56789', language: 'Hindi' },
-    { contactPerson: 'Kavita Rao', phone: '+91 91234 56790', language: 'English' },
-    { contactPerson: 'Dr. Suresh Patil', phone: '+91 91234 56791', language: 'Marathi' },
-    { contactPerson: 'Neha Sharma', phone: '+91 91234 56792', language: 'Hindi' },
-    { contactPerson: 'Amit Gupta', phone: '+91 91234 56793', language: 'English' }
-  ]);
+  const [masterRecords, setMasterRecords] = useState([]);
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
