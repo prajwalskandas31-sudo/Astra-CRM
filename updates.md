@@ -1,4 +1,12 @@
-problem : the number leads assigned by super admin via  Language-Based Lead Assignment Engine (Block 1 Routing) which is present in block-4 . the number of leads getting assigned to the user selected in Language-Based Lead Assignment Engine (Block 1 Routing) block must be equal to the count entered in Language-Based Lead Assignment Engine (Block 1 Routing) blocks's Assign Quantity:  section . but even after specifying the count in assign quantity , all leads that are uploaded is being reflected in the user panel of the user we have assigned leads to .
+created a new user
+assigned leads to it
+not visible in it
+refreshed
+logged out from same page , avoided opening multiple pages
+Still not working as expected
+it is getting assigned to pre defined users
+new user , no
 
 
-what is needed : in the user panel of the user for whom we have assigned leads to , in CRM Dashboard & Dynamic Dispositions Bar , in Assigned Leads Pipeline , the number of leads there must be as per what the super admin has specified in the super admin panel,in Language-Based Lead Assignment Engine (Block 1 Routing) , in   Assign Quantity:
+In summary:-
+leads assigned to super admin panel to pre defined suers are working as expected  . for  , leads assigned to newly created users , leads are not visible

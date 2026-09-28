@@ -90,6 +90,8 @@ if (typeof window !== 'undefined' && localStorage.getItem('crm_storage_version')
   localStorage.setItem('crm_storage_version', DATA_STORAGE_VERSION);
 }
 
+const CRMContext = createContext();
+
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
   const [currentUser, setCurrentUser] = useState(() => {
