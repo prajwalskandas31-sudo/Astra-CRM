@@ -365,8 +365,10 @@ export const LeadUploadModule = () => {
     const assigned = assignLeadsByLanguage(assignLang, qty, assignTargetUserId);
     const targetUser = users.find(u => u.id === assignTargetUserId);
 
-    if (assigned > 0) {
-      showToast(`Successfully assigned ${assigned} ${assignLang} leads to ${targetUser?.name} (${targetUser?.role})!`, 'success');
+    if (assigned === qty) {
+      showToast(`Successfully assigned strictly ${assigned} ${assignLang} lead(s) to ${targetUser?.name} (${targetUser?.role})!`, 'success');
+    } else if (assigned > 0) {
+      showToast(`Assigned ${assigned} of ${qty} requested ${assignLang} lead(s) to ${targetUser?.name} (${targetUser?.role}) (only ${assigned} unassigned lead(s) were available).`, 'info');
     } else {
       showToast(`No unassigned ${assignLang} leads available in the system.`, 'warning');
     }

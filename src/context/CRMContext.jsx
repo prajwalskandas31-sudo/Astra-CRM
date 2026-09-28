@@ -609,45 +609,47 @@ export const CRMProvider = ({ children }) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const langKey = (language || '').toLowerCase();
 
-    setLeads(prev => {
-      let count = 0;
-      const updated = prev.map(l => {
-        if ((l.language || '').toLowerCase() === langKey && (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned') && count < numToAssign) {
-          count++;
-          return {
-            ...l,
-            assignedToId: targetUser.id,
-            assignedToName: targetUser.name,
-            isUnassigned: false,
-            history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
-          };
-        }
-        return l;
-      });
+    // Find unassigned leads matching requested language
+    const matchingLeads = leads.filter(l => 
+      (l.language || '').toLowerCase() === langKey && 
+      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned')
+    );
 
-      if (count < numToAssign) {
-        const remaining = numToAssign - count;
-        const newLeads = Array.from({ length: remaining }).map((_, i) => ({
-          id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
-          clientName: `${language} Client ${Math.floor(100 + Math.random() * 900)}`,
-          contactPerson: `Lead Contact ${Math.floor(10 + Math.random() * 90)}`,
-          phone: '+91 9' + Math.floor(100000000 + Math.random() * 900000000),
-          language: language,
+    const leadsToAssign = matchingLeads.slice(0, numToAssign);
+    const assignedCount = leadsToAssign.length;
+    if (assignedCount === 0) return 0;
+
+    const assignedLeadIds = leadsToAssign.map(l => l.id);
+
+    setLeads(prev => prev.map(l => {
+      if (assignedLeadIds.includes(l.id)) {
+        return {
+          ...l,
           assignedToId: targetUser.id,
           assignedToName: targetUser.name,
           isUnassigned: false,
-          disposition: 'New Lead',
-          dispositionScheduledAt: '',
-          value: '₹' + (Math.floor(3 + Math.random() * 15)) + ',00,000',
-          history: [{ date: todayStr, text: `Fulfilled and assigned to ${targetUser.name} (${targetUser.role}) via Inbound Lead Request.` }]
-        }));
-        return [...newLeads, ...updated];
+          history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
+        };
       }
+      return l;
+    }));
 
-      return updated;
-    });
+    setAssignmentInstances(prev => [
+      {
+        id: 'inst-' + Math.floor(1000 + Math.random() * 9000),
+        fileName: `Assignment_${language}_Qty${assignedCount}_${todayStr}.csv`,
+        language: language,
+        quantity: assignedCount,
+        assignedToId: targetUser.id,
+        assignedToName: targetUser.name,
+        role: targetUser.role,
+        date: todayStr,
+        leadIds: assignedLeadIds
+      },
+      ...prev
+    ]);
 
-    return numToAssign;
+    return assignedCount;
   };
 
   const addBulkLeads = (newLeadsArray) => {
@@ -661,8 +663,8 @@ export const CRMProvider = ({ children }) => {
         contactPerson: ld.contactPerson,
         phone: ld.phone,
         language: ld.language || 'English',
-        assignedToId: isUnassigned ? null : (ld.assignedToId || 'usr-5'),
-        assignedToName: isUnassigned ? 'Unassigned' : (targetUser?.name || ld.assignedToName || 'ABHINAYA M'),
+        assignedToId: isUnassigned ? null : ld.assignedToId,
+        assignedToName: isUnassigned ? 'Unassigned' : (targetUser?.name || ld.assignedToName || 'User'),
         isUnassigned: isUnassigned,
         disposition: 'New Lead', // Default status per Block 2 specification
         dispositionScheduledAt: '',
