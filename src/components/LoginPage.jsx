@@ -39,7 +39,14 @@ export const LoginPage = () => {
       color: '#d97706'
     },
     {
-      role: 'Executive',
+      role: 'Executive (ABHINAYA M)',
+      email: 'abhinaya@company.com',
+      password: 'executive123',
+      badge: 'Default Allocation Target',
+      color: '#05a2c5'
+    },
+    {
+      role: 'Executive (AKSHATA)',
       email: 'tajayvarma76@gmail.com',
       password: 'executive123',
       badge: 'Personal Pipeline',

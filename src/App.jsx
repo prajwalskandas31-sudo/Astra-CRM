@@ -46,9 +46,32 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+import { RoleSimulatorBanner } from './components/RoleSimulatorBanner';
+
 const AppContent = () => {
-  const { authToken, currentUser } = useCRM();
+  const { authToken, currentUser, simulatedRole } = useCRM();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Enforce role-based tab guards and reset tab on logout or unauthorized role switch
+  React.useEffect(() => {
+    if (!currentUser) {
+      setActiveTab('dashboard');
+      return;
+    }
+
+    const currentRole = simulatedRole || currentUser.role || 'Executive';
+    const superAdminOnlyTabs = ['lead-summary', 'custom-roles'];
+    const adminTabs = ['lead-reassignment'];
+    const managementTabs = ['team-monitoring'];
+
+    if (superAdminOnlyTabs.includes(activeTab) && currentRole !== 'Super Admin') {
+      setActiveTab('dashboard');
+    } else if (adminTabs.includes(activeTab) && !['Super Admin', 'Admin'].includes(currentRole)) {
+      setActiveTab('dashboard');
+    } else if (managementTabs.includes(activeTab) && !['Super Admin', 'Admin', 'Manager', 'Team Leader'].includes(currentRole)) {
+      setActiveTab('dashboard');
+    }
+  }, [currentUser?.id, simulatedRole, activeTab]);
 
   if (!authToken || !currentUser) {
     return <LoginPage />;
@@ -98,6 +121,7 @@ const AppContent = () => {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="main-content">
         <Navbar currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} />
+        <RoleSimulatorBanner />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
             {renderTabContent()}

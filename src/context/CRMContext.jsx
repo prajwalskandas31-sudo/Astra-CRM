@@ -83,16 +83,19 @@ const CRMContext = createContext();
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
   const [currentUser, setCurrentUser] = useState(() => {
+    const savedToken = localStorage.getItem('crm_token');
     const saved = localStorage.getItem('crm_user');
-    if (saved) {
+    if (savedToken && saved) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id) return parsed;
       } catch (e) {}
     }
-    return DEFAULT_USERS[0];
+    return savedToken ? DEFAULT_USERS[0] : null;
   });
   const [simulatedRole, setSimulatedRoleState] = useState(() => {
+    const savedSimRole = localStorage.getItem('crm_simulated_role');
+    if (savedSimRole) return savedSimRole;
     return currentUser?.role || 'Super Admin';
   });
   const [loginError, setLoginError] = useState('');
@@ -160,6 +163,7 @@ export const CRMProvider = ({ children }) => {
 
   const setSimulatedRole = (newRole, targetUserId = null) => {
     setSimulatedRoleState(newRole);
+    localStorage.setItem('crm_simulated_role', newRole);
     let matchedUser = null;
     if (targetUserId) {
       matchedUser = users.find(u => u.id === targetUserId);
@@ -183,6 +187,7 @@ export const CRMProvider = ({ children }) => {
       setCurrentUser(targetUser);
       setSimulatedRoleState(targetUser.role);
       localStorage.setItem('crm_user', JSON.stringify(targetUser));
+      localStorage.setItem('crm_simulated_role', targetUser.role);
     }
   };
 
@@ -226,9 +231,37 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_leads', JSON.stringify(leads));
   }, [leads]);
 
-  const [sales, setSales] = useState(DEFAULT_SALES);
+  const [sales, setSales] = useState(() => {
+    const saved = localStorage.getItem('crm_sales');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_SALES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_sales', JSON.stringify(sales));
+  }, [sales]);
+
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
-  const [leadRequests, setLeadRequests] = useState(DEFAULT_LEAD_REQUESTS);
+
+  const [leadRequests, setLeadRequests] = useState(() => {
+    const saved = localStorage.getItem('crm_lead_requests');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_LEAD_REQUESTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_lead_requests', JSON.stringify(leadRequests));
+  }, [leadRequests]);
 
   const [assignmentInstances, setAssignmentInstances] = useState(() => {
     const saved = localStorage.getItem('crm_assignment_instances');
@@ -277,7 +310,8 @@ export const CRMProvider = ({ children }) => {
 
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
-    if (!authToken) return;
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (!authToken || !isLocalhost) return;
     try {
       const [uRes, lRes, sRes, dRes, rRes, dtRes] = await Promise.all([
         fetch(`${API_BASE_URL}/users`, { headers: authHeaders() }),
@@ -288,12 +322,31 @@ export const CRMProvider = ({ children }) => {
         fetch(`${API_BASE_URL}/document-types`, { headers: authHeaders() })
       ]);
 
-      if (uRes.ok) setUsers(await uRes.json());
-      if (lRes.ok) setLeads(await lRes.json());
-      if (sRes.ok) setSales(await sRes.json());
-      if (dRes.ok) setDispositions(await dRes.json());
-      if (rRes.ok) setCustomRoles(await rRes.json());
-      if (dtRes.ok) setDocumentTypes(await dtRes.json());
+      if (uRes.ok) {
+        const data = await uRes.json();
+        if (Array.isArray(data) && data.length > 0) setUsers(data);
+      }
+      if (lRes.ok) {
+        const data = await lRes.json();
+        // Never wipe out rich localStorage leads with empty array from cold backend
+        if (Array.isArray(data) && data.length > 0) setLeads(data);
+      }
+      if (sRes.ok) {
+        const data = await sRes.json();
+        if (Array.isArray(data) && data.length > 0) setSales(data);
+      }
+      if (dRes.ok) {
+        const data = await dRes.json();
+        if (Array.isArray(data) && data.length > 0) setDispositions(data);
+      }
+      if (rRes.ok) {
+        const data = await rRes.json();
+        if (Array.isArray(data) && data.length > 0) setCustomRoles(data);
+      }
+      if (dtRes.ok) {
+        const data = await dtRes.json();
+        if (Array.isArray(data) && data.length > 0) setDocumentTypes(data);
+      }
     } catch (err) {
       console.log('Operating in standalone interactive mode (FastAPI backend offline).');
     }
@@ -308,28 +361,33 @@ export const CRMProvider = ({ children }) => {
   // Login handler with backend attempt & seamless live fallback
   const handleLogin = async (email, password) => {
     setLoginError('');
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (isLocalhost) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        setAuthToken(data.access_token);
-        setCurrentUser(data.user);
-        setSimulatedRoleState(data.user?.role || 'Executive');
-        localStorage.setItem('crm_token', data.access_token);
-        localStorage.setItem('crm_user', JSON.stringify(data.user));
-        return true;
+        if (res.ok) {
+          const data = await res.json();
+          setAuthToken(data.access_token);
+          setCurrentUser(data.user);
+          setSimulatedRoleState(data.user?.role || 'Executive');
+          localStorage.setItem('crm_token', data.access_token);
+          localStorage.setItem('crm_user', JSON.stringify(data.user));
+          localStorage.setItem('crm_simulated_role', data.user?.role || 'Executive');
+          return true;
+        }
+      } catch (err) {
+        // Backend not running on live link - fall back to interactive mock mode
       }
-    } catch (err) {
-      // Backend not running on live link - fall back to interactive mock mode
     }
 
-    // Interactive standalone fallback login
-    const matchedUser = DEFAULT_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
+    // Standalone fallback login - check users list first, then default users
+    const matchedUser = (users || []).find(u => u.email.toLowerCase() === email.toLowerCase()) || 
+      DEFAULT_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
       id: 'usr-demo',
       name: email.split('@')[0].toUpperCase(),
       email: email,
@@ -343,6 +401,7 @@ export const CRMProvider = ({ children }) => {
     setSimulatedRoleState(matchedUser.role || 'Executive');
     localStorage.setItem('crm_token', token);
     localStorage.setItem('crm_user', JSON.stringify(matchedUser));
+    localStorage.setItem('crm_simulated_role', matchedUser.role || 'Executive');
     return true;
   };
 
@@ -352,6 +411,7 @@ export const CRMProvider = ({ children }) => {
     setSimulatedRoleState('Executive');
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_user');
+    localStorage.removeItem('crm_simulated_role');
   };
 
   // User Actions

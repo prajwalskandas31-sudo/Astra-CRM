@@ -1131,3 +1131,48 @@ input[type="checkbox"]:indeterminate {
     grid-template-columns: 1fr;
   }
 }
+
+/* Role Master Simulator Bar */
+.role-simulator-bar {
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  z-index: 5;
+}
+
+.role-badges-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.role-sim-btn {
+  font-size: 0.74rem;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.role-sim-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.role-sim-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
