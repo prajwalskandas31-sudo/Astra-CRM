@@ -579,8 +579,9 @@ export const CRMProvider = ({ children }) => {
   // Lead Upload Integration (Block 2 & Block 3 requirement: new uploaded leads get 'New Lead' disposition by default)
   const addLead = (leadData) => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const uniqueId = 'LD-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
     const newLeadObj = {
-      id: 'LD-' + Math.floor(1000 + Math.random() * 9000),
+      id: uniqueId,
       clientName: leadData.clientName || leadData.contactPerson + ' Co.',
       contactPerson: leadData.contactPerson,
       phone: leadData.phone,
@@ -607,22 +608,22 @@ export const CRMProvider = ({ children }) => {
     if (isNaN(numToAssign) || numToAssign <= 0) return 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const langKey = (language || '').toLowerCase();
+    const langKey = (language || '').trim().toLowerCase();
 
-    // Find unassigned leads matching requested language
+    // Find unassigned leads matching requested language strictly
     const matchingLeads = leads.filter(l => 
-      (l.language || '').toLowerCase() === langKey && 
-      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned')
+      ((l.language || '').trim().toLowerCase() === langKey || langKey === 'all') && 
+      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned')
     );
 
     const leadsToAssign = matchingLeads.slice(0, numToAssign);
     const assignedCount = leadsToAssign.length;
     if (assignedCount === 0) return 0;
 
-    const assignedLeadIds = leadsToAssign.map(l => l.id);
+    const assignedLeadIds = new Set(leadsToAssign.map(l => l.id));
 
     setLeads(prev => prev.map(l => {
-      if (assignedLeadIds.includes(l.id)) {
+      if (assignedLeadIds.has(l.id)) {
         return {
           ...l,
           assignedToId: targetUser.id,
@@ -636,7 +637,7 @@ export const CRMProvider = ({ children }) => {
 
     setAssignmentInstances(prev => [
       {
-        id: 'inst-' + Math.floor(1000 + Math.random() * 9000),
+        id: 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
         fileName: `Assignment_${language}_Qty${assignedCount}_${todayStr}.csv`,
         language: language,
         quantity: assignedCount,
@@ -644,7 +645,7 @@ export const CRMProvider = ({ children }) => {
         assignedToName: targetUser.name,
         role: targetUser.role,
         date: todayStr,
-        leadIds: assignedLeadIds
+        leadIds: Array.from(assignedLeadIds)
       },
       ...prev
     ]);
@@ -654,11 +655,12 @@ export const CRMProvider = ({ children }) => {
 
   const addBulkLeads = (newLeadsArray) => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const baseTime = Date.now();
     const formatted = newLeadsArray.map((ld, i) => {
       const isUnassigned = !ld.assignedToId || ld.assignedToId === 'unassigned';
       const targetUser = users.find(u => u.id === ld.assignedToId);
       return {
-        id: 'LD-' + Math.floor(2000 + Math.random() * 8000 + i),
+        id: `LD-${baseTime}-${i}-${Math.floor(Math.random() * 10000)}`,
         clientName: ld.contactPerson + ' Org',
         contactPerson: ld.contactPerson,
         phone: ld.phone,
@@ -702,15 +704,14 @@ export const CRMProvider = ({ children }) => {
     const targetUser = users.find(u => u.id === toUserId);
     if (!targetUser) return 0;
     const numToAssign = quantity ? parseInt(quantity, 10) : Infinity;
+    if (isNaN(numToAssign) || numToAssign <= 0) return 0;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    let count = 0;
-    setLeads(prev => prev.map(l => {
-      if (count >= numToAssign) return l;
-      if (fromUserId && fromUserId !== 'ALL' && l.assignedToId !== fromUserId) return l;
-      if (language && language !== 'ALL' && (l.language || '').toLowerCase() !== language.toLowerCase()) return l;
-      
-      // Date filtering: single date or date range
+    // Filter candidate matching leads
+    const candidates = leads.filter(l => {
+      if (fromUserId && fromUserId !== 'ALL' && l.assignedToId !== fromUserId) return false;
+      if (language && language !== 'ALL' && (l.language || '').trim().toLowerCase() !== language.trim().toLowerCase()) return false;
+
       if (dateMode === 'range' || (!date && (startDate || endDate))) {
         if (startDate || endDate) {
           const dates = [];
@@ -719,45 +720,56 @@ export const CRMProvider = ({ children }) => {
           (l.history || []).forEach(h => {
             if (h.date) dates.push(h.date);
           });
-          if (dates.length === 0) return l;
+          if (dates.length === 0) return false;
           const matchesRange = dates.some(d => {
             const dStr = String(d).slice(0, 10);
             if (startDate && dStr < startDate) return false;
             if (endDate && dStr > endDate) return false;
             return true;
           });
-          if (!matchesRange) return l;
+          if (!matchesRange) return false;
         }
       } else if (date) {
         const hasMatchingDate = (l.history || []).some(h => (h.date || '').includes(date)) || 
                                 (l.date && String(l.date).includes(date)) ||
                                 (l.assignedDate && String(l.assignedDate).includes(date));
-        if (!hasMatchingDate) return l;
+        if (!hasMatchingDate) return false;
       }
+      return true;
+    });
 
-      count++;
-      let dateDesc = 'Any';
-      if (dateMode === 'range' && (startDate || endDate)) {
-        if (startDate && endDate) dateDesc = `${startDate} to ${endDate}`;
-        else if (startDate) dateDesc = `From ${startDate}`;
-        else if (endDate) dateDesc = `Until ${endDate}`;
-      } else if (date) {
-        dateDesc = date;
+    const leadsToReassign = candidates.slice(0, numToAssign);
+    if (leadsToReassign.length === 0) return 0;
+
+    const targetIds = new Set(leadsToReassign.map(l => l.id));
+
+    let dateDesc = 'Any';
+    if (dateMode === 'range' && (startDate || endDate)) {
+      if (startDate && endDate) dateDesc = `${startDate} to ${endDate}`;
+      else if (startDate) dateDesc = `From ${startDate}`;
+      else if (endDate) dateDesc = `Until ${endDate}`;
+    } else if (date) {
+      dateDesc = date;
+    }
+
+    setLeads(prev => prev.map(l => {
+      if (targetIds.has(l.id)) {
+        const newHistory = [
+          ...(l.history || []),
+          { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${dateDesc}].` }
+        ];
+        return {
+          ...l,
+          assignedToId: targetUser.id,
+          assignedToName: targetUser.name,
+          isUnassigned: false,
+          history: newHistory
+        };
       }
-
-      const newHistory = [
-        ...(l.history || []),
-        { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${dateDesc}].` }
-      ];
-      return {
-        ...l,
-        assignedToId: targetUser.id,
-        assignedToName: targetUser.name,
-        history: newHistory
-      };
+      return l;
     }));
 
-    return count;
+    return leadsToReassign.length;
   };
 
   // Sales Workflow

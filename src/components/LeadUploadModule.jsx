@@ -45,6 +45,14 @@ export const LeadUploadModule = () => {
     }
   }, [simulatedRole, isSuperAdmin, activeSubBlock]);
 
+  useEffect(() => {
+    const activeUsers = users.filter(u => u.status === 'Active');
+    if (activeUsers.length > 0 && (!assignTargetUserId || !activeUsers.some(u => u.id === assignTargetUserId))) {
+      const defaultUser = activeUsers.find(u => u.role === 'Executive') || activeUsers[0];
+      setAssignTargetUserId(defaultUser.id);
+    }
+  }, [users, assignTargetUserId]);
+
   // --- 1. Data Record Upload State ---
   const [masterInputText, setMasterInputText] = useState('');
   const [masterSearch, setMasterSearch] = useState('');
