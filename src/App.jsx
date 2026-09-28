@@ -14,6 +14,38 @@ import { SaleApprovalWorkflow } from './components/SaleApprovalWorkflow';
 import { LeadReassignmentView } from './components/LeadReassignmentView';
 import { SystemSettings } from './components/SystemSettings';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('UI Runtime Error caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="directory-card" style={{ padding: '32px', textAlign: 'center', margin: '30px auto', maxWidth: '640px' }}>
+          <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>Module Render Error</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '18px' }}>
+            {this.state.error?.message || 'An unexpected error occurred while loading this view.'}
+          </p>
+          <button className="btn-primary" onClick={() => this.setState({ hasError: false, error: null })}>
+            Retry Loading View
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const AppContent = () => {
   const { authToken, currentUser } = useCRM();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -67,7 +99,9 @@ const AppContent = () => {
       <div className="main-content">
         <Navbar currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} />
         <main className="page-body">
-          {renderTabContent()}
+          <ErrorBoundary key={activeTab}>
+            {renderTabContent()}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

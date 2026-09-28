@@ -21,12 +21,12 @@ import {
 
 export const LeadUploadModule = () => {
   const { 
-    leads, 
+    leads = [], 
     addLead, 
     addBulkLeads, 
     simulatedRole, 
-    users, 
-    masterRecords, 
+    users = [], 
+    masterRecords = [], 
     addMasterRecords, 
     assignLeadsByLanguage 
   } = useCRM();
@@ -38,20 +38,6 @@ export const LeadUploadModule = () => {
 
   // Active sub-block state: 'master', 'bulk', 'single', 'report'
   const [activeSubBlock, setActiveSubBlock] = useState(isSuperAdmin ? 'bulk' : 'single');
-  
-  useEffect(() => {
-    if (!isSuperAdmin && activeSubBlock !== 'single') {
-      setActiveSubBlock('single');
-    }
-  }, [simulatedRole, isSuperAdmin, activeSubBlock]);
-
-  useEffect(() => {
-    const activeUsers = users.filter(u => u.status === 'Active');
-    if (activeUsers.length > 0 && (!assignTargetUserId || !activeUsers.some(u => u.id === assignTargetUserId))) {
-      const defaultUser = activeUsers.find(u => u.role === 'Executive') || activeUsers[0];
-      setAssignTargetUserId(defaultUser.id);
-    }
-  }, [users, assignTargetUserId]);
 
   // --- 1. Data Record Upload State ---
   const [masterInputText, setMasterInputText] = useState('');
@@ -70,15 +56,33 @@ export const LeadUploadModule = () => {
   // Dynamic Lead Assignment State (Block 1 Integration)
   const [assignLang, setAssignLang] = useState('Hindi');
   const [assignQty, setAssignQty] = useState('10');
-  const [assignTargetUserId, setAssignTargetUserId] = useState(users.find(u => u.role === 'Executive')?.id || users[0]?.id || '');
+  const [assignTargetUserId, setAssignTargetUserId] = useState(() => {
+    const activeExec = (users || []).find(u => u.status === 'Active' && u.role === 'Executive');
+    const firstActive = (users || []).find(u => u.status === 'Active');
+    return activeExec?.id || firstActive?.id || '';
+  });
 
   // --- 3. Single Upload Form State ---
   const [singleForm, setSingleForm] = useState({
     contactPerson: '',
     phone: '',
     language: 'English',
-    assignedToId: users.find(u => u.role === 'Executive')?.id || users[0]?.id || ''
+    assignedToId: (users || []).find(u => u.status === 'Active' && u.role === 'Executive')?.id || (users || [])[0]?.id || ''
   });
+
+  useEffect(() => {
+    if (!isSuperAdmin && activeSubBlock !== 'single') {
+      setActiveSubBlock('single');
+    }
+  }, [simulatedRole, isSuperAdmin, activeSubBlock]);
+
+  useEffect(() => {
+    const activeUsers = (users || []).filter(u => u.status === 'Active');
+    if (activeUsers.length > 0 && (!assignTargetUserId || !activeUsers.some(u => u.id === assignTargetUserId))) {
+      const defaultUser = activeUsers.find(u => u.role === 'Executive') || activeUsers[0];
+      setAssignTargetUserId(defaultUser.id);
+    }
+  }, [users, assignTargetUserId]);
 
   // ==========================================
   // HANDLER: Data Record Upload (Super Admin)
