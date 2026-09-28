@@ -1124,7 +1124,10 @@ export const CRMProvider = ({ children }) => {
         return {
           ...l,
           assignedToId: targetUser.id,
+          assigned_user_id: targetUser.id,
           assignedToName: targetUser.name,
+          assignedToEmail: targetUser.email || '',
+          assignedToRole: targetUser.role || 'Executive',
           isUnassigned: false,
           history: newHistory
         };
