@@ -291,10 +291,12 @@ def delete_disposition(disp_id: str, current_user: dict = Depends(require_roles(
 @app.get("/api/leads")
 def get_leads(current_user: dict = Depends(get_current_user)):
     # Scoped lead visibility based on role
-    if current_user["role"] == "Executive":
-        return [l for l in LEADS_DB if l["assignedToId"] == current_user["id"] or l["assignedToName"] == current_user["name"]]
-    elif current_user["role"] in ["Manager", "Team Leader"]:
-        return LEADS_DB
+    if current_user["role"] in ["Executive", "Team Leader", "Manager", "Admin"]:
+        return [
+            l for l in LEADS_DB 
+            if (l.get("assignedToId") == current_user["id"] or l.get("assigned_user_id") == current_user["id"] or (l.get("assignedToName") or "").strip().lower() == current_user["name"].strip().lower())
+            and not l.get("isUnassigned") and l.get("assignedToId") != "unassigned" and l.get("assignedToName") != "Unassigned"
+        ]
     return LEADS_DB
 
 @app.post("/api/leads/{lead_id}/disposition")

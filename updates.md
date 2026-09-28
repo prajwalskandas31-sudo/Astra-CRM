@@ -1,9 +1,4 @@
-In super admin panel ,  in lead upload module and block 3 report sync , in  block 3 in bulk upload
-In sub block 1 :bulk upload option (super admin)
-After uploading the leads , and processing it , in language based lead assignment engine (block 1 routing) ,in assign quanity make sure number of leads assigned to user is based on the number given in assign quantity
+problem : the number leads assigned by super admin via  Language-Based Lead Assignment Engine (Block 1 Routing) which is present in block-4 . the number of leads getting assigned to the user selected in Language-Based Lead Assignment Engine (Block 1 Routing) block must be equal to the count entered in Language-Based Lead Assignment Engine (Block 1 Routing) blocks's Assign Quantity:  section . but even after specifying the count in assign quantity , all leads that are uploaded is being reflected in the user panel of the user we have assigned leads to .
 
 
-Eg if i have uploaded 100 leads , full 100 leads are getting assigned to users
-
-
-It must be assigned to users ,strictly based on language and quantity given in  language based lead assignment engline (block 1 routing) block
+what is needed : in the user panel of the user for whom we have assigned leads to , in CRM Dashboard & Dynamic Dispositions Bar , in Assigned Leads Pipeline , the number of leads there must be as per what the super admin has specified in the super admin panel,in Language-Based Lead Assignment Engine (Block 1 Routing) , in   Assign Quantity:

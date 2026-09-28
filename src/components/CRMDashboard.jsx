@@ -13,7 +13,8 @@ export const CRMDashboard = () => {
     isShortcutEnabled, 
     toggleUserShortcut, 
     userShortcutSettings,
-    submitLeadRequest 
+    submitLeadRequest,
+    users
   } = useCRM();
   const { showToast } = useToast();
 
@@ -34,11 +35,48 @@ export const CRMDashboard = () => {
   const [reqQty, setReqQty] = useState(25);
   const [reqNote, setReqNote] = useState('');
 
+  const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
+  const [adminViewUserFilter, setAdminViewUserFilter] = useState('AUTO');
+
   const scopedLeads = leads.filter(l => {
-    if (simulatedRole === 'Executive') {
-      return l.assignedToName === 'ABHINAYA M' || l.assignedToName === 'AJAY' || l.assignedToName === 'AKSHATA' || l.assignedToName === 'ANITHA';
+    // Unassigned leads should NEVER appear in the Assigned Leads Pipeline
+    if (l.isUnassigned || !l.assignedToId || l.assignedToId === 'unassigned' || l.assignedToName === 'Unassigned') {
+      return false;
     }
-    return true;
+
+    if (isSuperAdmin) {
+      if (adminViewUserFilter === 'ALL') {
+        return true;
+      }
+      if (adminViewUserFilter !== 'AUTO') {
+        return (
+          l.assignedToId === adminViewUserFilter ||
+          l.assigned_user_id === adminViewUserFilter ||
+          (users?.find(u => u.id === adminViewUserFilter)?.name && 
+           (l.assignedToName || '').trim().toLowerCase() === (users.find(u => u.id === adminViewUserFilter)?.name || '').trim().toLowerCase())
+        );
+      }
+      // AUTO mode for Super Admin:
+      // If Super Admin was assigned leads directly, show them; otherwise show all assigned leads
+      const superAdminDirectLeads = leads.filter(lead => 
+        !lead.isUnassigned && lead.assignedToId && lead.assignedToName !== 'Unassigned' &&
+        (lead.assignedToId === currentUser?.id || lead.assigned_user_id === currentUser?.id || lead.assignedToName === currentUser?.name)
+      );
+      if (superAdminDirectLeads.length > 0) {
+        return l.assignedToId === currentUser?.id || l.assigned_user_id === currentUser?.id || l.assignedToName === currentUser?.name;
+      }
+      return true; // All assigned leads
+    }
+
+    // Standard User Panel (e.g., Executive, Team Leader, Manager, Admin):
+    // Strictly show ONLY the leads allocated to this active user
+    const currentId = currentUser?.id;
+    const currentName = (currentUser?.name || '').trim().toLowerCase();
+
+    return (
+      (currentId && (l.assignedToId === currentId || l.assigned_user_id === currentId)) ||
+      (currentName && (l.assignedToName || '').trim().toLowerCase() === currentName)
+    );
   });
 
   const filteredLeads = scopedLeads.filter(l => {
@@ -269,8 +307,37 @@ export const CRMDashboard = () => {
         <div className="directory-toolbar">
           <div className="directory-title-area">
             <h3>Assigned Leads Pipeline</h3>
-            <p>Configured Disposition List Schema • Strict 5 Columns (Deprecated fields removed)</p>
+            <p>
+              {isSuperAdmin
+                ? (adminViewUserFilter === 'ALL' || adminViewUserFilter === 'AUTO'
+                    ? `Enterprise Wide Pipeline • ${scopedLeads.length} Total Assigned Leads`
+                    : `Viewing User Pipeline: ${users?.find(u => u.id === adminViewUserFilter)?.name || 'User'} (${users?.find(u => u.id === adminViewUserFilter)?.role || 'User'}) • Exactly ${scopedLeads.length} Assigned Leads`)
+                : `User Personal Pipeline: ${currentUser?.name || 'User'} (${currentUser?.role || simulatedRole}) • Exactly ${scopedLeads.length} Assigned Leads`}
+            </p>
           </div>
+
+          {isSuperAdmin && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Inspect User Pipeline:</span>
+              <select
+                value={adminViewUserFilter}
+                onChange={(e) => setAdminViewUserFilter(e.target.value)}
+                style={{ fontSize: '0.8rem', padding: '5px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                <option value="AUTO">All Assigned Leads ({leads.filter(l => !l.isUnassigned && l.assignedToId && l.assignedToName !== 'Unassigned').length})</option>
+                <optgroup label="Select Specific User Pipeline (Block 1 Hierarchy)">
+                  {users?.filter(u => u.status === 'Active').map(u => {
+                    const count = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role}) — {count} Assigned Leads
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="table-responsive">

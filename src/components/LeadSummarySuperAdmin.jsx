@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import {
@@ -22,6 +22,8 @@ import {
   PhoneCall,
   PhoneOff,
   AlertCircle,
+  Tag,
+  AlertTriangle,
   X
 } from 'lucide-react';
 
@@ -73,6 +75,74 @@ export const LeadSummarySuperAdmin = () => {
 
   const [showGranularReassignModal, setShowGranularReassignModal] = useState(false);
   const [granularTargetUserId, setGranularTargetUserId] = useState('');
+
+  // Language-Based Lead Assignment Engine (Block 1 Routing) in Block 4
+  const [b4AssignLang, setB4AssignLang] = useState('Hindi');
+  const [b4AssignQty, setB4AssignQty] = useState('10');
+  const [b4AssignTargetUserId, setB4AssignTargetUserId] = useState('');
+
+  const unassignedLeads = useMemo(() => {
+    return leads.filter(l => 
+      l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned' || !l.assigned_user_id
+    );
+  }, [leads]);
+
+  const languagesList = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Marathi', 'Malayalam', 'Bengali'];
+
+  useEffect(() => {
+    const activeUsers = (users || []).filter(u => u.status === 'Active');
+    if (activeUsers.length > 0 && (!b4AssignTargetUserId || !activeUsers.some(u => u.id === b4AssignTargetUserId))) {
+      const defaultUser = activeUsers.find(u => u.role === 'Executive') || activeUsers[0];
+      setB4AssignTargetUserId(defaultUser.id);
+    }
+  }, [users, b4AssignTargetUserId]);
+
+  const handleB4AssignLeads = () => {
+    if (b4AssignQty === undefined || b4AssignQty === null || String(b4AssignQty).trim() === '') {
+      addToast('Quantity Validation: Assign Quantity field is required.', 'error');
+      return;
+    }
+    const qty = Number(b4AssignQty);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      addToast('Quantity Validation: Assign Quantity must be a valid positive integer greater than zero.', 'error');
+      return;
+    }
+    if (!b4AssignTargetUserId) {
+      addToast('Validation: Please select a target user from the Block 1 Hierarchy.', 'warning');
+      return;
+    }
+    const targetUser = users.find(u => u.id === b4AssignTargetUserId);
+    if (!targetUser) {
+      addToast('Validation: Selected user not found.', 'error');
+      return;
+    }
+
+    const currentLangMatching = unassignedLeads.filter(l => 
+      b4AssignLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === b4AssignLang.toLowerCase()
+    );
+    const availableCount = currentLangMatching.length;
+    if (availableCount === 0) {
+      addToast(`Quantity Validation: No unassigned leads available in the queue for language '${b4AssignLang}'. Allocation strictly prevented.`, 'error');
+      return;
+    }
+    if (qty > availableCount) {
+      addToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Requested quantity exceeds total unassigned leads (${availableCount}) available for language '${b4AssignLang}'. Allocation strictly prevented.`, 'error');
+      return;
+    }
+
+    const result = assignLeadsByLanguage(b4AssignLang, qty, b4AssignTargetUserId);
+    if (!result || !result.success) {
+      addToast(result?.error || 'Lead allocation failed.', 'error');
+      return;
+    }
+
+    addToast(`Successfully allocated exactly ${result.assigned} ${b4AssignLang} lead(s) to ${targetUser.name} (${targetUser.role})! Remaining unassigned: ${result.remainingUnassigned}.`, 'success');
+    if (result.remainingUnassigned > 0) {
+      setB4AssignQty(String(Math.min(result.assigned, result.remainingUnassigned)));
+    } else {
+      setB4AssignQty('');
+    }
+  };
 
   // Role Security Check
   if (simulatedRole !== 'Super Admin') {
@@ -260,6 +330,170 @@ export const LeadSummarySuperAdmin = () => {
           </div>
         </div>
       </div>
+
+      {/* LANGUAGE-BASED LEAD ASSIGNMENT ENGINE (BLOCK 1 ROUTING) */}
+      {(() => {
+        const currentLangMatching = unassignedLeads.filter(l => 
+          b4AssignLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === b4AssignLang.toLowerCase()
+        );
+        const currentLangAvailableCount = currentLangMatching.length;
+        const parsedQty = Number(b4AssignQty);
+        const isQtyEmpty = b4AssignQty === undefined || b4AssignQty === null || String(b4AssignQty).trim() === '';
+        const isQtyValid = !isQtyEmpty && Number.isInteger(parsedQty) && parsedQty > 0;
+        const isQtyExceeded = isQtyValid && parsedQty > currentLangAvailableCount;
+        const canAllocate = currentLangAvailableCount > 0 && isQtyValid && !isQtyExceeded && Boolean(b4AssignTargetUserId);
+
+        return (
+          <div className="card" style={{ padding: '1.25rem 1.5rem', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 700, color: 'var(--text-main)' }}>
+                <UserCheck size={18} color="var(--accent)" /> Language-Based Lead Assignment Engine (Block 1 Routing)
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="badge" style={{ backgroundColor: currentLangAvailableCount > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.12)', color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700, padding: '4px 10px', fontSize: '0.78rem' }}>
+                  <Tag size={12} /> {b4AssignLang}: {currentLangAvailableCount} Unassigned Available
+                </span>
+                <span className="badge" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: '0.76rem', padding: '4px 8px' }}>
+                  Total Queue: {unassignedLeads.length}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Super Admin allocates unassigned uploaded leads to users in the <strong>Block 1 Hierarchy</strong>. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', alignItems: 'start' }}>
+              {/* Active Language Filter */}
+              <div className="form-group">
+                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-main)', marginBottom: '6px' }}>
+                  <span>Filter by Language:</span>
+                  <span style={{ color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700 }}>
+                    {currentLangAvailableCount} in Queue
+                  </span>
+                </label>
+                <select 
+                  value={b4AssignLang} 
+                  onChange={(e) => {
+                    const newLang = e.target.value;
+                    setB4AssignLang(newLang);
+                    const newAvail = unassignedLeads.filter(l => 
+                      newLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === newLang.toLowerCase()
+                    ).length;
+                    if (newAvail > 0) {
+                      setB4AssignQty(String(Math.min(10, newAvail)));
+                    } else {
+                      setB4AssignQty('');
+                    }
+                  }}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
+                >
+                  {languagesList.map(lang => {
+                    const count = unassignedLeads.filter(l => (l.language || '').toLowerCase() === lang.toLowerCase()).length;
+                    return (
+                      <option key={lang} value={lang}>
+                        {lang} ({count} unassigned)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Assign Quantity with Real-time Validation */}
+              <div className="form-group">
+                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-main)', marginBottom: '6px' }}>
+                  <span>Assign Quantity:</span>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    Max: <strong>{currentLangAvailableCount}</strong>
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={currentLangAvailableCount || 1}
+                  value={b4AssignQty}
+                  onChange={(e) => setB4AssignQty(e.target.value)}
+                  placeholder={currentLangAvailableCount > 0 ? `1 to ${currentLangAvailableCount}` : "0 available"}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-input)',
+                    color: 'var(--text-main)',
+                    border: `1px solid ${isQtyExceeded || (isQtyEmpty && b4AssignQty !== '') ? '#ef4444' : isQtyValid ? '#10b981' : 'var(--border-color)'}`
+                  }}
+                />
+                {currentLangAvailableCount === 0 && (
+                  <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle size={12} /> 0 unassigned leads in queue for {b4AssignLang}. Allocation prevented.
+                  </div>
+                )}
+                {isQtyExceeded && (
+                  <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle size={12} /> Exceeds available leads ({currentLangAvailableCount} max). Allocation strictly prevented.
+                  </div>
+                )}
+                {!isQtyValid && !isQtyEmpty && (
+                  <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <AlertTriangle size={12} /> Must be a positive whole number &gt; 0
+                  </div>
+                )}
+                {isQtyValid && !isQtyExceeded && (
+                  <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={12} /> Strictly allocates exactly {parsedQty} {b4AssignLang} lead(s) ({currentLangAvailableCount - parsedQty} remaining)
+                  </div>
+                )}
+              </div>
+
+              {/* Assign To User (Block 1 Hierarchy) */}
+              <div className="form-group">
+                <label style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>Assign To User (Block 1 Hierarchy):</label>
+                <select 
+                  value={b4AssignTargetUserId} 
+                  onChange={(e) => setB4AssignTargetUserId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
+                >
+                  {users?.filter(u => u.status === 'Active').map(u => {
+                    const userAssignedCount = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role}) — {userAssignedCount} Assigned Leads
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Allocation Action Button */}
+              <div className="form-group">
+                <label style={{ visibility: 'hidden', fontSize: '0.82rem', marginBottom: '6px', display: 'block' }}>Action</label>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleB4AssignLeads} 
+                  disabled={!canAllocate}
+                  style={{ 
+                    width: '100%', 
+                    justifyContent: 'center',
+                    padding: '8px 16px',
+                    opacity: canAllocate ? 1 : 0.6,
+                    cursor: canAllocate ? 'pointer' : 'not-allowed',
+                    fontWeight: 600
+                  }}
+                >
+                  {currentLangAvailableCount === 0 
+                    ? 'No Leads Available' 
+                    : isQtyExceeded 
+                    ? 'Quantity Exceeded' 
+                    : isQtyValid 
+                    ? `Allocate Exactly ${parsedQty} Leads` 
+                    : 'Assign Confirmed Leads'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sub-Block 2: Inbound Lead Requests Queue (With Auto-Disappear Rule) */}
       <div className="card">

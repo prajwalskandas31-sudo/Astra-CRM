@@ -158,12 +158,31 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
   }, [userShortcutSettings]);
 
-  const setSimulatedRole = (newRole) => {
+  const setSimulatedRole = (newRole, targetUserId = null) => {
     setSimulatedRoleState(newRole);
-    const matchedUser = users.find(u => u.role === newRole) || DEFAULT_USERS.find(u => u.role === newRole);
+    let matchedUser = null;
+    if (targetUserId) {
+      matchedUser = users.find(u => u.id === targetUserId);
+    }
+    if (!matchedUser) {
+      if (currentUser?.role === newRole) {
+        matchedUser = currentUser;
+      } else {
+        matchedUser = users.find(u => u.role === newRole) || DEFAULT_USERS.find(u => u.role === newRole);
+      }
+    }
     if (matchedUser) {
       setCurrentUser(matchedUser);
       localStorage.setItem('crm_user', JSON.stringify(matchedUser));
+    }
+  };
+
+  const switchUser = (userId) => {
+    const targetUser = users.find(u => u.id === userId) || DEFAULT_USERS.find(u => u.id === userId);
+    if (targetUser) {
+      setCurrentUser(targetUser);
+      setSimulatedRoleState(targetUser.role);
+      localStorage.setItem('crm_user', JSON.stringify(targetUser));
     }
   };
 
@@ -192,12 +211,54 @@ export const CRMProvider = ({ children }) => {
     setUserShortcut(effectiveUserId, dispositionId, !current);
   };
 
-  const [leads, setLeads] = useState(DEFAULT_LEADS);
+  const [leads, setLeads] = useState(() => {
+    const saved = localStorage.getItem('crm_leads');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_LEADS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_leads', JSON.stringify(leads));
+  }, [leads]);
+
   const [sales, setSales] = useState(DEFAULT_SALES);
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
   const [leadRequests, setLeadRequests] = useState(DEFAULT_LEAD_REQUESTS);
-  const [assignmentInstances, setAssignmentInstances] = useState(DEFAULT_ASSIGNMENT_INSTANCES);
-  const [masterRecords, setMasterRecords] = useState([]);
+
+  const [assignmentInstances, setAssignmentInstances] = useState(() => {
+    const saved = localStorage.getItem('crm_assignment_instances');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_ASSIGNMENT_INSTANCES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_assignment_instances', JSON.stringify(assignmentInstances));
+  }, [assignmentInstances]);
+
+  const [masterRecords, setMasterRecords] = useState(() => {
+    const saved = localStorage.getItem('crm_master_records');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_master_records', JSON.stringify(masterRecords));
+  }, [masterRecords]);
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -258,6 +319,7 @@ export const CRMProvider = ({ children }) => {
         const data = await res.json();
         setAuthToken(data.access_token);
         setCurrentUser(data.user);
+        setSimulatedRoleState(data.user?.role || 'Executive');
         localStorage.setItem('crm_token', data.access_token);
         localStorage.setItem('crm_user', JSON.stringify(data.user));
         return true;
@@ -278,6 +340,7 @@ export const CRMProvider = ({ children }) => {
     const token = 'demo_token_' + Date.now();
     setAuthToken(token);
     setCurrentUser(matchedUser);
+    setSimulatedRoleState(matchedUser.role || 'Executive');
     localStorage.setItem('crm_token', token);
     localStorage.setItem('crm_user', JSON.stringify(matchedUser));
     return true;
@@ -286,6 +349,7 @@ export const CRMProvider = ({ children }) => {
   const handleLogout = () => {
     setAuthToken('');
     setCurrentUser(null);
+    setSimulatedRoleState('Executive');
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_user');
   };
@@ -1008,6 +1072,7 @@ export const CRMProvider = ({ children }) => {
       currentUser,
       simulatedRole,
       setSimulatedRole,
+      switchUser,
       loginError,
       handleLogin,
       handleLogout,
