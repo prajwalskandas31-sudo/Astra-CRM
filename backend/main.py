@@ -80,6 +80,11 @@ class LeadReassignRequest(BaseModel):
     startDate: Optional[str] = None
     endDate: Optional[str] = None
 
+class LanguageLeadAssignRequest(BaseModel):
+    language: str
+    quantity: int
+    targetUserId: str
+
 class SaleRegister(BaseModel):
     clientName: str
     amount: str
@@ -364,6 +369,74 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
         reassigned_count += 1
 
     return {"message": f"Reassigned {reassigned_count} leads to {target_user['name']}."}
+
+@app.post("/api/leads/assign-by-language")
+def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    if not req.quantity or req.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity Validation: Assign Quantity must be a valid positive integer greater than zero.")
+    
+    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found in Block 1 Hierarchy")
+
+    lang_key = (req.language or "").strip().lower()
+    matching_unassigned = [
+        l for l in LEADS_DB
+        if (lang_key == "all" or l.get("language", "").strip().lower() == lang_key)
+        and (l.get("isUnassigned") or not l.get("assignedToId") or l.get("assignedToName") == "Unassigned" or l.get("assignedToId") == "unassigned" or not l.get("assigned_user_id"))
+    ]
+
+    available_count = len(matching_unassigned)
+    if available_count == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quantity Validation: No unassigned leads available in the queue for language '{req.language}'. Allocation prevented."
+        )
+
+    if req.quantity > available_count:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Quantity Validation: Cannot allocate {req.quantity} leads. Requested quantity exceeds total unassigned leads ({available_count}) available for language '{req.language}'. Allocation strictly prevented."
+        )
+
+    leads_to_assign = matching_unassigned[:req.quantity]
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    assigned_ids = []
+    for lead in leads_to_assign:
+        lead["assignedToId"] = target_user["id"]
+        lead["assigned_user_id"] = target_user["id"]
+        lead["assignedToName"] = target_user["name"]
+        lead["isUnassigned"] = False
+        lead["disposition"] = lead.get("disposition") or "New Lead"
+        lead.setdefault("history", []).append({
+            "date": now_str,
+            "text": f"Allocated to {target_user['name']} ({target_user['role']}) via Language-Based Lead Assignment Engine [{req.language}]. Batch: {len(leads_to_assign)} leads."
+        })
+        assigned_ids.append(lead["id"])
+
+    inst = {
+        "id": f"inst-{int(datetime.utcnow().timestamp())}",
+        "fileName": f"Assignment_{req.language}_Qty{len(leads_to_assign)}_{today_str}.csv",
+        "language": req.language,
+        "quantity": len(leads_to_assign),
+        "assignedToId": target_user["id"],
+        "assigned_user_id": target_user["id"],
+        "assignedToName": target_user["name"],
+        "role": target_user["role"],
+        "date": today_str,
+        "leadIds": assigned_ids
+    }
+    ASSIGNMENT_INSTANCES_DB.insert(0, inst)
+
+    return {
+        "success": True,
+        "assigned": len(leads_to_assign),
+        "remainingUnassigned": available_count - len(leads_to_assign),
+        "targetUser": target_user["name"],
+        "instance": inst
+    }
 
 # Sale Approval Workflow Routes
 @app.get("/api/sales")

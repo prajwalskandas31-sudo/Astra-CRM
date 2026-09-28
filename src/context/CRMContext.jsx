@@ -580,13 +580,15 @@ export const CRMProvider = ({ children }) => {
   const addLead = (leadData) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const uniqueId = 'LD-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+    const assignedUserId = leadData.assignedToId || currentUser?.id || 'usr-5';
     const newLeadObj = {
       id: uniqueId,
       clientName: leadData.clientName || leadData.contactPerson + ' Co.',
       contactPerson: leadData.contactPerson,
       phone: leadData.phone,
       language: leadData.language || 'English',
-      assignedToId: leadData.assignedToId || currentUser?.id || 'usr-5',
+      assignedToId: assignedUserId,
+      assigned_user_id: assignedUserId,
       assignedToName: leadData.assignedToName || currentUser?.name || 'Assigned User',
       disposition: 'New Lead', // Default status per Block 2 specification
       dispositionScheduledAt: '',
@@ -603,22 +605,53 @@ export const CRMProvider = ({ children }) => {
 
   const assignLeadsByLanguage = (language, quantity, targetUserId) => {
     const targetUser = users.find(u => u.id === targetUserId);
-    if (!targetUser) return 0;
-    const numToAssign = parseInt(quantity, 10);
-    if (isNaN(numToAssign) || numToAssign <= 0) return 0;
+    if (!targetUser) {
+      return { success: false, error: 'Allocation prevented: Target user not found in Block 1 Hierarchy.', assigned: 0 };
+    }
+
+    if (quantity === undefined || quantity === null || String(quantity).trim() === '') {
+      return { success: false, error: 'Quantity Validation: Assign Quantity cannot be empty.', assigned: 0 };
+    }
+
+    const numToAssign = Number(quantity);
+    if (!Number.isInteger(numToAssign) || numToAssign <= 0) {
+      return { success: false, error: 'Quantity Validation: Assign Quantity must be a valid positive integer greater than zero.', assigned: 0 };
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const langKey = (language || '').trim().toLowerCase();
 
-    // Find unassigned leads matching requested language strictly
+    // Query unassigned leads matching requested language strictly
     const matchingLeads = leads.filter(l => 
       ((l.language || '').trim().toLowerCase() === langKey || langKey === 'all') && 
-      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned')
+      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned' || !l.assigned_user_id)
     );
 
+    const availableCount = matchingLeads.length;
+
+    // Quantity Validation: Prevent allocation if exceeds total number of unassigned leads available
+    if (numToAssign > availableCount) {
+      return {
+        success: false,
+        error: `Quantity Validation: Cannot allocate ${numToAssign} lead(s). Requested quantity exceeds total unassigned leads (${availableCount}) available for language '${language}'.`,
+        available: availableCount,
+        requested: numToAssign,
+        assigned: 0
+      };
+    }
+
+    // Select exactly N leads (where N = Assign Quantity)
     const leadsToAssign = matchingLeads.slice(0, numToAssign);
     const assignedCount = leadsToAssign.length;
-    if (assignedCount === 0) return 0;
+    if (assignedCount !== numToAssign) {
+      return {
+        success: false,
+        error: `Quantity Validation: Unable to select exactly ${numToAssign} leads for allocation.`,
+        available: availableCount,
+        requested: numToAssign,
+        assigned: 0
+      };
+    }
 
     const assignedLeadIds = new Set(leadsToAssign.map(l => l.id));
 
@@ -627,30 +660,48 @@ export const CRMProvider = ({ children }) => {
         return {
           ...l,
           assignedToId: targetUser.id,
+          assigned_user_id: targetUser.id,
           assignedToName: targetUser.name,
           isUnassigned: false,
-          history: [...(l.history || []), { date: todayStr, text: `Assigned to ${targetUser.name} (${targetUser.role}) via Language Lead Assignment [${language}].` }]
+          disposition: l.disposition || 'New Lead',
+          history: [
+            ...(l.history || []),
+            { date: todayStr, text: `Allocated to ${targetUser.name} (${targetUser.role}) via Language-Based Lead Assignment Engine [${language}]. Batch size: exactly ${assignedCount} leads.` }
+          ]
         };
       }
       return l;
     }));
 
-    setAssignmentInstances(prev => [
-      {
-        id: 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-        fileName: `Assignment_${language}_Qty${assignedCount}_${todayStr}.csv`,
-        language: language,
-        quantity: assignedCount,
-        assignedToId: targetUser.id,
-        assignedToName: targetUser.name,
-        role: targetUser.role,
-        date: todayStr,
-        leadIds: Array.from(assignedLeadIds)
-      },
-      ...prev
-    ]);
+    const newInstance = {
+      id: 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      fileName: `Assignment_${language}_Qty${assignedCount}_${todayStr}.csv`,
+      language: language,
+      quantity: assignedCount,
+      assignedToId: targetUser.id,
+      assigned_user_id: targetUser.id,
+      assignedToName: targetUser.name,
+      role: targetUser.role,
+      date: todayStr,
+      leadIds: Array.from(assignedLeadIds)
+    };
 
-    return assignedCount;
+    setAssignmentInstances(prev => [newInstance, ...prev]);
+
+    const resObj = {
+      success: true,
+      assigned: assignedCount,
+      count: assignedCount,
+      available: availableCount,
+      remainingUnassigned: availableCount - assignedCount,
+      targetUser: targetUser,
+      language: language,
+      error: null
+    };
+    resObj.valueOf = () => assignedCount;
+    resObj[Symbol.toPrimitive] = () => assignedCount;
+
+    return resObj;
   };
 
   const addBulkLeads = (newLeadsArray) => {
@@ -666,6 +717,7 @@ export const CRMProvider = ({ children }) => {
         phone: ld.phone,
         language: ld.language || 'English',
         assignedToId: isUnassigned ? null : ld.assignedToId,
+        assigned_user_id: isUnassigned ? null : ld.assignedToId,
         assignedToName: isUnassigned ? 'Unassigned' : (targetUser?.name || ld.assignedToName || 'User'),
         isUnassigned: isUnassigned,
         disposition: 'New Lead', // Default status per Block 2 specification

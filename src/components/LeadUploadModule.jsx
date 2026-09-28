@@ -33,11 +33,11 @@ export const LeadUploadModule = () => {
   
   const { showToast } = useToast();
 
-  // Active sub-block state: 'master', 'bulk', 'single', 'report'
-  const [activeSubBlock, setActiveSubBlock] = useState('single');
-
   // Enforce RBAC: Non-Super Admin roles strictly limited to Single Upload
   const isSuperAdmin = simulatedRole === 'Super Admin';
+
+  // Active sub-block state: 'master', 'bulk', 'single', 'report'
+  const [activeSubBlock, setActiveSubBlock] = useState(isSuperAdmin ? 'bulk' : 'single');
   
   useEffect(() => {
     if (!isSuperAdmin && activeSubBlock !== 'single') {
@@ -363,22 +363,67 @@ export const LeadUploadModule = () => {
   // ==========================================
   // HANDLER: Dynamic Lead Assignment by Language
   // ==========================================
+  // HANDLER: Dynamic Lead Assignment by Language (Block 1 Routing)
+  // ==========================================
   const handleAssignLeads = () => {
-    const qty = parseInt(assignQty, 10);
-    if (isNaN(qty) || qty <= 0) {
-      showToast('Please enter a valid quantity of leads to assign.', 'warning');
+    // Quantity Validation: Check empty
+    if (assignQty === undefined || assignQty === null || String(assignQty).trim() === '') {
+      showToast('Quantity Validation: Assign Quantity field is required.', 'error');
       return;
     }
 
-    const assigned = assignLeadsByLanguage(assignLang, qty, assignTargetUserId);
-    const targetUser = users.find(u => u.id === assignTargetUserId);
+    const qty = Number(assignQty);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      showToast('Quantity Validation: Assign Quantity must be a valid positive integer greater than zero.', 'error');
+      return;
+    }
 
-    if (assigned === qty) {
-      showToast(`Successfully assigned strictly ${assigned} ${assignLang} lead(s) to ${targetUser?.name} (${targetUser?.role})!`, 'success');
-    } else if (assigned > 0) {
-      showToast(`Assigned ${assigned} of ${qty} requested ${assignLang} lead(s) to ${targetUser?.name} (${targetUser?.role}) (only ${assigned} unassigned lead(s) were available).`, 'info');
+    if (!assignTargetUserId) {
+      showToast('Validation: Please select a target user from the Block 1 Hierarchy.', 'warning');
+      return;
+    }
+
+    const targetUser = users.find(u => u.id === assignTargetUserId);
+    if (!targetUser) {
+      showToast('Validation: Selected user not found.', 'error');
+      return;
+    }
+
+    // Available unassigned leads in queue matching the active language filter
+    const matchingUnassigned = leads.filter(l => 
+      ((l.language || '').trim().toLowerCase() === (assignLang || '').trim().toLowerCase() || assignLang.toLowerCase() === 'all') &&
+      (l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned' || !l.assigned_user_id)
+    );
+    const availableCount = matchingUnassigned.length;
+
+    // Quantity Validation: Prevent allocation if zero available or exceeds total unassigned leads
+    if (availableCount === 0) {
+      showToast(`Quantity Validation: No unassigned leads available in the queue for language '${assignLang}'. Allocation strictly prevented.`, 'error');
+      return;
+    }
+
+    if (qty > availableCount) {
+      showToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Requested quantity exceeds total unassigned leads (${availableCount}) available for language '${assignLang}'. Allocation strictly prevented.`, 'error');
+      return;
+    }
+
+    // Execution Rule: strictly limit batch size to exact numeric value N
+    const result = assignLeadsByLanguage(assignLang, qty, assignTargetUserId);
+    if (!result || !result.success) {
+      showToast(result?.error || 'Lead allocation failed.', 'error');
+      return;
+    }
+
+    const allocatedCount = result.assigned;
+    const remainingCount = result.remainingUnassigned;
+
+    showToast(`Successfully allocated exactly ${allocatedCount} ${assignLang} lead(s) to ${targetUser.name} (${targetUser.role})! Remaining unassigned: ${remainingCount}. Synced with Block 3 Reports.`, 'success');
+
+    // Auto-update assignQty input sensibly
+    if (remainingCount > 0) {
+      setAssignQty(String(Math.min(allocatedCount, remainingCount)));
     } else {
-      showToast(`No unassigned ${assignLang} leads available in the system.`, 'warning');
+      setAssignQty('');
     }
   };
 
@@ -388,17 +433,19 @@ export const LeadUploadModule = () => {
   const languagesList = ['English', 'Hindi', 'Kannada', 'Tamil', 'Telugu', 'Marathi', 'Malayalam', 'Bengali'];
 
   // Super Admin View Section 1: Unassigned leads breakdown language-wise
-  const unassignedLeads = leads.filter(l => l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned');
+  const unassignedLeads = leads.filter(l => 
+    l.isUnassigned || !l.assignedToId || l.assignedToName === 'Unassigned' || l.assignedToId === 'unassigned' || !l.assigned_user_id
+  );
   const languageBreakdown = languagesList.map(lang => {
-    const unassignedCount = unassignedLeads.filter(l => l.language?.toLowerCase() === lang.toLowerCase()).length;
-    const totalCount = leads.filter(l => l.language?.toLowerCase() === lang.toLowerCase()).length;
+    const unassignedCount = unassignedLeads.filter(l => (l.language || '').toLowerCase() === lang.toLowerCase()).length;
+    const totalCount = leads.filter(l => (l.language || '').toLowerCase() === lang.toLowerCase()).length;
     return { language: lang, unassignedCount, totalCount };
   });
 
   // User Level View Section 2: Count of 'New Lead' disposition per user from Block 2
   const userPerformanceList = users.map(u => {
-    const userNewLeads = leads.filter(l => (l.assignedToId === u.id || l.assignedToName === u.name) && l.disposition === 'New Lead');
-    const userTotalLeads = leads.filter(l => l.assignedToId === u.id || l.assignedToName === u.name);
+    const userNewLeads = leads.filter(l => (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name) && l.disposition === 'New Lead');
+    const userTotalLeads = leads.filter(l => l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name);
     return {
       user: u,
       newLeadCount: userNewLeads.length,
@@ -524,10 +571,10 @@ export const LeadUploadModule = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <Upload size={18} color="var(--accent-primary)" /> Block 3: Lead Upload Module
+              <Upload size={18} color="var(--accent-primary)" /> Lead Upload Module & Block 3 Report Sync
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-              Standalone feature module for uploading master records, bulk leads, single entries, and Block 2 synced reports.
+              Lead management system: Bulk upload, single entry, language-based allocation engine (Block 1 hierarchy routing), and Block 3 real-time synced reports.
             </p>
           </div>
 
@@ -539,7 +586,7 @@ export const LeadUploadModule = () => {
                   onClick={() => setActiveSubBlock('bulk')}
                   style={{ fontSize: '0.8rem', padding: '6px 12px' }}
                 >
-                  <Upload size={13} /> Bulk Upload
+                  <Upload size={13} /> Bulk Upload & Routing ({unassignedLeads.length})
                 </button>
               </>
             )}
@@ -558,7 +605,7 @@ export const LeadUploadModule = () => {
                 onClick={() => setActiveSubBlock('report')}
                 style={{ fontSize: '0.8rem', padding: '6px 12px' }}
               >
-                <BarChart3 size={13} /> Report Sub-Block
+                <BarChart3 size={13} /> Block 3 Reports
               </button>
             )}
           </div>
@@ -908,53 +955,171 @@ export const LeadUploadModule = () => {
             );
           })()}
 
-          {/* DYNAMIC LEAD ASSIGNMENT ENGINE BY LANGUAGE (BLOCK 1 INTEGRATION) */}
-          <div className="directory-card" style={{ padding: '20px 24px' }}>
-            <h4 style={{ fontSize: '0.95rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <UserCheck size={16} color="var(--accent-primary)" /> Language-Based Lead Assignment Engine (Block 1 Routing)
-            </h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Super Admin can filter confirmed unassigned leads by language and assign custom quantities directly to Executives or Team Leads created in Block 1.
-            </p>
+          {/* LANGUAGE-BASED LEAD ASSIGNMENT ENGINE (BLOCK 1 ROUTING) */}
+          {(() => {
+            const currentLangMatching = unassignedLeads.filter(l => 
+              assignLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === assignLang.toLowerCase()
+            );
+            const currentLangAvailableCount = currentLangMatching.length;
+            const parsedQty = Number(assignQty);
+            const isQtyEmpty = assignQty === undefined || assignQty === null || String(assignQty).trim() === '';
+            const isQtyValid = !isQtyEmpty && Number.isInteger(parsedQty) && parsedQty > 0;
+            const isQtyExceeded = isQtyValid && parsedQty > currentLangAvailableCount;
+            const canAllocate = currentLangAvailableCount > 0 && isQtyValid && !isQtyExceeded && Boolean(assignTargetUserId);
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', alignItems: 'end' }}>
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Filter by Language:</label>
-                <select value={assignLang} onChange={(e) => setAssignLang(e.target.value)}>
-                  {languagesList.map(lang => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
-              </div>
+            return (
+              <div className="directory-card" style={{ padding: '22px 24px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 700 }}>
+                    <UserCheck size={18} color="var(--accent-primary)" /> Language-Based Lead Assignment Engine (Block 1 Routing)
+                  </h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="badge" style={{ backgroundColor: currentLangAvailableCount > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.12)', color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700, padding: '4px 10px', fontSize: '0.78rem' }}>
+                      <Tag size={12} /> {assignLang}: {currentLangAvailableCount} Unassigned Available
+                    </span>
+                    <span className="badge" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: '0.76rem', padding: '4px 8px' }}>
+                      Total Queue: {unassignedLeads.length}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Assign Quantity:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="500"
-                  value={assignQty}
-                  onChange={(e) => setAssignQty(e.target.value)}
-                  placeholder="e.g. 10"
-                />
-              </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  Super Admin allocates uploaded leads to users in the <strong>Block 1 Hierarchy</strong>. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
+                </p>
 
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Assign To User (Block 1 Hierarchy):</label>
-                <select value={assignTargetUserId} onChange={(e) => setAssignTargetUserId(e.target.value)}>
-                  {users.filter(u => u.status === 'Active').map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role}) - {u.reportingTo ? `Reports to: ${u.reportingTo}` : 'Top Level'}</option>
-                  ))}
-                </select>
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', alignItems: 'start' }}>
+                  {/* Active Language Filter */}
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Filter by Language:</span>
+                      <span style={{ color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700 }}>
+                        {currentLangAvailableCount} in Queue
+                      </span>
+                    </label>
+                    <select 
+                      value={assignLang} 
+                      onChange={(e) => {
+                        const newLang = e.target.value;
+                        setAssignLang(newLang);
+                        const newAvail = unassignedLeads.filter(l => 
+                          newLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === newLang.toLowerCase()
+                        ).length;
+                        if (newAvail > 0) {
+                          setAssignQty(String(Math.min(10, newAvail)));
+                        } else {
+                          setAssignQty('');
+                        }
+                      }}
+                    >
+                      {languagesList.map(lang => {
+                        const count = unassignedLeads.filter(l => (l.language || '').toLowerCase() === lang.toLowerCase()).length;
+                        return (
+                          <option key={lang} value={lang}>
+                            {lang} ({count} unassigned)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
-              <div className="form-group">
-                <button type="button" className="btn-primary" onClick={handleAssignLeads} style={{ width: '100%', justifyContent: 'center' }}>
-                  Assign Confirmed Leads
-                </button>
+                  {/* Assign Quantity with Real-time Validation */}
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Assign Quantity:</span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        Max: <strong>{currentLangAvailableCount}</strong>
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={currentLangAvailableCount || 1}
+                      value={assignQty}
+                      onChange={(e) => setAssignQty(e.target.value)}
+                      placeholder={currentLangAvailableCount > 0 ? `1 to ${currentLangAvailableCount}` : "0 available"}
+                      style={{
+                        borderColor: isQtyExceeded || (isQtyEmpty && assignQty !== '') ? '#ef4444' : isQtyValid ? '#10b981' : undefined
+                      }}
+                    />
+                    
+                    {/* Live Validation Guidance */}
+                    {currentLangAvailableCount === 0 && (
+                      <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> 0 unassigned leads in queue for {assignLang}. Allocation prevented.
+                      </div>
+                    )}
+                    {isQtyExceeded && (
+                      <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> Exceeds available leads ({currentLangAvailableCount} max). Allocation strictly prevented.
+                      </div>
+                    )}
+                    {!isQtyValid && !isQtyEmpty && (
+                      <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertTriangle size={12} /> Must be a positive whole number &gt; 0
+                      </div>
+                    )}
+                    {isQtyValid && !isQtyExceeded && (
+                      <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle size={12} /> Strictly allocates exactly {parsedQty} {assignLang} lead(s) ({currentLangAvailableCount - parsedQty} remaining)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Assign To User (Block 1 Hierarchy) */}
+                  <div className="form-group">
+                    <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Assign To User (Block 1 Hierarchy):</label>
+                    <select value={assignTargetUserId} onChange={(e) => setAssignTargetUserId(e.target.value)}>
+                      {users.filter(u => u.status === 'Active').map(u => {
+                        const userNewLeadsCount = leads.filter(l => (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name) && l.disposition === 'New Lead').length;
+                        return (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.role}) — {userNewLeadsCount} New Leads
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Allocation Confirmation Action */}
+                  <div className="form-group">
+                    <label style={{ visibility: 'hidden', fontSize: '0.82rem' }}>Action</label>
+                    <button 
+                      type="button" 
+                      className="btn-primary" 
+                      onClick={handleAssignLeads} 
+                      disabled={!canAllocate}
+                      style={{ 
+                        width: '100%', 
+                        justifyContent: 'center',
+                        opacity: canAllocate ? 1 : 0.6,
+                        cursor: canAllocate ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      {currentLangAvailableCount === 0 
+                        ? 'No Leads Available' 
+                        : isQtyExceeded 
+                        ? 'Quantity Exceeded' 
+                        : isQtyValid 
+                        ? `Allocate Exactly ${parsedQty} Leads` 
+                        : 'Assign Confirmed Leads'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Real-time Sync & Edge Case Status Banner */}
+                <div style={{ marginTop: '14px', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle size={14} color="#10b981" />
+                    <span><strong>Real-time Sync Active:</strong> Lead allocation directly updates <code>assigned_user_id</code>, adjusts unassigned queues, and synchronizes Block 3 Reports.</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <span>Queue Remaining: <strong style={{ color: 'var(--text-main)' }}>{currentLangAvailableCount}</strong></span>
+                    <span>Total Pool: <strong style={{ color: 'var(--text-main)' }}>{unassignedLeads.length}</strong></span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1034,11 +1199,16 @@ export const LeadUploadModule = () => {
           <div className="directory-card" style={{ padding: '20px 24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
               <div>
-                <h4 style={{ fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                  <BarChart3 size={16} color="var(--accent-primary)" /> Sub-Block 3: Lead Upload Reports & Block 2 Sync
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h4 style={{ fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 700 }}>
+                    <BarChart3 size={18} color="var(--accent-primary)" /> Block 3 Reports & Real-Time Sync Dashboard
+                  </h4>
+                  <span className="badge badge-active" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
+                    <CheckCircle size={11} /> Real-Time Synced
+                  </span>
+                </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                  Central analytics dashboard aggregating unassigned leads by language and user-level <strong>New Lead</strong> status.
+                  Central analytics aggregating unassigned lead queues by language and real-time user-level <strong>New Lead</strong> status from Block 1 Routing and Block 2.
                 </p>
               </div>
 
