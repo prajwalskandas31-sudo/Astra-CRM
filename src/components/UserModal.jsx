@@ -372,8 +372,19 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         updateUser(userToEdit.id, formData);
         showToast(`User '${formData.name}' details updated.`, 'success');
       } else {
-        addUser(formData);
-        showToast(`User '${formData.name}' created successfully.`, 'success');
+        const cleanName = (formData.name || 'User').trim();
+        const autoEmail = formData.email && formData.email.trim() 
+          ? formData.email.trim() 
+          : `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@company.com`;
+        const autoPass = formData.password || '123456';
+        
+        addUser({
+          ...formData,
+          name: cleanName,
+          email: autoEmail,
+          password: autoPass
+        });
+        showToast(`User '${cleanName}' created successfully. Login with Name (${cleanName}), Email (${autoEmail}), or Mobile!`, 'success');
       }
     } else {
       if (parsedRecords.length === 0) {

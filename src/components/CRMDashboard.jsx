@@ -48,11 +48,11 @@ export const CRMDashboard = () => {
       if (adminViewUserFilter === 'ALL' || adminViewUserFilter === 'AUTO') {
         return true;
       }
+      const targetAdminUser = users?.find(u => u.id === adminViewUserFilter);
       return (
         l.assignedToId === adminViewUserFilter ||
         l.assigned_user_id === adminViewUserFilter ||
-        (users?.find(u => u.id === adminViewUserFilter)?.name && 
-         (l.assignedToName || '').trim().toLowerCase() === (users.find(u => u.id === adminViewUserFilter)?.name || '').trim().toLowerCase())
+        (targetAdminUser?.name && (l.assignedToName || '').trim().toLowerCase() === targetAdminUser.name.trim().toLowerCase())
       );
     }
 
@@ -60,10 +60,12 @@ export const CRMDashboard = () => {
     // Strictly show ONLY the leads allocated to this active user
     const currentId = currentUser?.id;
     const currentName = (currentUser?.name || '').trim().toLowerCase();
+    const currentEmail = (currentUser?.email || '').trim().toLowerCase();
 
     return (
       (currentId && (l.assignedToId === currentId || l.assigned_user_id === currentId)) ||
-      (currentName && (l.assignedToName || '').trim().toLowerCase() === currentName)
+      (currentName && (l.assignedToName || '').trim().toLowerCase() === currentName) ||
+      (currentEmail && l.assignedToEmail && l.assignedToEmail.trim().toLowerCase() === currentEmail)
     );
   });
 

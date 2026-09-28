@@ -31,9 +31,12 @@ import {
 export const UserDirectory = () => {
   const { 
     users, 
+    currentUser,
+    leads,
     simulatedRole, 
     toggleUserStatus, 
     deleteUser, 
+    purgeAllData,
     toggleAdminAccess, 
     changeUserPassword, 
     downloadUserDocument,
@@ -183,13 +186,13 @@ export const UserDirectory = () => {
       return;
     }
 
-    const result = deleteUser(user.id);
-    if (!result.success && result.requiresReassignment) {
-      setUserToDelete(user);
-      setIsReassignModalOpen(true);
-    } else {
-      showToast(`User '${user.name}' deleted successfully.`, 'success');
+    if (user.id === currentUser?.id) {
+      showToast('Action Denied: You cannot delete your own active Super Admin profile.', 'error');
+      return;
     }
+
+    setUserToDelete(user);
+    setIsReassignModalOpen(true);
   };
 
   const handlePasswordSubmit = (e) => {
@@ -327,9 +330,24 @@ export const UserDirectory = () => {
             </button>
 
             {simulatedRole === 'Super Admin' && (
-              <button className="btn-primary" onClick={() => { setEditingUser(null); setIsAddModalOpen(true); }}>
-                <UserPlus size={15} /> Add User
-              </button>
+              <>
+                <button 
+                  className="btn-danger" 
+                  style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete ALL CRM leads and activity data now? This will reset all active leads, master records, and assignment instances.')) {
+                      purgeAllData();
+                      showToast('All CRM lead and activity data has been wiped.', 'info');
+                    }
+                  }}
+                  title="Wipe and reset all leads data"
+                >
+                  <Trash2 size={14} /> Clear All Data
+                </button>
+                <button className="btn-primary" onClick={() => { setEditingUser(null); setIsAddModalOpen(true); }}>
+                  <UserPlus size={15} /> Add User
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -513,7 +531,14 @@ export const UserDirectory = () => {
         isOpen={isReassignModalOpen}
         onClose={() => setIsReassignModalOpen(false)}
         userToDelete={userToDelete}
-        onReassignComplete={() => setUserToDelete(null)}
+        onReassignComplete={(info) => {
+          setUserToDelete(null);
+          if (info && info.hasLeads) {
+            showToast(`Reassigned ${info.reassignedCount} leads to ${info.targetUserName} & deleted user '${info.deletedUserName}'.`, 'success');
+          } else if (info) {
+            showToast(`User '${info.deletedUserName}' deleted successfully.`, 'success');
+          }
+        }}
       />
 
       {passwordResetUser && (

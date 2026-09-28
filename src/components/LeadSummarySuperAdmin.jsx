@@ -171,7 +171,12 @@ export const LeadSummarySuperAdmin = () => {
   // All leads combined with assignment history filtering
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
-      if (selectedUserFilter !== 'ALL' && lead.assignedToId !== selectedUserFilter) return false;
+      if (selectedUserFilter !== 'ALL') {
+        const targetUserObj = users.find(u => u.id === selectedUserFilter);
+        const matchId = lead.assignedToId === selectedUserFilter || lead.assigned_user_id === selectedUserFilter;
+        const matchName = targetUserObj && lead.assignedToName && lead.assignedToName.trim().toLowerCase() === targetUserObj.name.trim().toLowerCase();
+        if (!matchId && !matchName) return false;
+      }
       if (selectedLanguageFilter !== 'ALL' && lead.language?.toLowerCase() !== selectedLanguageFilter.toLowerCase()) return false;
       if (selectedDispositionFilter !== 'ALL' && lead.disposition !== selectedDispositionFilter) return false;
       

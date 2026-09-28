@@ -3,9 +3,25 @@ import { useCRM } from '../context/CRMContext';
 import { Shield, Eye, Info } from 'lucide-react';
 
 export const RoleSimulatorBanner = () => {
-  const { simulatedRole, setSimulatedRole, users, currentUser, switchUser } = useCRM();
+  const { simulatedRole, setSimulatedRole, users = [], currentUser, switchUser, leads = [] } = useCRM();
 
   const roles = ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive'];
+
+  const handleRoleClick = (role) => {
+    // If the active user already has this role, retain them!
+    if (currentUser?.role === role) {
+      setSimulatedRole(role, currentUser.id);
+      return;
+    }
+    // Find active users with this role
+    const matchingUsers = users.filter(u => u.status === 'Active' && u.role === role);
+    // Prioritize an active user that has assigned leads
+    const userWithLeads = matchingUsers.find(u => 
+      leads.some(l => !l.isUnassigned && (l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.trim().toLowerCase() === (u.name || '').trim().toLowerCase())))
+    );
+    const chosenUser = userWithLeads || matchingUsers[0];
+    setSimulatedRole(role, chosenUser?.id);
+  };
 
   return (
     <div className="role-simulator-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -22,7 +38,7 @@ export const RoleSimulatorBanner = () => {
             <button
               key={r}
               className={`role-sim-btn ${simulatedRole === r ? 'active' : ''}`}
-              onClick={() => setSimulatedRole(r)}
+              onClick={() => handleRoleClick(r)}
             >
               {r}
             </button>
@@ -31,25 +47,29 @@ export const RoleSimulatorBanner = () => {
 
         {/* Direct User Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active User:</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active Profile:</span>
           <select
             value={currentUser?.id || ''}
             onChange={(e) => switchUser(e.target.value)}
             style={{
               fontSize: '0.76rem',
-              padding: '3px 8px',
+              padding: '4px 10px',
               borderRadius: '4px',
               backgroundColor: 'var(--bg-input)',
-              border: '1px solid var(--border-color)',
+              border: '1px solid var(--accent-primary)',
               color: 'var(--text-primary)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              fontWeight: 600
             }}
           >
-            {users?.filter(u => u.status === 'Active').map(u => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role})
-              </option>
-            ))}
+            {users?.filter(u => u.status === 'Active').map(u => {
+              const count = leads.filter(l => !l.isUnassigned && (l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.trim().toLowerCase() === (u.name || '').trim().toLowerCase()))).length;
+              return (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.role}) — {count} Leads
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>

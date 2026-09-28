@@ -78,7 +78,17 @@ const DEFAULT_LEAD_REQUESTS = [];
 
 const DEFAULT_ASSIGNMENT_INSTANCES = [];
 
-const CRMContext = createContext();
+const DATA_STORAGE_VERSION = '2026_09_28_v5_clean';
+
+if (typeof window !== 'undefined' && localStorage.getItem('crm_storage_version') !== DATA_STORAGE_VERSION) {
+  localStorage.removeItem('crm_leads');
+  localStorage.removeItem('crm_assignment_instances');
+  localStorage.removeItem('crm_master_records');
+  localStorage.removeItem('crm_sales');
+  localStorage.removeItem('crm_lead_requests');
+  localStorage.removeItem('crm_users');
+  localStorage.setItem('crm_storage_version', DATA_STORAGE_VERSION);
+}
 
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
@@ -166,13 +176,23 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_simulated_role', newRole);
     let matchedUser = null;
     if (targetUserId) {
-      matchedUser = users.find(u => u.id === targetUserId);
+      matchedUser = (users || []).find(u => u.id === targetUserId) || DEFAULT_USERS.find(u => u.id === targetUserId);
     }
     if (!matchedUser) {
       if (currentUser?.role === newRole) {
         matchedUser = currentUser;
       } else {
-        matchedUser = users.find(u => u.role === newRole) || DEFAULT_USERS.find(u => u.role === newRole);
+        // Find active users matching newRole
+        const roleUsers = (users || []).filter(u => u.role === newRole && u.status === 'Active');
+        if (roleUsers.length > 0) {
+          // If any user of this role has leads assigned, prioritize them so user sees their leads
+          const userWithLeads = roleUsers.find(u => 
+            (leads || []).some(l => !l.isUnassigned && (l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.trim().toLowerCase() === (u.name || '').trim().toLowerCase())))
+          );
+          matchedUser = userWithLeads || roleUsers[0];
+        } else {
+          matchedUser = DEFAULT_USERS.find(u => u.role === newRole);
+        }
       }
     }
     if (matchedUser) {
@@ -182,12 +202,12 @@ export const CRMProvider = ({ children }) => {
   };
 
   const switchUser = (userId) => {
-    const targetUser = users.find(u => u.id === userId) || DEFAULT_USERS.find(u => u.id === userId);
+    const targetUser = (users || []).find(u => u.id === userId) || DEFAULT_USERS.find(u => u.id === userId);
     if (targetUser) {
       setCurrentUser(targetUser);
-      setSimulatedRoleState(targetUser.role);
+      setSimulatedRoleState(targetUser.role || 'Executive');
       localStorage.setItem('crm_user', JSON.stringify(targetUser));
-      localStorage.setItem('crm_simulated_role', targetUser.role);
+      localStorage.setItem('crm_simulated_role', targetUser.role || 'Executive');
     }
   };
 
@@ -359,15 +379,18 @@ export const CRMProvider = ({ children }) => {
   }, [authToken]);
 
   // Login handler with backend attempt & seamless live fallback
-  const handleLogin = async (email, password) => {
+  const handleLogin = async (identifier, password) => {
     setLoginError('');
+    const cleanId = (identifier || '').trim().toLowerCase();
+    const cleanDigits = (identifier || '').replace(/\D/g, '');
+
     const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     if (isLocalhost) {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email: identifier, password })
         });
 
         if (res.ok) {
@@ -385,15 +408,46 @@ export const CRMProvider = ({ children }) => {
       }
     }
 
-    // Standalone fallback login - check users list first, then default users
-    const matchedUser = (users || []).find(u => u.email.toLowerCase() === email.toLowerCase()) || 
-      DEFAULT_USERS.find(u => u.email.toLowerCase() === email.toLowerCase()) || {
-      id: 'usr-demo',
-      name: email.split('@')[0].toUpperCase(),
-      email: email,
-      role: email.includes('superadmin') ? 'Super Admin' : email.includes('admin') ? 'Admin' : email.includes('manager') ? 'Manager' : email.includes('tl') ? 'Team Leader' : 'Executive',
-      status: 'Active'
+    // Helper to test if a candidate user matches identifier (by Email, Name, Mobile, or Employee ID)
+    const matchesUser = (u) => {
+      if (!u) return false;
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const uName = (u.name || '').trim().toLowerCase();
+      const uEmpId = (u.employeeId || '').trim().toLowerCase();
+      const uMobileDigits = (u.mobile || '').replace(/\D/g, '');
+
+      if (cleanId && uEmail && uEmail === cleanId) return true;
+      if (cleanId && uName && uName === cleanId) return true;
+      if (cleanId && uEmpId && uEmpId === cleanId) return true;
+      if (cleanDigits && uMobileDigits && (uMobileDigits === cleanDigits || uMobileDigits.endsWith(cleanDigits) || cleanDigits.endsWith(uMobileDigits))) return true;
+      return false;
     };
+
+    // Check custom and persisted users list first, then default users
+    let matchedUser = (users || []).find(matchesUser) || DEFAULT_USERS.find(matchesUser);
+
+    if (!matchedUser && cleanId) {
+      // Fuzzy match by name prefix if exact match didn't find anything
+      matchedUser = (users || []).find(u => (u.name || '').trim().toLowerCase().startsWith(cleanId)) ||
+                    DEFAULT_USERS.find(u => (u.name || '').trim().toLowerCase().startsWith(cleanId));
+    }
+
+    if (!matchedUser) {
+      // If still not found, check if it matches a role keyword or fallback
+      matchedUser = {
+        id: 'usr-' + Date.now(),
+        name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
+        email: identifier.includes('@') ? identifier : `${cleanId.replace(/[^a-z0-9]/g, '') || 'user'}@company.com`,
+        mobile: cleanDigits || '+91 98765 00000',
+        role: identifier.toLowerCase().includes('superadmin') ? 'Super Admin' :
+              identifier.toLowerCase().includes('admin') ? 'Admin' :
+              identifier.toLowerCase().includes('manager') ? 'Manager' :
+              identifier.toLowerCase().includes('tl') ? 'Team Leader' : 'Executive',
+        status: 'Active'
+      };
+      // Register this newly logged in user into state so their leads and pipeline are tracked
+      setUsers(prev => [matchedUser, ...(prev || [])]);
+    }
 
     const token = 'demo_token_' + Date.now();
     setAuthToken(token);
@@ -425,15 +479,23 @@ export const CRMProvider = ({ children }) => {
       if (res.ok) { refreshData(); return; }
     } catch (err) {}
 
-    // Standalone fallback action
+    // Standalone fallback action - ensure unique ID and clean credentials
+    const cleanName = (userData.name || 'User').trim();
+    const fallbackEmail = `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@company.com`;
+    const uniqueId = 'usr-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900);
+
     const newUserObj = {
-      id: 'usr-' + (users.length + 1),
+      id: uniqueId,
       ...userData,
+      name: cleanName,
+      email: (userData.email && userData.email.trim()) ? userData.email.trim() : fallbackEmail,
+      password: userData.password || '123456',
       status: 'Active',
-      expiryDate: '27-07-2028',
+      expiryDate: userData.expiryDate || '27-07-2028',
       employeeId: userData.employeeId || ('EMP-' + Math.floor(100 + Math.random() * 900))
     };
-    setUsers(prev => [newUserObj, ...prev]);
+    setUsers(prev => [newUserObj, ...(prev || [])]);
+    return newUserObj;
   };
 
   const updateUser = async (userId, updatedFields) => {
@@ -472,19 +534,139 @@ export const CRMProvider = ({ children }) => {
     } catch (err) {}
   };
 
-  const deleteUser = (userId, targetUserId = null) => {
-    const userLeads = leads.filter(l => l.assignedToId === userId);
+  const deleteUser = async (userId, targetUserId = null) => {
+    const userToDelete = (users || []).find(u => u.id === userId) || DEFAULT_USERS.find(u => u.id === userId);
+    if (!userToDelete) return { success: false, error: 'User not found' };
+
+    // Identify all active leads held by this user
+    const userLeads = (leads || []).filter(l => {
+      if (!l || l.isUnassigned || l.assignedToId === 'unassigned' || l.assignedToName === 'Unassigned') return false;
+      return (
+        l.assignedToId === userId ||
+        l.assigned_user_id === userId ||
+        (userToDelete.email && l.assignedToEmail && l.assignedToEmail.toLowerCase() === userToDelete.email.toLowerCase()) ||
+        (userToDelete.name && l.assignedToName && l.assignedToName.trim().toLowerCase() === userToDelete.name.trim().toLowerCase())
+      );
+    });
+
     if (userLeads.length > 0 && !targetUserId) {
-      return { success: false, requiresReassignment: true, leadCount: userLeads.length };
+      return { success: false, requiresReassignment: true, leadCount: userLeads.length, userToDelete };
     }
 
+    let targetUser = null;
     if (targetUserId) {
-      const targetUser = users.find(u => u.id === targetUserId);
-      setLeads(prev => prev.map(l => l.assignedToId === userId ? { ...l, assignedToId: targetUserId, assignedToName: targetUser?.name || 'Reassigned User' } : l));
+      targetUser = (users || []).find(u => u.id === targetUserId) || DEFAULT_USERS.find(u => u.id === targetUserId);
+      if (!targetUser) {
+        return { success: false, error: 'Target user not found' };
+      }
     }
 
-    setUsers(prev => prev.filter(u => u.id !== userId));
-    return { success: true };
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Reassign leads if targetUser exists
+    if (targetUser && userLeads.length > 0) {
+      const reassignedLeadIds = new Set(userLeads.map(l => l.id));
+
+      setLeads(prevLeads => {
+        const updated = (prevLeads || []).map(l => {
+          if (reassignedLeadIds.has(l.id)) {
+            const newHistory = [
+              ...(l.history || []),
+              {
+                date: todayStr,
+                time: nowTime,
+                text: `Reassigned from ${userToDelete.name} to ${targetUser.name} due to account deletion`,
+                by: currentUser?.name || 'Super Admin'
+              }
+            ];
+            return {
+              ...l,
+              assignedToId: targetUser.id,
+              assigned_user_id: targetUser.id,
+              assignedToName: targetUser.name,
+              assignedToEmail: targetUser.email || '',
+              assignedToRole: targetUser.role || 'Executive',
+              isUnassigned: false,
+              history: newHistory
+            };
+          }
+          return l;
+        });
+        localStorage.setItem('crm_leads', JSON.stringify(updated));
+        return updated;
+      });
+
+      // 2. Update assignmentInstances so reports / logs reflect the transfer
+      setAssignmentInstances(prevInst => {
+        const updatedInst = (prevInst || []).map(inst => {
+          if (inst.assignedToId === userId || inst.assigned_user_id === userId) {
+            return {
+              ...inst,
+              assignedToId: targetUser.id,
+              assigned_user_id: targetUser.id,
+              assignedToName: targetUser.name,
+              assignedToEmail: targetUser.email || '',
+              role: targetUser.role || 'Executive'
+            };
+          }
+          return inst;
+        });
+        localStorage.setItem('crm_assignment_instances', JSON.stringify(updatedInst));
+        return updatedInst;
+      });
+    }
+
+    // 3. Remove user from users state & localStorage
+    setUsers(prevUsers => {
+      const updatedUsers = (prevUsers || []).filter(u => u.id !== userId);
+      localStorage.setItem('crm_users', JSON.stringify(updatedUsers));
+      return updatedUsers;
+    });
+
+    // 4. If currently active user was the deleted user, switch to Super Admin
+    if (currentUser?.id === userId) {
+      const fallbackUser = (users || []).find(u => u.id !== userId && u.role === 'Super Admin') || DEFAULT_USERS[0];
+      setCurrentUser(fallbackUser);
+      setSimulatedRoleState(fallbackUser.role || 'Super Admin');
+      localStorage.setItem('crm_user', JSON.stringify(fallbackUser));
+      localStorage.setItem('crm_simulated_role', fallbackUser.role || 'Super Admin');
+    }
+
+    // 5. Backend sync attempt if running
+    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    if (isLocalhost) {
+      try {
+        if (targetUserId) {
+          await fetch(`${API_BASE_URL}/users/${userId}/reassign-and-delete`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ targetUserId })
+          });
+        }
+      } catch (e) {}
+    }
+
+    return { 
+      success: true, 
+      reassignedCount: userLeads.length, 
+      targetUserName: targetUser?.name 
+    };
+  };
+
+  const purgeAllData = () => {
+    localStorage.removeItem('crm_leads');
+    localStorage.removeItem('crm_assignment_instances');
+    localStorage.removeItem('crm_master_records');
+    localStorage.removeItem('crm_sales');
+    localStorage.removeItem('crm_lead_requests');
+    localStorage.removeItem('crm_users');
+    setLeads([]);
+    setAssignmentInstances([]);
+    setMasterRecords([]);
+    setSales([]);
+    setLeadRequests([]);
+    setUsers(DEFAULT_USERS);
   };
 
   // ==========================================
@@ -728,7 +910,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const assignLeadsByLanguage = (language, quantity, targetUserId) => {
-    const targetUser = users.find(u => u.id === targetUserId);
+    const targetUser = (users || []).find(u => u.id === targetUserId) || DEFAULT_USERS.find(u => u.id === targetUserId);
     if (!targetUser) {
       return { success: false, error: 'Allocation prevented: Target user not found in Block 1 Hierarchy.', assigned: 0 };
     }
@@ -786,6 +968,8 @@ export const CRMProvider = ({ children }) => {
           assignedToId: targetUser.id,
           assigned_user_id: targetUser.id,
           assignedToName: targetUser.name,
+          assignedToEmail: targetUser.email || '',
+          assignedToRole: targetUser.role || 'Executive',
           isUnassigned: false,
           disposition: l.disposition || 'New Lead',
           history: [
@@ -805,7 +989,8 @@ export const CRMProvider = ({ children }) => {
       assignedToId: targetUser.id,
       assigned_user_id: targetUser.id,
       assignedToName: targetUser.name,
-      role: targetUser.role,
+      assignedToEmail: targetUser.email || '',
+      role: targetUser.role || 'Executive',
       date: todayStr,
       leadIds: Array.from(assignedLeadIds)
     };
@@ -1158,6 +1343,7 @@ export const CRMProvider = ({ children }) => {
       reassignLeads,
       reassignLeadsFiltered,
       deleteUser,
+      purgeAllData,
       registerSale,
       approveSale,
       rejectSale,
