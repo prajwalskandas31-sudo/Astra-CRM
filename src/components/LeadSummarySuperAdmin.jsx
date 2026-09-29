@@ -919,14 +919,17 @@ export const LeadSummarySuperAdmin = () => {
                         >
                           <Eye size={12} /> View
                         </button>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => { setShowReassignFileModal(inst); setReassignFileTargetUserId(inst.assignedToId); }}
-                          title="Reassign entire file to another user"
-                          style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
-                        >
-                          <UserCheck size={12} /> Reassign
-                        </button>
+                        {/* Repeated Reassign button — disabled per request (use View modal for granular lead reassignment) */}
+                        {false && (
+                          <button
+                            className="btn btn-sm btn-secondary"
+                            onClick={() => { setShowReassignFileModal(inst); setReassignFileTargetUserId(inst.assignedToId); }}
+                            title="Reassign entire file to another user"
+                            style={{ padding: '0.28rem 0.6rem', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
+                          >
+                            <UserCheck size={12} /> Reassign
+                          </button>
+                        )}
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => {
