@@ -1413,17 +1413,48 @@ export const CRMProvider = ({ children }) => {
         return {
           ...l,
           assignedToId: targetUser.id,
+          assigned_user_id: targetUser.id,
           assignedToName: targetUser.name,
+          assignedToEmail: targetUser.email || '',
+          assignedToRole: targetUser.role || 'Executive',
           history: [...(l.history || []), { date: todayStr, text: `Granularly reassigned to ${targetUser.name} by Super Admin` }]
         };
       }
       return l;
+    }));
+
+    // Update assignmentInstances to remove reassigned lead IDs from their source instance file
+    setAssignmentInstances(prev => prev.map(inst => {
+      if (inst.leadIds && inst.leadIds.some(id => ids.includes(id))) {
+        const remainingLeadIds = inst.leadIds.filter(id => !ids.includes(id));
+        return {
+          ...inst,
+          leadIds: remainingLeadIds,
+          quantity: remainingLeadIds.length,
+          totalLeads: remainingLeadIds.length
+        };
+      }
+      return inst;
     }));
   };
 
   const granularDeleteLeads = (leadIds) => {
     const ids = Array.isArray(leadIds) ? leadIds : [leadIds];
     setLeads(prev => prev.filter(l => !ids.includes(l.id)));
+
+    // Update assignmentInstances to remove deleted lead IDs from their instance file
+    setAssignmentInstances(prev => prev.map(inst => {
+      if (inst.leadIds && inst.leadIds.some(id => ids.includes(id))) {
+        const remainingLeadIds = inst.leadIds.filter(id => !ids.includes(id));
+        return {
+          ...inst,
+          leadIds: remainingLeadIds,
+          quantity: remainingLeadIds.length,
+          totalLeads: remainingLeadIds.length
+        };
+      }
+      return inst;
+    }));
   };
 
   return (

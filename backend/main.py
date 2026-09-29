@@ -625,6 +625,11 @@ def granular_reassign_leads(req: GranularLeadReassignRequest, current_user: dict
             })
             count += 1
 
+    for inst in ASSIGNMENT_INSTANCES_DB:
+        if "leadIds" in inst and any(lid in inst["leadIds"] for lid in req.leadIds):
+            inst["leadIds"] = [lid for lid in inst["leadIds"] if lid not in req.leadIds]
+            inst["quantity"] = len(inst["leadIds"])
+
     return {"message": f"Reassigned {count} selected lead(s) to {target_user['name']}."}
 
 @app.delete("/api/leads/granular-delete")
@@ -635,6 +640,11 @@ def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = D
         if lead:
             LEADS_DB.remove(lead)
             count += 1
+
+    for inst in ASSIGNMENT_INSTANCES_DB:
+        if "leadIds" in inst and any(lid in inst["leadIds"] for lid in req.leadIds):
+            inst["leadIds"] = [lid for lid in inst["leadIds"] if lid not in req.leadIds]
+            inst["quantity"] = len(inst["leadIds"])
 
     return {"message": f"Deleted {count} selected lead(s) permanently."}
 

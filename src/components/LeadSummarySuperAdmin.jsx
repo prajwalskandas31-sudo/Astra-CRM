@@ -301,18 +301,20 @@ export const LeadSummarySuperAdmin = () => {
   // Helper stats for active instance modal
   const instanceStats = useMemo(() => {
     if (!activeInstanceModal) return null;
-    const batchLeadIds = activeInstanceModal.leadIds || [];
+    const currentInst = assignmentInstances.find(i => i.id === activeInstanceModal.id) || activeInstanceModal;
+    const batchLeadIds = currentInst.leadIds || [];
     const instLeads = leads.filter(l => {
+      const matchesUser = l.assignedToId === currentInst.assignedToId || l.assigned_user_id === currentInst.assignedToId;
       // Lead must be in the original batch
       if (batchLeadIds.length > 0 && !batchLeadIds.includes(l.id)) return false;
       // Lead must still be assigned to the original user (not reassigned away)
-      if (batchLeadIds.length > 0) return l.assignedToId === activeInstanceModal.assignedToId;
+      if (batchLeadIds.length > 0) return matchesUser;
       // Fallback: no leadIds recorded, match by assignedToId only
-      return l.assignedToId === activeInstanceModal.assignedToId;
+      return matchesUser;
     });
     const total = instLeads.length;
     const dialed = instLeads.filter(l => l.disposition && l.disposition !== 'New Lead').length;
-    const uncontacted = total - dialed;
+    const uncontacted = Math.max(0, total - dialed);
 
     const dispositionBreakdown = {};
     dispositions.forEach(d => { dispositionBreakdown[d.name] = 0; });
@@ -322,7 +324,7 @@ export const LeadSummarySuperAdmin = () => {
     });
 
     return { total, dialed, uncontacted, instLeads, dispositionBreakdown };
-  }, [activeInstanceModal, leads, dispositions]);
+  }, [activeInstanceModal, assignmentInstances, leads, dispositions]);
 
   return (
     <div className="lead-summary-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -787,10 +789,16 @@ export const LeadSummarySuperAdmin = () => {
             </thead>
             <tbody>
               {assignmentInstances.map(inst => {
-                const instLeads = leads.filter(l => l.assignedToId === inst.assignedToId || (inst.leadIds || []).includes(l.id));
-                const total = instLeads.length || inst.totalLeads;
+                const instLeads = leads.filter(l => {
+                  const matchesUser = (l.assignedToId === inst.assignedToId || l.assigned_user_id === inst.assignedToId);
+                  if (inst.leadIds && inst.leadIds.length > 0) {
+                    return inst.leadIds.includes(l.id) && matchesUser;
+                  }
+                  return matchesUser;
+                });
+                const total = instLeads.length;
                 const dialed = instLeads.filter(l => l.disposition && l.disposition !== 'New Lead').length;
-                const uncontacted = total - dialed;
+                const uncontacted = Math.max(0, total - dialed);
                 const isSelected = selectedInstanceIds.includes(inst.id);
 
                 return (
