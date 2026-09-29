@@ -301,7 +301,15 @@ export const LeadSummarySuperAdmin = () => {
   // Helper stats for active instance modal
   const instanceStats = useMemo(() => {
     if (!activeInstanceModal) return null;
-    const instLeads = leads.filter(l => l.assignedToId === activeInstanceModal.assignedToId || (activeInstanceModal.leadIds || []).includes(l.id));
+    const batchLeadIds = activeInstanceModal.leadIds || [];
+    const instLeads = leads.filter(l => {
+      // Lead must be in the original batch
+      if (batchLeadIds.length > 0 && !batchLeadIds.includes(l.id)) return false;
+      // Lead must still be assigned to the original user (not reassigned away)
+      if (batchLeadIds.length > 0) return l.assignedToId === activeInstanceModal.assignedToId;
+      // Fallback: no leadIds recorded, match by assignedToId only
+      return l.assignedToId === activeInstanceModal.assignedToId;
+    });
     const total = instLeads.length;
     const dialed = instLeads.filter(l => l.disposition && l.disposition !== 'New Lead').length;
     const uncontacted = total - dialed;
