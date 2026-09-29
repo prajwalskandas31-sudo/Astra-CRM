@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle } from 'lucide-react';
+import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe } from 'lucide-react';
 
 export const SystemSettings = () => {
   const { 
@@ -15,12 +15,22 @@ export const SystemSettings = () => {
     documentTypes,
     addDocumentType,
     deleteDocumentType,
-    simulatedRole 
+    simulatedRole,
+    users,
+    currentUser,
+    detectedIP,
+    getUserAllowedIPs,
+    resetUserIPs,
+    addIPToUser
   } = useCRM();
   const { showToast } = useToast();
 
   const [roleForm, setRoleForm] = useState({ roleName: '' });
   const [docTypeForm, setDocTypeForm] = useState({ name: '', required: false, description: '' });
+  const [ipPanelUser, setIPPanelUser] = useState(null); // userId being viewed
+  const [manualIPInput, setManualIPInput] = useState('');
+  const [ipForceRefresh, setIPForceRefresh] = useState(0); // trigger re-render after mutations
+
 
   const handleAddDocType = async (e) => {
     e.preventDefault();
@@ -359,6 +369,152 @@ export const SystemSettings = () => {
           </table>
         </div>
       </div>
+      {/* ── IP Guard Management — Super Admin Only ──────────────────── */}
+      {(simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin') && (
+        <div className="directory-card" style={{ padding: '20px 24px' }}>
+          <h3 style={{ fontSize: '1.05rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={18} color="var(--accent-primary)" /> IP Guard Management
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            View, reset, or manually whitelist IP addresses per user. Each user's first login auto-registers their IP.
+            Super Admins are always exempt from IP restrictions.
+          </p>
+          {detectedIP && (
+            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Globe size={12} /> Your current IP: <code style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{detectedIP}</code>
+            </div>
+          )}
+
+          {/* User list with their IPs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {users.filter(u => u.status === 'Active' && u.role !== 'Super Admin').map(u => {
+              const ips = getUserAllowedIPs(u.id);
+              const isExpanded = ipPanelUser === u.id;
+              return (
+                <div key={u.id} style={{
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden'
+                }}>
+                  {/* Row header */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: 'var(--bg-surface)',
+                    cursor: 'pointer'
+                  }} onClick={() => setIPPanelUser(isExpanded ? null : u.id)}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                        {u.name} <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)', fontWeight: 400 }}>({u.role})</span>
+                      </div>
+                      <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                    </div>
+                    <span className="badge" style={{
+                      backgroundColor: ips.length > 0 ? '#10b98115' : '#f59e0b15',
+                      color: ips.length > 0 ? '#10b981' : '#f59e0b',
+                      border: `1px solid ${ips.length > 0 ? '#10b98130' : '#f59e0b30'}`,
+                      fontSize: '0.7rem', fontWeight: 700
+                    }}>
+                      {ips.length > 0 ? `${ips.length} IP${ips.length > 1 ? 's' : ''} Registered` : 'No IPs — Open Access'}
+                    </span>
+                    <ShieldCheck size={14} color={ips.length > 0 ? '#10b981' : '#f59e0b'} />
+                  </div>
+
+                  {/* Expanded IP details */}
+                  {isExpanded && (
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-app)' }}>
+                      {ips.length === 0 ? (
+                        <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                          No IPs registered yet. This user has open access. Their IP will be locked after first login.
+                        </p>
+                      ) : (
+                        <div style={{ marginBottom: '10px' }}>
+                          {ips.map((entry, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              padding: '6px 10px', marginBottom: '4px',
+                              backgroundColor: 'var(--bg-surface)',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border-subtle)',
+                              fontSize: '0.78rem'
+                            }}>
+                              <code style={{ fontWeight: 700, color: 'var(--accent-primary)', flex: 1 }}>{entry.ip}</code>
+                              <span style={{ color: 'var(--text-muted)' }}>{entry.label}</span>
+                              <span style={{ color: 'var(--text-muted)' }}>
+                                {new Date(entry.registeredAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Manual IP add */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Add IP manually (e.g. 203.0.113.5)"
+                          value={ipPanelUser === u.id ? manualIPInput : ''}
+                          onChange={e => setManualIPInput(e.target.value)}
+                          style={{ flex: 1, fontSize: '0.78rem', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                        />
+                        <button
+                          className="btn-secondary"
+                          style={{ fontSize: '0.76rem', padding: '6px 12px', gap: '4px' }}
+                          onClick={() => {
+                            const ip = manualIPInput.trim();
+                            if (!ip) return;
+                            addIPToUser(u.id, ip, 'Manually added by Super Admin');
+                            showToast(`IP ${ip} whitelisted for ${u.name}`, 'success');
+                            setManualIPInput('');
+                            setIPForceRefresh(v => v + 1);
+                          }}
+                        >
+                          <Plus size={13} /> Add IP
+                        </button>
+                        {detectedIP && (
+                          <button
+                            className="btn-secondary"
+                            style={{ fontSize: '0.76rem', padding: '6px 12px', gap: '4px' }}
+                            title={`Add your current IP (${detectedIP}) to this user`}
+                            onClick={() => {
+                              addIPToUser(u.id, detectedIP, 'Added by Super Admin (their current IP)');
+                              showToast(`Your IP ${detectedIP} added for ${u.name}`, 'success');
+                              setIPForceRefresh(v => v + 1);
+                            }}
+                          >
+                            <Globe size={13} /> Add My IP
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Reset all IPs */}
+                      <button
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '6px 12px', fontSize: '0.76rem', fontWeight: 600,
+                          border: '1px solid #ef444440',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: '#ef444410', color: '#ef4444',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          if (window.confirm(`Reset ALL registered IPs for ${u.name}? They will be able to log in from any IP and a new IP will be registered on their next login.`)) {
+                            resetUserIPs(u.id);
+                            showToast(`All IPs reset for ${u.name}. They can now log in from any location.`, 'info');
+                            setIPForceRefresh(v => v + 1);
+                          }
+                        }}
+                      >
+                        <ShieldOff size={13} /> Reset All IPs for {u.name}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

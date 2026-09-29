@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "homepage": "https://prajwalskandas31-sudo.github.io/Astra-CRM",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

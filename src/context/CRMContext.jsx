@@ -1,6 +1,40 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const API_BASE_URL = 'http://localhost:8000/api';
+
+// ─── IP Detection & Restriction Utilities ───────────────────────────────────
+// Fetches the user's current public IP from a free, no-auth API.
+async function detectPublicIP() {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      return data.ip || null;
+    }
+  } catch (_) {}
+  try {
+    const res2 = await fetch('https://api64.ipify.org?format=json', { cache: 'no-store' });
+    if (res2.ok) {
+      const data2 = await res2.json();
+      return data2.ip || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+// Load the global IP registry from localStorage
+function loadIPRegistry() {
+  try {
+    const raw = localStorage.getItem('crm_ip_registry');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return {}; // { userId: [{ ip, registeredAt, label }] }
+}
+
+// Save the global IP registry to localStorage
+function saveIPRegistry(registry) {
+  localStorage.setItem('crm_ip_registry', JSON.stringify(registry));
+}
 
 const DEFAULT_USERS = [
   { id: 'usr-1', name: 'Srinivas R', email: 'superadmin@company.com', mobile: '+91 98765 43210', role: 'Super Admin', status: 'Active', reportingTo: 'Board of Directors', expiryDate: '27-07-2028', employeeId: 'EMP-001', adminAccessEnabled: true, bankAccountNumber: '91234567890123', ifscCode: 'HDFC0000123', bankNameAndBranch: 'HDFC Bank, MG Road Branch', familyReferenceNumber: '+91 98765 43219', referredBy: 'Board of Directors' },
@@ -78,7 +112,7 @@ const DEFAULT_LEAD_REQUESTS = [];
 
 const DEFAULT_ASSIGNMENT_INSTANCES = [];
 
-const DATA_STORAGE_VERSION = '2026_09_28_v5_clean';
+const DATA_STORAGE_VERSION = '2026_09_29_v6_ip_restriction';
 
 if (typeof window !== 'undefined' && localStorage.getItem('crm_storage_version') !== DATA_STORAGE_VERSION) {
   localStorage.removeItem('crm_leads');
@@ -380,11 +414,58 @@ export const CRMProvider = ({ children }) => {
     }
   }, [authToken]);
 
-  // Login handler with backend attempt & seamless live fallback
+  // ─── IP Restriction State ──────────────────────────────────────────────────
+  const [detectedIP, setDetectedIP] = useState(null);
+  const [ipDetecting, setIPDetecting] = useState(false);
+
+  // Expose detected IP (pre-fetched when login page loads)
+  const prefetchIP = async () => {
+    if (detectedIP) return detectedIP;
+    setIPDetecting(true);
+    const ip = await detectPublicIP();
+    setDetectedIP(ip);
+    setIPDetecting(false);
+    return ip;
+  };
+
+  // Get all allowed IPs for a user from registry
+  const getUserAllowedIPs = (userId) => {
+    const registry = loadIPRegistry();
+    return registry[userId] || [];
+  };
+
+  // Reset/revoke all IPs for a user (Super Admin action)
+  const resetUserIPs = (userId) => {
+    const registry = loadIPRegistry();
+    delete registry[userId];
+    saveIPRegistry(registry);
+  };
+
+  // Manually add an IP for a user (Super Admin action)
+  const addIPToUser = (userId, ip, label = 'Manual') => {
+    const registry = loadIPRegistry();
+    if (!registry[userId]) registry[userId] = [];
+    const already = registry[userId].some(e => e.ip === ip);
+    if (!already) {
+      registry[userId].push({ ip, registeredAt: new Date().toISOString(), label });
+      saveIPRegistry(registry);
+    }
+  };
+
+  // Login handler with backend attempt, IP restriction, & seamless live fallback
   const handleLogin = async (identifier, password) => {
     setLoginError('');
     const cleanId = (identifier || '').trim().toLowerCase();
     const cleanDigits = (identifier || '').replace(/\D/g, '');
+
+    // ── Step 1: Detect public IP ────────────────────────────────────────────
+    let currentIP = detectedIP;
+    if (!currentIP) {
+      setIPDetecting(true);
+      currentIP = await detectPublicIP();
+      setDetectedIP(currentIP);
+      setIPDetecting(false);
+    }
 
     const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     if (isLocalhost) {
@@ -429,13 +510,11 @@ export const CRMProvider = ({ children }) => {
     let matchedUser = (users || []).find(matchesUser) || DEFAULT_USERS.find(matchesUser);
 
     if (!matchedUser && cleanId) {
-      // Fuzzy match by name prefix if exact match didn't find anything
       matchedUser = (users || []).find(u => (u.name || '').trim().toLowerCase().startsWith(cleanId)) ||
                     DEFAULT_USERS.find(u => (u.name || '').trim().toLowerCase().startsWith(cleanId));
     }
 
     if (!matchedUser) {
-      // If still not found, check if it matches a role keyword or fallback
       matchedUser = {
         id: 'usr-' + Date.now(),
         name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
@@ -447,10 +526,41 @@ export const CRMProvider = ({ children }) => {
               identifier.toLowerCase().includes('tl') ? 'Team Leader' : 'Executive',
         status: 'Active'
       };
-      // Register this newly logged in user into state so their leads and pipeline are tracked
       setUsers(prev => [matchedUser, ...(prev || [])]);
     }
 
+    // ── Step 2: IP Restriction Check ────────────────────────────────────────
+    // Super Admin is always exempt from IP restrictions
+    const isSuperAdmin = matchedUser.role === 'Super Admin';
+    if (!isSuperAdmin && currentIP) {
+      const registry = loadIPRegistry();
+      const userIPs = registry[matchedUser.id] || [];
+
+      if (userIPs.length === 0) {
+        // First login: auto-register this IP
+        const newRegistry = { ...registry };
+        newRegistry[matchedUser.id] = [{
+          ip: currentIP,
+          registeredAt: new Date().toISOString(),
+          label: 'Auto-registered on first login'
+        }];
+        saveIPRegistry(newRegistry);
+        // Show info toast (non-blocking)
+        console.info(`[IP Guard] First login for ${matchedUser.name}. IP ${currentIP} registered.`);
+      } else {
+        // Subsequent logins: check if IP is whitelisted
+        const isAllowed = userIPs.some(entry => entry.ip === currentIP);
+        if (!isAllowed) {
+          setLoginError(
+            `🔒 Access Denied: Your current IP address (${currentIP}) is not authorised for this account. ` +
+            `Only pre-registered IPs can access this account. Contact your Super Admin to reset or whitelist your new IP.`
+          );
+          return false;
+        }
+      }
+    }
+
+    // ── Step 3: Grant Access ────────────────────────────────────────────────
     const token = 'demo_token_' + Date.now();
     setAuthToken(token);
     setCurrentUser(matchedUser);
@@ -1376,7 +1486,14 @@ export const CRMProvider = ({ children }) => {
       userShortcutSettings,
       isShortcutEnabled,
       setUserShortcut,
-      toggleUserShortcut
+      toggleUserShortcut,
+      // ─── IP Restriction ─────────────────────────────────────
+      detectedIP,
+      ipDetecting,
+      prefetchIP,
+      getUserAllowedIPs,
+      resetUserIPs,
+      addIPToUser
     }}>
       {children}
     </CRMContext.Provider>

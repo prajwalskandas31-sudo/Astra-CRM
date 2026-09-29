@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { Mail, Lock, LogIn, Command, ArrowRight } from 'lucide-react';
+import { Mail, Lock, LogIn, Command, ArrowRight, Shield, ShieldCheck, ShieldAlert, Wifi } from 'lucide-react';
 
 export const LoginPage = () => {
-  const { loginError, handleLogin, users = [], leads = [] } = useCRM();
+  const { loginError, handleLogin, users = [], leads = [], detectedIP, ipDetecting, prefetchIP } = useCRM();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fetch IP as soon as login page mounts so it's ready when user submits
+  useEffect(() => {
+    prefetchIP();
+  }, []);
 
   const defaultRoleConfigs = [
     { role: 'Super Admin', email: 'superadmin@company.com', defaultPass: 'admin123', badge: 'Full Authority', color: '#6e56cf' },
@@ -186,15 +191,49 @@ export const LoginPage = () => {
           <h2 style={{ fontSize: '1.2rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <LogIn size={20} color="var(--accent)" /> Direct Sign In
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
             Sign in with User Name, Email, or Mobile Number.
           </p>
 
+          {/* ── IP Shield Status Bar ────────────────────────────── */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '14px',
+            backgroundColor: detectedIP ? '#10b98110' : '#f59e0b10',
+            border: `1px solid ${detectedIP ? '#10b98130' : '#f59e0b30'}`,
+            fontSize: '0.76rem'
+          }}>
+            {ipDetecting ? (
+              <><Wifi size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <span style={{ color: '#f59e0b' }}>Detecting your IP address...</span></>
+            ) : detectedIP ? (
+              <><ShieldCheck size={13} color="#10b981" style={{ flexShrink: 0 }} />
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Your IP: <code style={{ fontWeight: 700, color: '#10b981' }}>{detectedIP}</code>
+              </span>
+              <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                🔒 IP Guard Active
+              </span></>
+            ) : (
+              <><ShieldAlert size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <span style={{ color: '#f59e0b' }}>IP detection unavailable — restriction bypassed</span></>
+            )}
+          </div>
+
           {loginError && (
-            <div className="alert-box alert-warning" style={{ marginBottom: '16px' }}>
+            <div className="alert-box alert-warning" style={{
+              marginBottom: '16px',
+              borderColor: loginError.includes('Access Denied') ? '#ef4444' : undefined,
+              backgroundColor: loginError.includes('Access Denied') ? '#ef444410' : undefined
+            }}>
               {loginError}
             </div>
           )}
+
 
           <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="form-group">
