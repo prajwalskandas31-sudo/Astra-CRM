@@ -336,8 +336,8 @@ export const LeadSummarySuperAdmin = () => {
         </div>
       </div>
 
-      {/* LANGUAGE-BASED LEAD ASSIGNMENT ENGINE (BLOCK 1 ROUTING) */}
-      {(() => {
+      {/* Language-Based Lead Assignment Engine (Block 1 Routing) — disabled */}
+      {false && (() => {
         const currentLangMatching = unassignedLeads.filter(l => 
           b4AssignLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === b4AssignLang.toLowerCase()
         );
