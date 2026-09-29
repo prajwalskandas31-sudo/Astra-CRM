@@ -959,8 +959,8 @@ export const LeadUploadModule = () => {
             );
           })()}
 
-          {/* LANGUAGE-BASED LEAD ASSIGNMENT ENGINE (BLOCK 1 ROUTING) */}
-          {(() => {
+          {/* Language-Based Lead Assignment Engine (Block 1 Routing) — disabled in Lead Upload Module */}
+          {false && (() => {
             const currentLangMatching = unassignedLeads.filter(l => 
               assignLang.toLowerCase() === 'all' || (l.language || '').toLowerCase() === assignLang.toLowerCase()
             );
