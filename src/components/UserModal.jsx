@@ -15,7 +15,8 @@ import {
   Trash2, 
   Eye, 
   EyeOff, 
-  AlertTriangle 
+  AlertTriangle,
+  Plus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -56,7 +57,7 @@ const isHeaderRow = (parts) => {
 };
 
 export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
-  const { users, customRoles, addUser, updateUser } = useCRM();
+  const { users, customRoles, documentTypes = [], addUser, updateUser } = useCRM();
   const { showToast } = useToast();
 
   const [mode, setMode] = useState('single');
@@ -74,6 +75,13 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     familyReferenceNumber: userToEdit ? (userToEdit.familyReferenceNumber || '') : '',
     referredBy: userToEdit ? (userToEdit.referredBy || '') : ''
   });
+
+  // Attached Documents State (Direct upload on user creation/edit)
+  const [attachedDocs, setAttachedDocs] = useState([]);
+  const [selectedDocTypeId, setSelectedDocTypeId] = useState('');
+  const [docFileToUpload, setDocFileToUpload] = useState(null);
+  const [isAttachingDoc, setIsAttachingDoc] = useState(false);
+  const docFileInputRef = useRef(null);
 
   // Bulk Upload State
   const [bulkText, setBulkText] = useState('');
@@ -101,6 +109,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           familyReferenceNumber: userToEdit.familyReferenceNumber || '',
           referredBy: userToEdit.referredBy || ''
         });
+        setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
       } else {
         setFormData({
           name: '',
@@ -116,14 +125,75 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           familyReferenceNumber: '',
           referredBy: ''
         });
+        setAttachedDocs([]);
         setBulkText('');
         setUploadedFileName('');
         setUploadedFileSize('');
         setFileError('');
         setShowPreview(false);
       }
+      setSelectedDocTypeId(documentTypes[0]?.id || '');
+      setDocFileToUpload(null);
+      if (docFileInputRef.current) docFileInputRef.current.value = '';
     }
-  }, [isOpen, userToEdit]);
+  }, [isOpen, userToEdit, documentTypes]);
+
+  useEffect(() => {
+    if (documentTypes.length > 0 && !selectedDocTypeId) {
+      setSelectedDocTypeId(documentTypes[0].id);
+    }
+  }, [documentTypes, selectedDocTypeId]);
+
+  const handleAttachDocument = (e) => {
+    if (e) e.preventDefault();
+    if (!docFileToUpload) {
+      showToast('Please select a document file to attach.', 'warning');
+      return;
+    }
+    const docType = documentTypes.find(dt => dt.id === selectedDocTypeId) || { name: 'Document', id: selectedDocTypeId };
+    setIsAttachingDoc(true);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const fileData = event.target.result;
+      const sizeStr = (docFileToUpload.size / 1024).toFixed(0) + ' KB';
+      const newDoc = {
+        id: 'doc-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        documentTypeId: docType.id || selectedDocTypeId || 'doc-custom',
+        documentName: docType.name || 'Document',
+        fileName: docFileToUpload.name,
+        fileType: docFileToUpload.type,
+        fileSize: sizeStr,
+        fileData: fileData,
+        uploadedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
+      };
+
+      setAttachedDocs(prev => {
+        const existingIdx = prev.findIndex(d => d.documentTypeId === newDoc.documentTypeId);
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = newDoc;
+          return updated;
+        }
+        return [...prev, newDoc];
+      });
+
+      setDocFileToUpload(null);
+      if (docFileInputRef.current) docFileInputRef.current.value = '';
+      setIsAttachingDoc(false);
+      showToast(`Document '${docType.name}' attached.`, 'success');
+    };
+    reader.onerror = () => {
+      setIsAttachingDoc(false);
+      showToast('Failed to read document file.', 'error');
+    };
+    reader.readAsDataURL(docFileToUpload);
+  };
+
+  const handleRemoveAttachedDoc = (docId) => {
+    setAttachedDocs(prev => prev.filter(d => d.id !== docId));
+    showToast('Attached document removed.', 'info');
+  };
 
   const managementUsers = useMemo(() => {
     return users.filter(u => 
@@ -369,7 +439,10 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
       }
 
       if (userToEdit) {
-        updateUser(userToEdit.id, formData);
+        updateUser(userToEdit.id, {
+          ...formData,
+          documents: attachedDocs
+        });
         showToast(`User '${formData.name}' details updated.`, 'success');
       } else {
         const cleanName = (formData.name || 'User').trim();
@@ -382,7 +455,8 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
           ...formData,
           name: cleanName,
           email: autoEmail,
-          password: autoPass
+          password: autoPass,
+          documents: attachedDocs
         });
         showToast(`User '${cleanName}' created successfully. Login with Name (${cleanName}), Email (${autoEmail}), or Mobile!`, 'success');
       }
@@ -582,6 +656,223 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                         </optgroup>
                       )}
                     </select>
+                  </div>
+                )}
+
+                {/* ── Provision: Bank Account & Referral Details ── */}
+                {formData.role !== 'Super Admin' && (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    background: 'var(--bg-table-head)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem' }}>
+                      <Landmark size={15} />
+                      <span>Bank Account & Referral Details (Optional)</span>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.76rem' }}>Bank Account Number</label>
+                        <input
+                          type="text"
+                          name="bankAccountNumber"
+                          value={formData.bankAccountNumber}
+                          onChange={handleChange}
+                          placeholder="e.g. 91234567890123"
+                          style={{ fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.76rem' }}>IFSC Code</label>
+                        <input
+                          type="text"
+                          name="ifscCode"
+                          value={formData.ifscCode}
+                          onChange={handleChange}
+                          placeholder="e.g. HDFC0000123"
+                          style={{ fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                        <label style={{ fontSize: '0.76rem' }}>Bank Name & Branch</label>
+                        <input
+                          type="text"
+                          name="bankNameAndBranch"
+                          value={formData.bankNameAndBranch}
+                          onChange={handleChange}
+                          placeholder="e.g. HDFC Bank, MG Road Branch"
+                          style={{ fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.76rem' }}>Family Reference Number</label>
+                        <input
+                          type="text"
+                          name="familyReferenceNumber"
+                          value={formData.familyReferenceNumber}
+                          onChange={handleChange}
+                          placeholder="e.g. +91 98765 43219"
+                          style={{ fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0 }}>
+                        <label style={{ fontSize: '0.76rem' }}>Referred By</label>
+                        <input
+                          type="text"
+                          name="referredBy"
+                          value={formData.referredBy}
+                          onChange={handleChange}
+                          placeholder="e.g. Priya Nair (TL-201)"
+                          style={{ fontSize: '0.82rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Provision: Employee Documents Upload ── */}
+                {formData.role !== 'Super Admin' && (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    background: 'var(--bg-table-head)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem' }}>
+                        <UploadCloud size={15} />
+                        <span>Upload Employee Documents (Optional)</span>
+                      </div>
+                      {attachedDocs.length > 0 && (
+                        <span className="badge badge-success" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                          {attachedDocs.length} {attachedDocs.length === 1 ? 'Doc Attached' : 'Docs Attached'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                      Directly attach verification documents (Aadhaar, PAN, Degree, etc.) to this employee profile.
+                    </div>
+
+                    {/* Document Picker & Attach Input Row */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '10px',
+                      alignItems: 'flex-end',
+                      background: 'var(--bg-card)',
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '160px' }}>
+                        <label style={{ fontSize: '0.74rem' }}>Document Type</label>
+                        <select
+                          value={selectedDocTypeId}
+                          onChange={(e) => setSelectedDocTypeId(e.target.value)}
+                          style={{ fontSize: '0.8rem', background: 'var(--bg-input)' }}
+                        >
+                          {documentTypes.map(dt => (
+                            <option key={dt.id} value={dt.id}>
+                              {dt.name} {dt.required ? '(Mandatory)' : '(Optional)'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '180px' }}>
+                        <label style={{ fontSize: '0.74rem' }}>Select File (PDF, PNG, JPG)</label>
+                        <input
+                          ref={docFileInputRef}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          onChange={(e) => setDocFileToUpload(e.target.files[0] || null)}
+                          style={{ fontSize: '0.78rem', background: 'var(--bg-input)' }}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleAttachDocument}
+                        disabled={isAttachingDoc || !docFileToUpload}
+                        style={{
+                          fontSize: '0.76rem',
+                          padding: '7px 14px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          height: '36px'
+                        }}
+                      >
+                        <Plus size={13} /> {isAttachingDoc ? 'Attaching...' : 'Attach Doc'}
+                      </button>
+                    </div>
+
+                    {/* Attached Documents List Preview */}
+                    {attachedDocs.length === 0 ? (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
+                        No documents attached yet. Documents can also be added or managed anytime later from User Directory.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                        {attachedDocs.map(doc => (
+                          <div
+                            key={doc.id || doc.documentTypeId}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              background: 'var(--bg-card)',
+                              padding: '8px 12px',
+                              borderRadius: 'var(--radius-sm)',
+                              border: '1px solid var(--border-color)',
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                              <FileText size={15} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
+                              <div>
+                                <strong style={{ color: 'var(--text-primary)', marginRight: '6px' }}>{doc.documentName}</strong>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>({doc.fileName} • {doc.fileSize})</span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAttachedDoc(doc.id)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--status-danger)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '0.75rem',
+                                padding: '3px 6px'
+                              }}
+                              title="Remove document"
+                            >
+                              <Trash2 size={13} /> Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -42,6 +42,7 @@ class UserCreate(BaseModel):
     bankNameAndBranch: Optional[str] = ""
     familyReferenceNumber: Optional[str] = ""
     referredBy: Optional[str] = ""
+    documents: Optional[List[dict]] = []
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -54,6 +55,7 @@ class UserUpdate(BaseModel):
     bankNameAndBranch: Optional[str] = None
     familyReferenceNumber: Optional[str] = None
     referredBy: Optional[str] = None
+    documents: Optional[List[dict]] = None
 
 class PasswordChange(BaseModel):
     newPassword: str
@@ -180,7 +182,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "ifscCode": req.ifscCode or "",
         "bankNameAndBranch": req.bankNameAndBranch or "",
         "familyReferenceNumber": req.familyReferenceNumber or "",
-        "referredBy": req.referredBy or ""
+        "referredBy": req.referredBy or "",
+        "documents": req.documents or []
     }
     USERS_DB.insert(0, new_user)
     return new_user
@@ -201,6 +204,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch
     if req.familyReferenceNumber is not None: user["familyReferenceNumber"] = req.familyReferenceNumber
     if req.referredBy is not None: user["referredBy"] = req.referredBy
+    if req.documents is not None: user["documents"] = req.documents
 
     return user
 

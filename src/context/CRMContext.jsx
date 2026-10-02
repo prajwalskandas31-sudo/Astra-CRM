@@ -604,7 +604,8 @@ export const CRMProvider = ({ children }) => {
       password: userData.password || '123456',
       status: 'Active',
       expiryDate: userData.expiryDate || '27-07-2028',
-      employeeId: userData.employeeId || ('EMP-' + Math.floor(100 + Math.random() * 900))
+      employeeId: userData.employeeId || ('EMP-' + Math.floor(100 + Math.random() * 900)),
+      documents: userData.documents || []
     };
     setUsers(prev => [newUserObj, ...(prev || [])]);
     return newUserObj;
