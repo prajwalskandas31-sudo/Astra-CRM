@@ -77,6 +77,7 @@ class LeadReassignRequest(BaseModel):
     toUserId: str
     quantity: Optional[int] = None
     language: Optional[str] = None
+    disposition: Optional[str] = None
     date: Optional[str] = None
     dateMode: Optional[str] = "single"
     startDate: Optional[str] = None
@@ -335,6 +336,8 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
             continue
         if req.language and req.language != "ALL" and lead.get("language", "").lower() != req.language.lower():
             continue
+        if req.disposition and req.disposition != "ALL" and lead.get("disposition", "New Lead").lower() != req.disposition.lower():
+            continue
         
         # Date filter: single or range
         if req.dateMode == "range" or (req.startDate or req.endDate):
@@ -370,7 +373,7 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
 
         lead["history"].append({
             "date": now_str,
-            "text": f"Lead reassigned to {target_user['name']} by {current_user['name']} via Protocol [Qty: {req.quantity or 'All'}, Lang: {req.language or 'All'}, Date: {date_desc}]"
+            "text": f"Lead reassigned to {target_user['name']} by {current_user['name']} via Protocol [Qty: {req.quantity or 'All'}, Lang: {req.language or 'All'}, Disp: {req.disposition or 'All'}, Date: {date_desc}]"
         })
         reassigned_count += 1
 

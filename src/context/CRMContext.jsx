@@ -1285,7 +1285,18 @@ export const CRMProvider = ({ children }) => {
     }));
   };
 
-  const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, date, dateMode = 'single', startDate, endDate }) => {
+  const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, disposition, date, dateMode = 'single', startDate, endDate }) => {
+    // Attempt backend sync in background
+    try {
+      fetch(`${API_BASE_URL}/leads/reassign`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ fromUserId, toUserId, quantity, language, disposition, date, dateMode, startDate, endDate })
+      }).then(res => {
+        if (res.ok) refreshData();
+      }).catch(() => {});
+    } catch (e) {}
+
     const targetUser = users.find(u => u.id === toUserId);
     if (!targetUser) return 0;
     const numToAssign = quantity ? parseInt(quantity, 10) : Infinity;
@@ -1296,6 +1307,10 @@ export const CRMProvider = ({ children }) => {
     const candidates = leads.filter(l => {
       if (fromUserId && fromUserId !== 'ALL' && l.assignedToId !== fromUserId) return false;
       if (language && language !== 'ALL' && (l.language || '').trim().toLowerCase() !== language.trim().toLowerCase()) return false;
+      if (disposition && disposition !== 'ALL') {
+        const leadDisp = (l.disposition || 'New Lead').trim().toLowerCase();
+        if (leadDisp !== disposition.trim().toLowerCase()) return false;
+      }
 
       if (dateMode === 'range' || (!date && (startDate || endDate))) {
         if (startDate || endDate) {
@@ -1341,7 +1356,7 @@ export const CRMProvider = ({ children }) => {
       if (targetIds.has(l.id)) {
         const newHistory = [
           ...(l.history || []),
-          { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Date: ${dateDesc}].` }
+          { date: todayStr, text: `Reassigned to ${targetUser.name} (${targetUser.role}) via Protocol [Qty: ${quantity || 'All'}, Lang: ${language || 'All'}, Disp: ${disposition || 'All'}, Date: ${dateDesc}].` }
         ];
         return {
           ...l,

@@ -1,20 +1,25 @@
 import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { Layers, ArrowRight, Calendar, Hash, Globe, Filter, CheckCircle2 } from 'lucide-react';
+import { Layers, ArrowRight, Calendar, Hash, Globe, Filter, CheckCircle2, Search, RotateCcw, X, BookmarkCheck } from 'lucide-react';
 
 export const LeadReassignmentView = () => {
-  const { users, leads, reassignLeadsFiltered, simulatedRole } = useCRM();
+  const { users, leads, dispositions, reassignLeadsFiltered, simulatedRole } = useCRM();
   const { showToast } = useToast();
 
   const [fromUser, setFromUser] = useState('');
   const [toUser, setToUser] = useState('');
   const [reassignQty, setReassignQty] = useState('');
   const [reassignLang, setReassignLang] = useState('ALL');
+  const [reassignDisposition, setReassignDisposition] = useState('ALL');
   const [dateMode, setDateMode] = useState('single'); // 'single' | 'range'
   const [reassignDate, setReassignDate] = useState('');
   const [reassignStartDate, setReassignStartDate] = useState('');
   const [reassignEndDate, setReassignEndDate] = useState('');
+
+  // Table directory search and disposition filter state
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableDispositionFilter, setTableDispositionFilter] = useState('ALL');
 
   // Extract available languages from leads
   const availableLanguages = useMemo(() => {
@@ -23,12 +28,26 @@ export const LeadReassignmentView = () => {
     return Array.from(langs);
   }, [leads]);
 
+  // Extract available dispositions from context and leads
+  const availableDispositions = useMemo(() => {
+    const dispSet = new Set((dispositions || []).map(d => d.name));
+    leads.forEach(l => {
+      if (l.disposition) dispSet.add(l.disposition);
+    });
+    ['New Lead', 'Interested', 'Call Back Later', 'Give Demo Call', 'Follow Up', 'Not Interested', 'Commitment', 'Paid / Converted'].forEach(d => dispSet.add(d));
+    return Array.from(dispSet);
+  }, [dispositions, leads]);
+
   // Preview count of matching leads based on selected criteria
   const matchingLeadsCount = useMemo(() => {
     if (!fromUser) return 0;
     return leads.filter(l => {
       if (fromUser !== 'ALL' && l.assignedToId !== fromUser) return false;
       if (reassignLang !== 'ALL' && (l.language || '').toLowerCase() !== reassignLang.toLowerCase()) return false;
+      if (reassignDisposition !== 'ALL') {
+        const leadDisp = (l.disposition || 'New Lead').trim().toLowerCase();
+        if (leadDisp !== reassignDisposition.trim().toLowerCase()) return false;
+      }
       
       if (dateMode === 'single') {
         if (reassignDate) {
@@ -57,7 +76,32 @@ export const LeadReassignmentView = () => {
       }
       return true;
     }).length;
-  }, [leads, fromUser, reassignLang, dateMode, reassignDate, reassignStartDate, reassignEndDate]);
+  }, [leads, fromUser, reassignLang, reassignDisposition, dateMode, reassignDate, reassignStartDate, reassignEndDate]);
+
+  // Filtered leads for the Active Lead Directory table
+  const filteredTableLeads = useMemo(() => {
+    return leads.filter(l => {
+      // Disposition filter
+      if (tableDispositionFilter !== 'ALL') {
+        const leadDisp = (l.disposition || 'New Lead').trim().toLowerCase();
+        if (leadDisp !== tableDispositionFilter.trim().toLowerCase()) return false;
+      }
+      // Text search filter
+      if (tableSearch.trim()) {
+        const q = tableSearch.trim().toLowerCase();
+        const contact = (l.contactPerson || '').toLowerCase();
+        const client = (l.clientName || '').toLowerCase();
+        const phone = (l.phone || '').toLowerCase();
+        const owner = (l.assignedToName || '').toLowerCase();
+        const lang = (l.language || '').toLowerCase();
+        const disp = (l.disposition || 'New Lead').toLowerCase();
+        if (!contact.includes(q) && !client.includes(q) && !phone.includes(q) && !owner.includes(q) && !lang.includes(q) && !disp.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [leads, tableDispositionFilter, tableSearch]);
 
   const handleManualReassignment = (e) => {
     e.preventDefault();
@@ -71,7 +115,7 @@ export const LeadReassignmentView = () => {
     }
 
     if (matchingLeadsCount === 0) {
-      showToast('No leads match the selected criteria (User, Language, Date).', 'warning');
+      showToast('No leads match the selected criteria (User, Language, Disposition, Date).', 'warning');
       return;
     }
 
@@ -80,6 +124,7 @@ export const LeadReassignmentView = () => {
       toUserId: toUser,
       quantity: reassignQty ? parseInt(reassignQty, 10) : undefined,
       language: reassignLang,
+      disposition: reassignDisposition,
       dateMode,
       date: dateMode === 'single' ? reassignDate : undefined,
       startDate: dateMode === 'range' ? reassignStartDate : undefined,
@@ -92,6 +137,7 @@ export const LeadReassignmentView = () => {
     // Reset filters
     setReassignQty('');
     setReassignLang('ALL');
+    setReassignDisposition('ALL');
     setReassignDate('');
     setReassignStartDate('');
     setReassignEndDate('');
@@ -128,7 +174,7 @@ export const LeadReassignmentView = () => {
           <Layers size={18} color="var(--accent-primary)" /> Lead Reassignment Protocol
         </h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Super Admin and Admin can reassign leads based on <strong>Quantity</strong>, <strong>Language</strong>, and <strong>Date</strong> (Single Date or Date Range) filters.
+          Super Admin and Admin can reassign leads based on <strong>Quantity</strong>, <strong>Language</strong>, <strong>Disposition</strong>, and <strong>Date</strong> (Single Date or Date Range) filters.
         </p>
 
         {simulatedRole === 'Super Admin' || simulatedRole === 'Admin' ? (
@@ -156,32 +202,55 @@ export const LeadReassignmentView = () => {
                 </select>
               </div>
 
-              {/* Quantity */}
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Hash size={13} /> Quantity (Optional)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={reassignQty}
-                  onChange={(e) => setReassignQty(e.target.value)}
-                  placeholder="e.g. 15 (leave empty for all)"
-                />
-              </div>
+              {/* 3-Column Filter Row: Quantity, Language, Disposition */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', gridColumn: 'span 2' }}>
+                {/* Quantity */}
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Hash size={13} /> Quantity (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={reassignQty}
+                    onChange={(e) => setReassignQty(e.target.value)}
+                    placeholder="e.g. 15 (leave empty for all)"
+                  />
+                </div>
 
-              {/* Language */}
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Globe size={13} /> Language Filter
-                </label>
-                <select value={reassignLang} onChange={(e) => setReassignLang(e.target.value)}>
-                  <option value="ALL">All Languages</option>
-                  {availableLanguages.map(l => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
+                {/* Language */}
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Globe size={13} /> Language Filter
+                  </label>
+                  <select value={reassignLang} onChange={(e) => setReassignLang(e.target.value)}>
+                    <option value="ALL">All Languages</option>
+                    {availableLanguages.map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Disposition Filter */}
+                <div className="form-group">
+                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <BookmarkCheck size={13} color="var(--accent-primary)" /> Disposition Filter
+                  </label>
+                  <select value={reassignDisposition} onChange={(e) => setReassignDisposition(e.target.value)}>
+                    <option value="ALL">All Dispositions</option>
+                    {availableDispositions.map(d => {
+                      const countInSource = fromUser && fromUser !== 'ALL'
+                        ? leads.filter(l => l.assignedToId === fromUser && (l.disposition || 'New Lead').toLowerCase() === d.toLowerCase()).length
+                        : null;
+                      return (
+                        <option key={d} value={d}>
+                          {d} {countInSource !== null ? `(${countInSource})` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
               {/* Date Filter (Calendar Picker) */}
@@ -333,12 +402,79 @@ export const LeadReassignmentView = () => {
         )}
       </div>
 
-      {/* Active Leads Table */}
+      {/* Active Leads Directory & Audit Logs Table */}
       <div className="directory-card">
         <div className="directory-toolbar">
           <div className="directory-title-area">
-            <h3>Active Lead Directory & History Logs</h3>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              Active Lead Directory & History Logs
+              <span style={{ fontSize: '0.74rem', background: 'var(--accent-soft)', color: 'var(--accent-primary)', padding: '2px 8px', borderRadius: 'var(--radius-full)', border: '1px solid var(--accent-border)' }}>
+                {filteredTableLeads.length} leads
+              </span>
+            </h3>
             <p>Immutable audit trail maintained across reassignment transfers.</p>
+          </div>
+
+          <div className="directory-actions">
+            {/* Search Input */}
+            <div className="search-input-wrapper">
+              <Search className="search-icon" size={15} />
+              <input
+                type="text"
+                placeholder="Search contact, phone, owner..."
+                value={tableSearch}
+                onChange={(e) => setTableSearch(e.target.value)}
+              />
+              {tableSearch && (
+                <button
+                  type="button"
+                  onClick={() => setTableSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Table Disposition Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={15} color="var(--text-muted)" />
+              <select
+                className="select-filter"
+                value={tableDispositionFilter}
+                onChange={(e) => setTableDispositionFilter(e.target.value)}
+                style={{ minWidth: '160px' }}
+              >
+                <option value="ALL">All Dispositions</option>
+                {availableDispositions.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            {(tableSearch || tableDispositionFilter !== 'ALL') && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setTableSearch(''); setTableDispositionFilter('ALL'); }}
+                title="Reset Directory Filters"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            )}
           </div>
         </div>
 
@@ -349,30 +485,44 @@ export const LeadReassignmentView = () => {
                 <th>Contact Name</th>
                 <th>Phone Number</th>
                 <th>Language</th>
+                <th>Disposition</th>
                 <th>Owner</th>
                 <th>Value</th>
                 <th>Audit Log Trail</th>
               </tr>
             </thead>
             <tbody>
-              {leads.map(l => (
-                <tr key={l.id}>
-                  <td style={{ fontWeight: 600 }}>{l.contactPerson}</td>
-                  <td>{l.phone}</td>
-                  <td><span className="badge" style={{ background: 'var(--bg-input)' }}>{l.language || 'English'}</span></td>
-                  <td><span className="badge badge-role">{l.assignedToName}</span></td>
-                  <td style={{ fontWeight: 700 }}>{l.value}</td>
-                  <td>
-                    <div style={{ fontSize: '0.76rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      {(l.history || []).map((h, i) => (
-                        <div key={i} style={{ color: 'var(--text-secondary)' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>[{h.date}]</span> {h.text}
-                        </div>
-                      ))}
-                    </div>
+              {filteredTableLeads.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
+                    No leads found matching the selected disposition and filter criteria.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredTableLeads.map(l => (
+                  <tr key={l.id}>
+                    <td style={{ fontWeight: 600 }}>{l.contactPerson}</td>
+                    <td>{l.phone}</td>
+                    <td><span className="badge" style={{ background: 'var(--bg-input)' }}>{l.language || 'English'}</span></td>
+                    <td>
+                      <span className="badge badge-disposition" style={{ whiteSpace: 'nowrap' }}>
+                        {l.disposition || 'New Lead'}
+                      </span>
+                    </td>
+                    <td><span className="badge badge-role">{l.assignedToName}</span></td>
+                    <td style={{ fontWeight: 700 }}>{l.value}</td>
+                    <td>
+                      <div style={{ fontSize: '0.76rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {(l.history || []).map((h, i) => (
+                          <div key={i} style={{ color: 'var(--text-secondary)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>[{h.date}]</span> {h.text}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
