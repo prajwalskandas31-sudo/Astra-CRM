@@ -607,25 +607,6 @@ export const LeadSummarySuperAdmin = () => {
               Filter by user, date, language, team, or disposition — individually or in combination.
             </p>
           </div>
-
-          {/* View Density */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'var(--bg-app)', padding: '0.35rem 0.6rem 0.35rem 0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-            <Layers size={13} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>Rows per page</span>
-            <select
-              className="form-select"
-              value={pageSize}
-              onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-              style={{ width: '100px', padding: '0.3rem 0.5rem', fontSize: '0.78rem', border: 'none', background: 'transparent', outline: 'none', cursor: 'pointer', fontWeight: 600, color: 'var(--text-main)' }}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={500}>500</option>
-              <option value={1000}>1000</option>
-            </select>
-          </div>
         </div>
 
         {/* Multi-Criteria Filters Bar */}
@@ -950,104 +931,6 @@ export const LeadSummarySuperAdmin = () => {
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Master Leads & Advanced Filtered Table */}
-        <div style={{ marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '0.35rem', borderRadius: '7px', display: 'flex' }}>
-                <AlertCircle size={15} />
-              </div>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
-                  Filtered Leads Audit Table
-                </h4>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{filteredLeads.length} leads matched current filters</span>
-              </div>
-            </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-app)', padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid var(--border-color)' }}>
-              Page {currentPage} / {totalPages}
-            </span>
-          </div>
-
-          <div className="table-container">
-            <table className="table" style={{ fontSize: '0.84rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Lead ID</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Client / Contact</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Phone Number</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Language</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Assigned Owner</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Disposition</th>
-                  <th style={{ fontSize: '0.68rem', letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-muted)', padding: '0.75rem 1rem' }}>Last Activity</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedLeads.map(lead => (
-                  <tr key={lead.id} style={{ transition: 'background 0.12s ease' }}>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <code style={{ fontSize: '0.78rem', color: 'var(--accent)', background: 'var(--accent-soft)', padding: '0.15rem 0.45rem', borderRadius: '5px', fontWeight: 600 }}>{lead.id}</code>
-                    </td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.86rem' }}>{lead.clientName}</div>
-                      <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>{lead.contactPerson}</div>
-                    </td>
-                    <td style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', padding: '0.9rem 1rem', whiteSpace: 'nowrap' }}>{lead.phone}</td>
-                    <td style={{ padding: '0.9rem 1rem' }}><span className="badge badge-purple" style={{ fontSize: '0.71rem' }}>{lead.language}</span></td>
-                    <td style={{ padding: '0.9rem 1rem' }}><span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.85rem' }}>{lead.assignedToName}</span></td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <span className={`badge ${
-                        lead.disposition === 'Paid / Converted' ? 'badge-success' :
-                        lead.disposition === 'Interested' ? 'badge-success' :
-                        lead.disposition === 'Not Interested' ? 'badge-danger' :
-                        lead.disposition === 'New Lead' ? 'badge-info' :
-                        lead.disposition === 'Call Back Later' ? 'badge-warning' :
-                        'badge-warning'
-                      }`} style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-                        {lead.disposition}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: '0.77rem', color: 'var(--text-muted)', maxWidth: '260px', padding: '0.9rem 1rem' }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lead.history && lead.history.length > 0 ? lead.history[lead.history.length - 1].text : <span style={{ fontStyle: 'italic', opacity: 0.6 }}>No activity logged</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Controls Footer */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              Showing <strong style={{ color: 'var(--text-main)' }}>{Math.min((currentPage - 1) * pageSize + 1, filteredLeads.length)}</strong> – <strong style={{ color: 'var(--text-main)' }}>{Math.min(currentPage * pageSize, filteredLeads.length)}</strong> of <strong style={{ color: 'var(--text-main)' }}>{filteredLeads.length}</strong> leads
-            </span>
-
-            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-              <button
-                className="btn btn-sm btn-secondary"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}
-              >
-                <ChevronLeft size={13} /> Prev
-              </button>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-main)', padding: '0.3rem 0.75rem', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 600, minWidth: '60px', textAlign: 'center' }}>
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                className="btn btn-sm btn-secondary"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}
-              >
-                Next <ChevronRight size={13} />
-              </button>
-            </div>
-          </div>
         </div>
 
       </div>
