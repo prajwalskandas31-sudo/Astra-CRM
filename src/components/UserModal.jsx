@@ -57,7 +57,7 @@ const isHeaderRow = (parts) => {
 };
 
 export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
-  const { users, customRoles, documentTypes = [], addUser, updateUser } = useCRM();
+  const { users, customRoles, documentTypes = [], addUser, updateUser, downloadUserDocument } = useCRM();
   const { showToast } = useToast();
 
   const [mode, setMode] = useState('single');
@@ -659,20 +659,25 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                   </div>
                 )}
 
-                {/* ── Provision: Bank Account & Referral Details ── */}
+                {/* ── Provision: User & Bank Profile Details ── */}
                 <div style={{
                     gridColumn: '1 / -1',
                     background: 'var(--bg-table-head)',
                     border: '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-md)',
-                    padding: '14px 16px',
+                    padding: '16px 18px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem' }}>
-                      <Landmark size={15} />
-                      <span>Bank Account & Referral Details (Optional)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.88rem' }}>
+                        <Landmark size={16} />
+                        <span>User & Bank Profile Details</span>
+                      </div>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        Bank & Reference Verification
+                      </span>
                     </div>
                     
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -738,21 +743,21 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     </div>
                   </div>
 
-                {/* ── Provision: Employee Documents Upload ── */}
+                {/* ── Provision: Employee Documents Upload & Verification ── */}
                 <div style={{
                     gridColumn: '1 / -1',
                     background: 'var(--bg-table-head)',
                     border: '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-md)',
-                    padding: '14px 16px',
+                    padding: '16px 18px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '12px'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.85rem' }}>
-                        <UploadCloud size={15} />
-                        <span>Upload Employee Documents (Optional)</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.88rem' }}>
+                        <FileText size={16} />
+                        <span>Employee Documents & Verification</span>
                       </div>
                       {attachedDocs.length > 0 && (
                         <span className="badge badge-success" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
@@ -762,7 +767,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     </div>
 
                     <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                      Directly attach verification documents (Aadhaar, PAN, Degree, etc.) to this employee profile.
+                      Upload and manage verification documents (Aadhaar, PAN, Degree, Offer Letter, etc.) directly for this employee.
                     </div>
 
                     {/* Document Picker & Attach Input Row */}
@@ -771,13 +776,13 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       gap: '10px',
                       alignItems: 'flex-end',
                       background: 'var(--bg-card)',
-                      padding: '10px 12px',
+                      padding: '12px 14px',
                       borderRadius: 'var(--radius-sm)',
                       border: '1px solid var(--border-color)',
                       flexWrap: 'wrap'
                     }}>
                       <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '160px' }}>
-                        <label style={{ fontSize: '0.74rem' }}>Document Type</label>
+                        <label style={{ fontSize: '0.74rem' }}>Select Document Type</label>
                         <select
                           value={selectedDocTypeId}
                           onChange={(e) => setSelectedDocTypeId(e.target.value)}
@@ -822,50 +827,85 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
 
                     {/* Attached Documents List Preview */}
                     {attachedDocs.length === 0 ? (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '4px 0' }}>
-                        No documents attached yet. Documents can also be added or managed anytime later from User Directory.
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px 0' }}>
+                        No documents attached yet for this employee. Select a document type and file above to attach.
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
                         {attachedDocs.map(doc => (
                           <div
                             key={doc.id || doc.documentTypeId}
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
                               background: 'var(--bg-card)',
-                              padding: '8px 12px',
-                              borderRadius: 'var(--radius-sm)',
                               border: '1px solid var(--border-color)',
-                              fontSize: '0.8rem'
+                              borderRadius: 'var(--radius-sm)',
+                              padding: '9px 12px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: '10px'
                             }}
                           >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                              <FileText size={15} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
-                              <div>
-                                <strong style={{ color: 'var(--text-primary)', marginRight: '6px' }}>{doc.documentName}</strong>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>({doc.fileName} • {doc.fileSize})</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                              <span style={{
+                                padding: '2px 6px',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.68rem',
+                                fontWeight: 600,
+                                background: doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                color: doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? '#ef4444' : '#10b981',
+                                flexShrink: 0
+                              }}>
+                                {doc.fileType?.includes('pdf') || doc.fileName?.endsWith('.pdf') ? 'PDF' : 'IMG'}
+                              </span>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {doc.documentName}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  {doc.fileName} • {doc.fileSize}
+                                </div>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAttachedDoc(doc.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--status-danger)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '0.75rem',
-                                padding: '3px 6px'
-                              }}
-                              title="Remove document"
-                            >
-                              <Trash2 size={13} /> Remove
-                            </button>
+
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              {doc.fileData && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '0.72rem',
+                                    borderRadius: 'var(--radius-sm)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    flexShrink: 0
+                                  }}
+                                  onClick={() => downloadUserDocument(doc, formData.name)}
+                                  title="Download attached document"
+                                >
+                                  <Download size={12} /> Download
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn-danger"
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '0.72rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  flexShrink: 0
+                                }}
+                                onClick={() => handleRemoveAttachedDoc(doc.id)}
+                                title="Remove document"
+                              >
+                                <Trash2 size={12} /> Remove
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
