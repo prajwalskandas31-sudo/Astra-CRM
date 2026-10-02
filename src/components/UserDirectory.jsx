@@ -79,6 +79,7 @@ export const UserDirectory = () => {
   const [newPasswordInput, setNewPasswordInput] = useState('');
 
   const handleOpenBankProfile = (u) => {
+    if (u?.role === 'Super Admin') return;
     // Pick the freshest record from users list if present
     const freshUser = users.find(user => user.id === u.id) || u;
     setViewingUserDetails(freshUser);
@@ -466,13 +467,15 @@ export const UserDirectory = () => {
                               flexDirection: 'column',
                               padding: '4px'
                             }}>
-                              <button
-                                className="btn-secondary"
-                                style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
-                                onClick={() => { handleOpenBankProfile(u); setActiveDropdownId(null); }}
-                              >
-                                <Eye size={13} /> View Bank & Profile
-                              </button>
+                              {u.role !== 'Super Admin' && (
+                                <button
+                                  className="btn-secondary"
+                                  style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
+                                  onClick={() => { handleOpenBankProfile(u); setActiveDropdownId(null); }}
+                                >
+                                  <Eye size={13} /> View Bank & Profile
+                                </button>
+                              )}
 
                               <button
                                 className="btn-secondary"
