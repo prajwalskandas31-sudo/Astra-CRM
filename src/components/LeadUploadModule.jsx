@@ -247,6 +247,12 @@ export const LeadUploadModule = () => {
     // Normalize phone helper for comparison
     const normPhone = (p) => p.replace(/[^0-9]/g, '');
 
+    // Determine active source file name from bulk upload block
+    const activeBulkFileName = excelFileName || csvFileName || `Bulk_Upload_${new Date().toISOString().split('T')[0]}.csv`;
+    try {
+      localStorage.setItem('crm_last_bulk_upload_filename', activeBulkFileName);
+    } catch (e) {}
+
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',').map(p => p.trim());
       const name = parts[0] || ''; // NAME is optional
@@ -283,14 +289,17 @@ export const LeadUploadModule = () => {
           phone: phone,
           language: lang,
           assignedToId: null, // Default unassigned for language-based assignment engine
-          assignedToName: 'Unassigned'
+          assignedToName: 'Unassigned',
+          sourceFileName: activeBulkFileName,
+          sourceFile: activeBulkFileName,
+          batchName: activeBulkFileName
         });
       }
     }
 
     // Process successful leads into database and update master database
     if (successful.length > 0) {
-      addBulkLeads(successful);
+      addBulkLeads(successful, activeBulkFileName);
       addMasterRecords(successful.map(s => ({ contactPerson: s.contactPerson, phone: s.phone, language: s.language })));
     }
 
@@ -825,7 +834,7 @@ export const LeadUploadModule = () => {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName(''); setExcelFileName(''); }}
+                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName('Sample_Bulk_Leads.csv'); setExcelFileName(''); }}
                 >
                   Load Sample Bulk Dataset
                 </button>

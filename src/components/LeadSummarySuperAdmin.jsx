@@ -782,6 +782,13 @@ export const LeadSummarySuperAdmin = () => {
                 const uncontacted = Math.max(0, total - dialed);
                 const isSelected = selectedInstanceIds.includes(inst.id);
 
+                // Source file must be the same name as the bulk upload file name
+                const displayFileName = inst.sourceFileName || inst.sourceFile || inst.batchName || (() => {
+                  const matched = instLeads.find(l => l.sourceFileName || l.sourceFile || l.batchName);
+                  if (matched) return matched.sourceFileName || matched.sourceFile || matched.batchName;
+                  return localStorage.getItem('crm_last_bulk_upload_filename') || 'Sample_Bulk_Leads.csv';
+                })();
+
                 return (
                   <tr key={inst.id} style={{ background: isSelected ? 'rgba(110, 86, 207, 0.08)' : 'transparent', transition: 'background 0.15s ease', borderLeft: isSelected ? '3px solid var(--accent)' : '3px solid transparent' }}>
                     <td style={{ textAlign: 'center', padding: '0.85rem 0.5rem', verticalAlign: 'middle' }}>
@@ -790,16 +797,16 @@ export const LeadSummarySuperAdmin = () => {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleInstanceSelection(inst.id)}
-                          title={`Select ${inst.batchName}`}
-                          aria-label={`Select ${inst.batchName}`}
+                          title={`Select ${displayFileName}`}
+                          aria-label={`Select ${displayFileName}`}
                         />
                       </div>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.28rem 0.65rem', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.22)', maxWidth: '210px' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.28rem 0.65rem', borderRadius: '6px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.22)', maxWidth: '240px' }}>
                         <FileSpreadsheet size={13} style={{ color: '#818cf8', flexShrink: 0 }} />
-                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={inst.sourceFileName || inst.batchName}>
-                          {inst.sourceFileName || inst.batchName}
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={displayFileName}>
+                          {displayFileName}
                         </span>
                       </div>
                     </td>
@@ -914,9 +921,9 @@ export const LeadSummarySuperAdmin = () => {
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => {
-                            if (window.confirm(`Delete assignment file '${inst.batchName}'?`)) {
+                            if (window.confirm(`Delete assignment file '${displayFileName}'?`)) {
                               deleteAssignmentFiles([inst.id]);
-                              addToast(`Deleted assignment file '${inst.batchName}'`, 'success');
+                              addToast(`Deleted assignment file '${displayFileName}'`, 'success');
                             }
                           }}
                           title="Delete this file"
@@ -947,7 +954,7 @@ export const LeadSummarySuperAdmin = () => {
                   <PieChart size={14} /> REAL-TIME DISPOSITION & INSTANCE TRACKING
                 </div>
                 <h2 style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                  {activeInstanceModal.batchName}
+                  {activeInstanceModal.sourceFileName || activeInstanceModal.sourceFile || activeInstanceModal.batchName || activeInstanceModal.fileName || 'Sample_Bulk_Leads.csv'}
                 </h2>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
                   Assigned To: <strong style={{ color: 'var(--text-main)' }}>{activeInstanceModal.assignedToName}</strong> • Language: <strong>{activeInstanceModal.language}</strong> • Date: <strong>{activeInstanceModal.date}</strong>
@@ -1131,7 +1138,7 @@ export const LeadSummarySuperAdmin = () => {
           <div className="card" style={{ width: '100%', maxWidth: '440px', border: '1px solid var(--border-color)' }}>
             <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>Reassign Assignment File</h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Reassign entire batch file <strong>'{showReassignFileModal.batchName}'</strong> to another user.
+              Reassign entire batch file <strong>'{showReassignFileModal.sourceFileName || showReassignFileModal.sourceFile || showReassignFileModal.batchName || showReassignFileModal.fileName || 'Sample_Bulk_Leads.csv'}'</strong> to another user.
             </p>
 
             <div className="form-group" style={{ marginBottom: '1.25rem' }}>

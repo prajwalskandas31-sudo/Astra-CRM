@@ -425,9 +425,16 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
         })
         assigned_ids.append(lead["id"])
 
+    # Derive source file name from bulk upload leads
+    distinct_sources = list({lead.get("sourceFileName") or lead.get("sourceFile") or lead.get("batchName") for lead in leads_to_assign if (lead.get("sourceFileName") or lead.get("sourceFile") or lead.get("batchName"))})
+    source_file_name = ", ".join(distinct_sources) if distinct_sources else "Sample_Bulk_Leads.csv"
+
     inst = {
         "id": f"inst-{int(datetime.utcnow().timestamp())}",
-        "fileName": f"Assignment_{req.language}_Qty{len(leads_to_assign)}_{today_str}.csv",
+        "sourceFileName": source_file_name,
+        "sourceFile": source_file_name,
+        "batchName": source_file_name,
+        "fileName": source_file_name,
         "language": req.language,
         "quantity": len(leads_to_assign),
         "assignedToId": target_user["id"],

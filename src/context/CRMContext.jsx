@@ -304,10 +304,21 @@ export const CRMProvider = ({ children }) => {
 
   const [leads, setLeads] = useState(() => {
     const saved = localStorage.getItem('crm_leads');
+    const lastUpload = localStorage.getItem('crm_last_bulk_upload_filename') || 'Sample_Bulk_Leads.csv';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map(l => {
+            const src = l.sourceFileName || l.sourceFile || l.batchName || lastUpload;
+            return {
+              ...l,
+              sourceFileName: src,
+              sourceFile: src,
+              batchName: src
+            };
+          });
+        }
       } catch (e) {}
     }
     return DEFAULT_LEADS;
@@ -351,10 +362,22 @@ export const CRMProvider = ({ children }) => {
 
   const [assignmentInstances, setAssignmentInstances] = useState(() => {
     const saved = localStorage.getItem('crm_assignment_instances');
+    const lastUpload = localStorage.getItem('crm_last_bulk_upload_filename') || 'Sample_Bulk_Leads.csv';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map(inst => {
+            const resolvedSource = inst.sourceFileName || inst.sourceFile || inst.batchName || lastUpload;
+            return {
+              ...inst,
+              sourceFileName: resolvedSource,
+              sourceFile: resolvedSource,
+              batchName: resolvedSource,
+              fileName: resolvedSource
+            };
+          });
+        }
       } catch (e) {}
     }
     return DEFAULT_ASSIGNMENT_INSTANCES;
@@ -1111,6 +1134,7 @@ export const CRMProvider = ({ children }) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const uniqueId = 'LD-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
     const assignedUserId = leadData.assignedToId || currentUser?.id || 'usr-5';
+    const source = leadData.sourceFileName || leadData.sourceFile || leadData.batchName || 'Single_Manual_Upload.csv';
     const newLeadObj = {
       id: uniqueId,
       clientName: leadData.clientName || leadData.contactPerson + ' Co.',
@@ -1120,6 +1144,9 @@ export const CRMProvider = ({ children }) => {
       assignedToId: assignedUserId,
       assigned_user_id: assignedUserId,
       assignedToName: leadData.assignedToName || currentUser?.name || 'Assigned User',
+      sourceFileName: source,
+      sourceFile: source,
+      batchName: source,
       disposition: 'New Lead', // Default status per Block 2 specification
       dispositionScheduledAt: '',
       value: leadData.value || '₹5,00,000',
@@ -1205,9 +1232,18 @@ export const CRMProvider = ({ children }) => {
       return l;
     }));
 
+    // Determine the source file name from the leads being assigned (must match the bulk upload file name)
+    const distinctSources = [...new Set(leadsToAssign.map(l => l.sourceFileName || l.sourceFile || l.batchName).filter(Boolean))];
+    const sourceFileName = distinctSources.length > 0 
+      ? distinctSources.join(', ') 
+      : (localStorage.getItem('crm_last_bulk_upload_filename') || 'Sample_Bulk_Leads.csv');
+
     const newInstance = {
       id: 'inst-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      fileName: `Assignment_${language}_Qty${assignedCount}_${todayStr}.csv`,
+      sourceFileName: sourceFileName,
+      sourceFile: sourceFileName,
+      batchName: sourceFileName,
+      fileName: sourceFileName,
       language: language,
       quantity: assignedCount,
       assignedToId: targetUser.id,
@@ -1237,12 +1273,22 @@ export const CRMProvider = ({ children }) => {
     return resObj;
   };
 
-  const addBulkLeads = (newLeadsArray) => {
+  const addBulkLeads = (newLeadsArray, sourceFileName) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const baseTime = Date.now();
+    const effectiveFileName = sourceFileName 
+      || (newLeadsArray && newLeadsArray[0]?.sourceFileName) 
+      || localStorage.getItem('crm_last_bulk_upload_filename') 
+      || `Bulk_Upload_${todayStr}.csv`;
+
+    try {
+      localStorage.setItem('crm_last_bulk_upload_filename', effectiveFileName);
+    } catch (e) {}
+
     const formatted = newLeadsArray.map((ld, i) => {
       const isUnassigned = !ld.assignedToId || ld.assignedToId === 'unassigned';
       const targetUser = users.find(u => u.id === ld.assignedToId);
+      const leadSource = ld.sourceFileName || ld.sourceFile || ld.batchName || effectiveFileName;
       return {
         id: `LD-${baseTime}-${i}-${Math.floor(Math.random() * 10000)}`,
         clientName: ld.contactPerson + ' Org',
@@ -1253,10 +1299,13 @@ export const CRMProvider = ({ children }) => {
         assigned_user_id: isUnassigned ? null : ld.assignedToId,
         assignedToName: isUnassigned ? 'Unassigned' : (targetUser?.name || ld.assignedToName || 'User'),
         isUnassigned: isUnassigned,
+        sourceFileName: leadSource,
+        sourceFile: leadSource,
+        batchName: leadSource,
         disposition: 'New Lead', // Default status per Block 2 specification
         dispositionScheduledAt: '',
         value: ld.value || '₹4,00,000',
-        history: [{ date: todayStr, text: `Bulk uploaded with default disposition [New Lead]. ${isUnassigned ? 'Marked Unassigned.' : `Assigned to ${targetUser?.name || 'User'}.`}` }]
+        history: [{ date: todayStr, text: `Bulk uploaded with default disposition [New Lead] from source file '${leadSource}'. ${isUnassigned ? 'Marked Unassigned.' : `Assigned to ${targetUser?.name || 'User'}.`}` }]
       };
     });
     setLeads(prev => [...formatted, ...prev]);
