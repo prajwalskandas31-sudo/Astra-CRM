@@ -467,15 +467,7 @@ export const UserDirectory = () => {
                               flexDirection: 'column',
                               padding: '4px'
                             }}>
-                              {u.role !== 'Super Admin' && (
-                                <button
-                                  className="btn-secondary"
-                                  style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', gap: '6px' }}
-                                  onClick={() => { handleOpenBankProfile(u); setActiveDropdownId(null); }}
-                                >
-                                  <Eye size={13} /> View Bank & Profile
-                                </button>
-                              )}
+
 
                               <button
                                 className="btn-secondary"

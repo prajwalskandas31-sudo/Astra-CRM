@@ -660,8 +660,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                 )}
 
                 {/* ── Provision: Bank Account & Referral Details ── */}
-                {formData.role !== 'Super Admin' && (
-                  <div style={{
+                <div style={{
                     gridColumn: '1 / -1',
                     background: 'var(--bg-table-head)',
                     border: '1px solid var(--border-color)',
@@ -738,11 +737,9 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       </div>
                     </div>
                   </div>
-                )}
 
                 {/* ── Provision: Employee Documents Upload ── */}
-                {formData.role !== 'Super Admin' && (
-                  <div style={{
+                <div style={{
                     gridColumn: '1 / -1',
                     background: 'var(--bg-table-head)',
                     border: '1px solid var(--border-color)',
@@ -874,7 +871,6 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       </div>
                     )}
                   </div>
-                )}
 
               </div>
             ) : (
