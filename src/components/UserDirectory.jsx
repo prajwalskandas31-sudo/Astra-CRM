@@ -16,7 +16,9 @@ import {
   UserCheck, 
   Clock, 
   X, 
-  Edit2
+  Edit2,
+  Sliders,
+  FileText
 } from 'lucide-react';
 
 export const UserDirectory = () => {
@@ -288,6 +290,25 @@ export const UserDirectory = () => {
                           >
                             <FileText size={10} /> {u.documents.length} docs
                           </button>
+                        )}
+                        {u.customFieldValues && Object.values(u.customFieldValues).some(v => v?.sub1 || v?.sub2) && (
+                          <span
+                            style={{
+                              background: 'var(--accent-soft)',
+                              border: '1px solid var(--accent-border)',
+                              borderRadius: 'var(--radius-full)',
+                              padding: '1px 6px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              fontSize: '0.68rem',
+                              color: 'var(--accent)',
+                              fontWeight: 500
+                            }}
+                            title="Custom profile fields populated for this user"
+                          >
+                            <Sliders size={9} /> Custom Fields
+                          </span>
                         )}
                       </div>
                     </td>

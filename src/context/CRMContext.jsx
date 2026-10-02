@@ -88,6 +88,21 @@ const DEFAULT_DOCUMENT_TYPES = [
   { id: 'doctype-5', name: 'Graduation Certificate', required: false, description: 'Degree convocation or provisional passing certificate' }
 ];
 
+const DEFAULT_USER_CUSTOM_FIELDS = [
+  {
+    id: 'ucf-1',
+    fieldName: 'Emergency Contact Details',
+    subField1Name: 'Contact Person Name',
+    subField2Name: 'Emergency Mobile Number'
+  },
+  {
+    id: 'ucf-2',
+    fieldName: 'Previous Employment History',
+    subField1Name: 'Previous Company Name',
+    subField2Name: 'Past Designation / Experience'
+  }
+];
+
 const DEFAULT_DISPOSITIONS = [
   { id: 'disp-1', name: 'New Lead', requiresDateTimePicker: false, color: 'blue', isDefault: true },
   { id: 'disp-2', name: 'Interested', requiresDateTimePicker: false, color: 'emerald', isDefault: true },
@@ -175,6 +190,21 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_document_types', JSON.stringify(documentTypes));
   }, [documentTypes]);
+
+  const [userCustomFields, setUserCustomFields] = useState(() => {
+    const saved = localStorage.getItem('crm_user_custom_fields');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_USER_CUSTOM_FIELDS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_user_custom_fields', JSON.stringify(userCustomFields));
+  }, [userCustomFields]);
 
   const [customRoles, setCustomRoles] = useState(() => {
     const saved = localStorage.getItem('crm_custom_roles');
@@ -605,7 +635,8 @@ export const CRMProvider = ({ children }) => {
       status: 'Active',
       expiryDate: userData.expiryDate || '27-07-2028',
       employeeId: userData.employeeId || ('EMP-' + Math.floor(100 + Math.random() * 900)),
-      documents: userData.documents || []
+      documents: userData.documents || [],
+      customFieldValues: userData.customFieldValues || {}
     };
     setUsers(prev => [newUserObj, ...(prev || [])]);
     return newUserObj;
@@ -839,6 +870,86 @@ export const CRMProvider = ({ children }) => {
     } catch (err) {}
 
     setDocumentTypes(prev => prev.filter(dt => dt.id !== id));
+    return { success: true };
+  };
+
+  // ==========================================
+  // User Custom Fields Configuration (Super Admin, Max 20 slots, each with 2 sub-fields)
+  // ==========================================
+  const addUserCustomField = async (fieldData) => {
+    if (userCustomFields.length >= 20) {
+      return { success: false, message: 'Maximum limit of 20 custom fields reached.' };
+    }
+    const fieldName = (fieldData.fieldName || '').trim();
+    const subField1Name = (fieldData.subField1Name || '').trim();
+    const subField2Name = (fieldData.subField2Name || '').trim();
+
+    if (!fieldName) {
+      return { success: false, message: 'Custom field name is required.' };
+    }
+    if (!subField1Name || !subField2Name) {
+      return { success: false, message: 'Both sub-field names are required.' };
+    }
+
+    const newField = {
+      id: 'ucf-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900),
+      fieldName,
+      subField1Name,
+      subField2Name
+    };
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/user-custom-fields`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(newField)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setUserCustomFields(prev => [...prev, saved]);
+        return { success: true, field: saved };
+      }
+    } catch (err) {}
+
+    setUserCustomFields(prev => [...prev, newField]);
+    return { success: true, field: newField };
+  };
+
+  const updateUserCustomField = async (id, updatedFields) => {
+    const fieldName = (updatedFields.fieldName || '').trim();
+    const subField1Name = (updatedFields.subField1Name || '').trim();
+    const subField2Name = (updatedFields.subField2Name || '').trim();
+
+    if (!fieldName || !subField1Name || !subField2Name) {
+      return { success: false, message: 'Field name and both sub-field names are required.' };
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/user-custom-fields/${id}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ fieldName, subField1Name, subField2Name })
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setUserCustomFields(prev => prev.map(f => f.id === id ? { ...f, ...saved } : f));
+        return { success: true };
+      }
+    } catch (err) {}
+
+    setUserCustomFields(prev => prev.map(f => f.id === id ? { ...f, fieldName, subField1Name, subField2Name } : f));
+    return { success: true };
+  };
+
+  const deleteUserCustomField = async (id) => {
+    try {
+      await fetch(`${API_BASE_URL}/user-custom-fields/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders()
+      });
+    } catch (err) {}
+
+    setUserCustomFields(prev => prev.filter(f => f.id !== id));
     return { success: true };
   };
 
@@ -1515,6 +1626,10 @@ export const CRMProvider = ({ children }) => {
       uploadUserDocument,
       deleteUserDocument,
       downloadUserDocument,
+      userCustomFields,
+      addUserCustomField,
+      updateUserCustomField,
+      deleteUserCustomField,
       userShortcutSettings,
       isShortcutEnabled,
       setUserShortcut,

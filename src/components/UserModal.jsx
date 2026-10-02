@@ -16,7 +16,11 @@ import {
   Eye, 
   EyeOff, 
   AlertTriangle,
-  Plus
+  Plus,
+  Sliders,
+  Edit2,
+  Tag,
+  Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -57,8 +61,23 @@ const isHeaderRow = (parts) => {
 };
 
 export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
-  const { users, customRoles, documentTypes = [], addUser, updateUser, downloadUserDocument } = useCRM();
+  const { 
+    users, 
+    customRoles, 
+    documentTypes = [], 
+    userCustomFields = [], 
+    addUserCustomField, 
+    updateUserCustomField, 
+    deleteUserCustomField, 
+    simulatedRole,
+    currentUser,
+    addUser, 
+    updateUser, 
+    downloadUserDocument 
+  } = useCRM();
   const { showToast } = useToast();
+
+  const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
 
   const [mode, setMode] = useState('single');
   const [formData, setFormData] = useState({
@@ -82,6 +101,21 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   const [docFileToUpload, setDocFileToUpload] = useState(null);
   const [isAttachingDoc, setIsAttachingDoc] = useState(false);
   const docFileInputRef = useRef(null);
+
+  // Custom Profile Fields State (Up to 20 fields with 2 sub-fields each)
+  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [isAddingCustomField, setIsAddingCustomField] = useState(false);
+  const [newFieldForm, setNewFieldForm] = useState({
+    fieldName: '',
+    subField1Name: '',
+    subField2Name: ''
+  });
+  const [editingFieldId, setEditingFieldId] = useState(null);
+  const [editFieldForm, setEditFieldForm] = useState({
+    fieldName: '',
+    subField1Name: '',
+    subField2Name: ''
+  });
 
   // Bulk Upload State
   const [bulkText, setBulkText] = useState('');
@@ -110,6 +144,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: userToEdit.referredBy || ''
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
+        setCustomFieldValues(userToEdit.customFieldValues ? { ...userToEdit.customFieldValues } : {});
       } else {
         setFormData({
           name: '',
@@ -126,12 +161,16 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: ''
         });
         setAttachedDocs([]);
+        setCustomFieldValues({});
         setBulkText('');
         setUploadedFileName('');
         setUploadedFileSize('');
         setFileError('');
         setShowPreview(false);
       }
+      setIsAddingCustomField(false);
+      setEditingFieldId(null);
+      setNewFieldForm({ fieldName: '', subField1Name: '', subField2Name: '' });
       setSelectedDocTypeId(documentTypes[0]?.id || '');
       setDocFileToUpload(null);
       if (docFileInputRef.current) docFileInputRef.current.value = '';
@@ -193,6 +232,82 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   const handleRemoveAttachedDoc = (docId) => {
     setAttachedDocs(prev => prev.filter(d => d.id !== docId));
     showToast('Attached document removed.', 'info');
+  };
+
+  const handleCustomFieldValueChange = (fieldId, subKey, value) => {
+    setCustomFieldValues(prev => ({
+      ...prev,
+      [fieldId]: {
+        ...(prev[fieldId] || {}),
+        [subKey]: value
+      }
+    }));
+  };
+
+  const handleCreateCustomField = async (e) => {
+    if (e) e.preventDefault();
+    if (!newFieldForm.fieldName.trim()) {
+      showToast('Please provide a Custom Field Name.', 'warning');
+      return;
+    }
+    if (!newFieldForm.subField1Name.trim() || !newFieldForm.subField2Name.trim()) {
+      showToast('Please provide custom names for both Sub-Field 1 and Sub-Field 2.', 'warning');
+      return;
+    }
+    if (userCustomFields.length >= 20) {
+      showToast('Maximum limit of 20 custom fields reached. Remove an existing field to add a new one.', 'warning');
+      return;
+    }
+
+    const res = await addUserCustomField(newFieldForm);
+    if (res?.success) {
+      showToast(`Custom field '${newFieldForm.fieldName.trim()}' created! (Total: ${userCustomFields.length + 1}/20)`, 'success');
+      setNewFieldForm({ fieldName: '', subField1Name: '', subField2Name: '' });
+      setIsAddingCustomField(false);
+    } else {
+      showToast(res?.message || 'Failed to create custom field', 'error');
+    }
+  };
+
+  const handleStartEditField = (field) => {
+    setEditingFieldId(field.id);
+    setEditFieldForm({
+      fieldName: field.fieldName,
+      subField1Name: field.subField1Name,
+      subField2Name: field.subField2Name
+    });
+  };
+
+  const handleCancelEditField = () => {
+    setEditingFieldId(null);
+    setEditFieldForm({ fieldName: '', subField1Name: '', subField2Name: '' });
+  };
+
+  const handleSaveEditField = async (fieldId) => {
+    if (!editFieldForm.fieldName.trim() || !editFieldForm.subField1Name.trim() || !editFieldForm.subField2Name.trim()) {
+      showToast('Field Name and both Sub-Field names are required.', 'warning');
+      return;
+    }
+
+    const res = await updateUserCustomField(fieldId, editFieldForm);
+    if (res?.success) {
+      showToast('Custom field names updated successfully.', 'success');
+      setEditingFieldId(null);
+    } else {
+      showToast(res?.message || 'Failed to update custom field', 'error');
+    }
+  };
+
+  const handleDeleteCustomField = async (fieldId, fieldName) => {
+    if (window.confirm(`Are you sure you want to delete custom field '${fieldName}'?`)) {
+      await deleteUserCustomField(fieldId);
+      showToast(`Custom field '${fieldName}' deleted.`, 'info');
+      setCustomFieldValues(prev => {
+        const copy = { ...prev };
+        delete copy[fieldId];
+        return copy;
+      });
+    }
   };
 
   const managementUsers = useMemo(() => {
@@ -441,7 +556,8 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
       if (userToEdit) {
         updateUser(userToEdit.id, {
           ...formData,
-          documents: attachedDocs
+          documents: attachedDocs,
+          customFieldValues
         });
         showToast(`User '${formData.name}' details updated.`, 'success');
       } else {
@@ -456,7 +572,8 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
           name: cleanName,
           email: autoEmail,
           password: autoPass,
-          documents: attachedDocs
+          documents: attachedDocs,
+          customFieldValues
         });
         showToast(`User '${cleanName}' created successfully. Login with Name (${cleanName}), Email (${autoEmail}), or Mobile!`, 'success');
       }
@@ -742,6 +859,313 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       </div>
                     </div>
                   </div>
+
+                {/* ── Provision: Custom Profile Fields (Up to 20) with 2 Sub-Fields Each ── */}
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: 'var(--bg-table-head)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '16px 18px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-primary)', fontWeight: 600, fontSize: '0.88rem' }}>
+                      <Sliders size={16} />
+                      <span>Custom Profile Fields ({userCustomFields.length}/20)</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-full)',
+                        background: userCustomFields.length >= 20 ? 'rgba(239, 68, 68, 0.15)' : 'var(--accent-soft)',
+                        color: userCustomFields.length >= 20 ? '#ef4444' : 'var(--accent)',
+                        border: `1px solid ${userCustomFields.length >= 20 ? 'rgba(239, 68, 68, 0.3)' : 'var(--accent-border)'}`,
+                        fontWeight: 600
+                      }}>
+                        {userCustomFields.length} / 20 Configured
+                      </span>
+
+                      {isSuperAdmin && (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{
+                            fontSize: '0.74rem',
+                            padding: '4px 10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: isAddingCustomField ? 'var(--accent-soft)' : undefined,
+                            borderColor: isAddingCustomField ? 'var(--accent-primary)' : undefined
+                          }}
+                          onClick={() => {
+                            if (!isAddingCustomField && userCustomFields.length >= 20) {
+                              showToast('Maximum limit of 20 custom fields reached. Remove an existing field to add a new one.', 'warning');
+                              return;
+                            }
+                            setIsAddingCustomField(!isAddingCustomField);
+                          }}
+                          title={userCustomFields.length >= 20 ? 'Maximum 20 fields reached' : 'Create new custom field with 2 sub-fields'}
+                        >
+                          <Plus size={13} /> {isAddingCustomField ? 'Close Creator' : '+ Add Custom Field'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    Provision for custom employee profile attributes. Super Admin can define up to 20 custom fields with custom names for the parent field and both sub-fields.
+                  </div>
+
+                  {/* Super Admin: New Custom Field Creator Panel */}
+                  {isAddingCustomField && isSuperAdmin && (
+                    <div style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--accent-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)' }}>
+                          <Tag size={14} />
+                          <span>Define New Custom Field & 2 Sub-Fields (Slot {userCustomFields.length + 1} of 20)</span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Super Admin Authority</span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: '0.74rem' }}>Custom Field Name *</label>
+                          <input
+                            type="text"
+                            value={newFieldForm.fieldName}
+                            onChange={(e) => setNewFieldForm(prev => ({ ...prev, fieldName: e.target.value }))}
+                            placeholder="e.g. Emergency Contact, Vehicle Details"
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: '0.74rem' }}>Sub-Field 1 Name *</label>
+                          <input
+                            type="text"
+                            value={newFieldForm.subField1Name}
+                            onChange={(e) => setNewFieldForm(prev => ({ ...prev, subField1Name: e.target.value }))}
+                            placeholder="e.g. Contact Person, Registration No."
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label style={{ fontSize: '0.74rem' }}>Sub-Field 2 Name *</label>
+                          <input
+                            type="text"
+                            value={newFieldForm.subField2Name}
+                            onChange={(e) => setNewFieldForm(prev => ({ ...prev, subField2Name: e.target.value }))}
+                            placeholder="e.g. Mobile Number, Vehicle Model"
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '2px' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: '0.74rem', padding: '5px 12px' }}
+                          onClick={() => {
+                            setIsAddingCustomField(false);
+                            setNewFieldForm({ fieldName: '', subField1Name: '', subField2Name: '' });
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: '0.74rem', padding: '5px 14px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                          onClick={handleCreateCustomField}
+                        >
+                          <Check size={13} /> Save Custom Field
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Configured Custom Fields List with 2 Sub-Fields Values */}
+                  {userCustomFields.length === 0 ? (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '10px 0', textAlign: 'center' }}>
+                      No custom fields configured yet. {isSuperAdmin ? "Click '+ Add Custom Field' above to define your first custom field." : "Super Admin has not created custom fields yet."}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {userCustomFields.map((field, index) => (
+                        <div
+                          key={field.id}
+                          style={{
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}
+                        >
+                          {/* Field Header & Super Admin Rename / Delete Actions */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                              <span style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '4px',
+                                background: 'var(--accent-soft)',
+                                color: 'var(--accent)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '0.7rem',
+                                fontWeight: 700
+                              }}>
+                                {index + 1}
+                              </span>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {field.fieldName}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                ({field.subField1Name} & {field.subField2Name})
+                              </span>
+                            </div>
+
+                            {isSuperAdmin && editingFieldId !== field.id && (
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ padding: '3px 7px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  onClick={() => handleStartEditField(field)}
+                                  title="Rename field and sub-field labels"
+                                >
+                                  <Edit2 size={11} /> Rename Names
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-danger"
+                                  style={{ padding: '3px 7px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  onClick={() => handleDeleteCustomField(field.id, field.fieldName)}
+                                  title="Delete custom field"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Inline Rename Form for Super Admin */}
+                          {editingFieldId === field.id ? (
+                            <div style={{
+                              background: 'var(--bg-table-head)',
+                              border: '1px solid var(--accent-border)',
+                              borderRadius: 'var(--radius-sm)',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px'
+                            }}>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--accent)' }}>
+                                Rename Custom Field & Sub-Fields Labels:
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.72rem' }}>Field Name</label>
+                                  <input
+                                    type="text"
+                                    value={editFieldForm.fieldName}
+                                    onChange={(e) => setEditFieldForm(prev => ({ ...prev, fieldName: e.target.value }))}
+                                    style={{ fontSize: '0.78rem' }}
+                                  />
+                                </div>
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.72rem' }}>Sub-Field 1 Name</label>
+                                  <input
+                                    type="text"
+                                    value={editFieldForm.subField1Name}
+                                    onChange={(e) => setEditFieldForm(prev => ({ ...prev, subField1Name: e.target.value }))}
+                                    style={{ fontSize: '0.78rem' }}
+                                  />
+                                </div>
+                                <div className="form-group" style={{ margin: 0 }}>
+                                  <label style={{ fontSize: '0.72rem' }}>Sub-Field 2 Name</label>
+                                  <input
+                                    type="text"
+                                    value={editFieldForm.subField2Name}
+                                    onChange={(e) => setEditFieldForm(prev => ({ ...prev, subField2Name: e.target.value }))}
+                                    style={{ fontSize: '0.78rem' }}
+                                  />
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '4px' }}>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                                  onClick={handleCancelEditField}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-primary"
+                                  style={{ fontSize: '0.72rem', padding: '3px 10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  onClick={() => handleSaveEditField(field.id)}
+                                >
+                                  <Check size={11} /> Save Names
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Sub-Field 1 and Sub-Field 2 Values Entry */
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{field.subField1Name}</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customFieldValues[field.id]?.sub1 || ''}
+                                  onChange={(e) => handleCustomFieldValueChange(field.id, 'sub1', e.target.value)}
+                                  placeholder={`Enter ${field.subField1Name}`}
+                                  style={{ fontSize: '0.82rem' }}
+                                />
+                              </div>
+
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{field.subField2Name}</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={customFieldValues[field.id]?.sub2 || ''}
+                                  onChange={(e) => handleCustomFieldValueChange(field.id, 'sub2', e.target.value)}
+                                  placeholder={`Enter ${field.subField2Name}`}
+                                  style={{ fontSize: '0.82rem' }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Provision: Employee Documents Upload & Verification ── */}
                 <div style={{
