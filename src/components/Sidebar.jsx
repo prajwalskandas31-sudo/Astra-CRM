@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
   const { simulatedRole, sales, leadRequests, hasPermission } = useCRM();
@@ -13,6 +13,11 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       id: 'dashboard',
       label: 'CRM Dashboard',
       icon: LayoutDashboard
+    },
+    {
+      id: 'lead-history',
+      label: 'Lead History (Block 5)',
+      icon: History
     },
     {
       id: 'directory',

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { PhoneCall, PhoneOff, Sparkles, Tag, Calendar, UserCheck, Layers, Sliders, Send, Clock, X, Check } from 'lucide-react';
+import { PhoneCall, PhoneOff, Sparkles, Tag, Calendar, UserCheck, Layers, Sliders, Send, Clock, X, Check, History } from 'lucide-react';
 import { LeadHistoryBlock } from './LeadHistoryBlock';
 
 export const CRMDashboard = () => {
@@ -15,7 +15,8 @@ export const CRMDashboard = () => {
     toggleUserShortcut, 
     userShortcutSettings,
     submitLeadRequest,
-    users
+    users,
+    hasPermission
   } = useCRM();
   const { showToast } = useToast();
 
@@ -307,28 +308,51 @@ export const CRMDashboard = () => {
             </p>
           </div>
 
-          {isSuperAdmin && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Inspect User Pipeline:</span>
-              <select
-                value={adminViewUserFilter}
-                onChange={(e) => setAdminViewUserFilter(e.target.value)}
-                style={{ fontSize: '0.8rem', padding: '5px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {hasPermission('lead-history') && (
+              <a
+                href="#lead-history-block"
+                className="btn-secondary"
+                style={{
+                  textDecoration: 'none',
+                  fontSize: '0.78rem',
+                  padding: '6px 12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)'
+                }}
+                title="Scroll down to Lead Assignment History (Block 5)"
               >
-                <option value="ALL">All Assigned Leads ({leads.filter(l => !l.isUnassigned && l.assignedToId && l.assignedToName !== 'Unassigned').length})</option>
-                <optgroup label="Select Specific User Pipeline (Block 1 Hierarchy)">
-                  {users?.filter(u => u.status === 'Active').map(u => {
-                    const count = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
-                    return (
-                      <option key={u.id} value={u.id}>
-                        {u.name} ({u.role}) — {count} Assigned Leads
-                      </option>
-                    );
-                  })}
-                </optgroup>
-              </select>
-            </div>
-          )}
+                <History size={13} color="var(--accent-primary)" />
+                Lead History (Block 5) ↓
+              </a>
+            )}
+
+            {isSuperAdmin && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Inspect User Pipeline:</span>
+                <select
+                  value={adminViewUserFilter}
+                  onChange={(e) => setAdminViewUserFilter(e.target.value)}
+                  style={{ fontSize: '0.8rem', padding: '5px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                >
+                  <option value="ALL">All Assigned Leads ({leads.filter(l => !l.isUnassigned && l.assignedToId && l.assignedToName !== 'Unassigned').length})</option>
+                  <optgroup label="Select Specific User Pipeline (Block 1 Hierarchy)">
+                    {users?.filter(u => u.status === 'Active').map(u => {
+                      const count = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
+                      return (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role}) — {count} Assigned Leads
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -407,7 +431,7 @@ export const CRMDashboard = () => {
       {/* ============================================================ */}
       {/* HISTORY BLOCK — Lead Assignment History (All Roles)         */}
       {/* ============================================================ */}
-      <LeadHistoryBlock />
+      {hasPermission('lead-history') && <LeadHistoryBlock />}
 
       {/* Post-Call Disconnect Modal */}
       {activeCallLead && (

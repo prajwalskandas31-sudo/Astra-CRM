@@ -48,6 +48,7 @@ class ErrorBoundary extends React.Component {
 
 import { RoleSimulatorBanner } from './components/RoleSimulatorBanner';
 import { FeatureAccessBlock } from './components/FeatureAccessBlock';
+import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 
 const AppContent = () => {
   const { authToken, currentUser, simulatedRole, hasPermission, userPermissions } = useCRM();
@@ -62,6 +63,7 @@ const AppContent = () => {
 
     const allTabs = [
       'dashboard',
+      'lead-history',
       'directory',
       'dispositions',
       'lead-upload',
@@ -86,6 +88,7 @@ const AppContent = () => {
 
   const tabTitles = {
     dashboard: 'CRM Dashboard & Dynamic Dispositions Bar',
+    'lead-history': 'Lead Assignment History (Block 5) - Full Search & Audit Timeline',
     directory: 'User Directory & Account Controls',
     dispositions: 'Dispositions & Pipeline Manager (Block 2 Settings)',
     'lead-upload': 'Lead Upload Module & Block 3 Report Sync',
@@ -102,6 +105,8 @@ const AppContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <CRMDashboard />;
+      case 'lead-history':
+        return <LeadHistoryBlock />;
       case 'directory':
         return <UserDirectory />;
       case 'dispositions':

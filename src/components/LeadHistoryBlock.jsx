@@ -108,7 +108,7 @@ export const LeadHistoryBlock = () => {
   };
 
   return (
-    <div className="directory-card" style={{ overflow: 'hidden' }}>
+    <div className="directory-card" id="lead-history-block" style={{ overflow: 'hidden' }}>
       <div className="directory-toolbar" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
         <div className="directory-title-area">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
