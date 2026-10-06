@@ -9,9 +9,6 @@ export const SystemSettings = () => {
     setThemeMode, 
     accentColor, 
     setAccentColor, 
-    customRoles, 
-    addCustomRole, 
-    deleteCustomRole,
     documentTypes,
     addDocumentType,
     deleteDocumentType,
@@ -30,10 +27,7 @@ export const SystemSettings = () => {
   } = useCRM();
   const { showToast } = useToast();
 
-  const canManageCustomRoles = hasPermission('custom-roles');
   const canManageSettings = hasPermission('system-settings');
-
-  const [roleForm, setRoleForm] = useState({ roleName: '' });
   const [docTypeForm, setDocTypeForm] = useState({ name: '', required: false, description: '' });
   const [customFieldForm, setCustomFieldForm] = useState({ fieldName: '', subField1Name: '', subField2Name: '' });
   const [editingCustomFieldId, setEditingCustomFieldId] = useState(null);
@@ -169,21 +163,6 @@ export const SystemSettings = () => {
     }
   };
 
-  const handleAddRole = (e) => {
-    e.preventDefault();
-    if (!roleForm.roleName) return;
-    addCustomRole(roleForm);
-    showToast(`Custom Role '${roleForm.roleName}' created!`, 'success');
-    setRoleForm({ roleName: '' });
-  };
-
-  const handleDeleteCustomRole = (role) => {
-    if (window.confirm(`Are you sure you want to delete custom role '${role.roleName}'?`)) {
-      deleteCustomRole(role.id);
-      showToast(`Custom Role '${role.roleName}' deleted successfully.`, 'info');
-    }
-  };
-
   const colors = [
     { id: 'purple', label: 'Royal Violet', hex: '#6e56cf' },
     { id: 'blue', label: 'Cobalt Blue', hex: '#3e63dd' },
@@ -259,92 +238,6 @@ export const SystemSettings = () => {
         </div>
       </div>
 
-      {/* Custom Roles Builder */}
-      <div className="directory-card" style={{ padding: '20px 24px' }}>
-        <h3 style={{ fontSize: '1.05rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Shield size={18} color="var(--accent-primary)" /> Custom Roles Builder (Annexure-I)
-        </h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Provision custom organizational roles and operational permissions.
-        </p>
-
-        {canManageCustomRoles ? (
-          <form onSubmit={handleAddRole} style={{ marginBottom: '20px' }}>
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Role Title *</label>
-                <input
-                  type="text"
-                  value={roleForm.roleName}
-                  onChange={(e) => setRoleForm({ ...roleForm, roleName: e.target.value })}
-                  placeholder="e.g. Senior Regional Manager"
-                  required
-                />
-              </div>
-
-              <div className="form-group" style={{ justifyContent: 'flex-end' }}>
-                <button type="submit" className="btn-primary" style={{ marginTop: 'auto' }}>
-                  <Plus size={15} /> Create Role
-                </button>
-              </div>
-            </div>
-          </form>
-        ) : (
-          <div className="alert-box alert-warning">
-            Permission required to create or modify custom role matrices. Contact Super Admin to grant 'Custom Roles Builder (Annexure-I)' in the Feature Access Block.
-          </div>
-        )}
-
-        <h4 style={{ fontSize: '0.86rem', marginBottom: '10px' }}>Existing Custom Roles:</h4>
-        <div className="table-responsive">
-          <table className="crm-table">
-            <thead>
-              <tr>
-                <th style={{ width: '50px' }}>No.</th>
-                <th>Role Name</th>
-                <th>Status</th>
-                {canManageCustomRoles && <th style={{ width: '100px' }}>Action</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {customRoles.length === 0 ? (
-                <tr>
-                  <td colSpan={canManageCustomRoles ? 4 : 3} style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)' }}>
-                    No custom roles configured yet. Use the form above to create one.
-                  </td>
-                </tr>
-              ) : (
-                customRoles.map((cr, idx) => (
-                  <tr key={cr.id}>
-                    <td style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
-                    <td style={{ fontWeight: 600 }}>{cr.roleName}</td>
-                    <td>
-                      <div className="status-indicator">
-                        <span className="status-dot active" />
-                        <span>Active</span>
-                      </div>
-                    </td>
-                    {canManageCustomRoles && (
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-danger"
-                          style={{ padding: '3px 8px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={() => handleDeleteCustomRole(cr)}
-                          title={`Delete Custom Role '${cr.roleName}'`}
-                        >
-                          <Trash2 size={12} />
-                          <span>Delete</span>
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* Employee Document Types Manager (Similar to Dispositions, Max 10 slots) */}
       <div className="directory-card" style={{ padding: '20px 24px' }}>

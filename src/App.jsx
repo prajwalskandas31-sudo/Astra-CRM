@@ -13,6 +13,7 @@ import { TeamMonitoring } from './components/TeamMonitoring';
 import { SaleApprovalWorkflow } from './components/SaleApprovalWorkflow';
 import { LeadReassignmentView } from './components/LeadReassignmentView';
 import { SystemSettings } from './components/SystemSettings';
+import { CustomRolesBuilder } from './components/CustomRolesBuilder';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -122,8 +123,9 @@ const AppContent = () => {
       case 'lead-reassignment':
         return <LeadReassignmentView />;
       case 'system-settings':
-      case 'custom-roles':
         return <SystemSettings />;
+      case 'custom-roles':
+        return <CustomRolesBuilder />;
       case 'feature-access':
         return <FeatureAccessBlock />;
       default:
