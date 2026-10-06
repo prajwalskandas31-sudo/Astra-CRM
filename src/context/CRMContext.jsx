@@ -689,6 +689,11 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', themeMode);
     document.documentElement.setAttribute('data-accent', accentColor);
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [themeMode, accentColor]);
 
   // Auth Header helper
