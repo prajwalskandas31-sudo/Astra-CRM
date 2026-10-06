@@ -12,6 +12,7 @@ dist
 dist-isolation
 .DS_Store
 *.local
+*.timestamp-*.mjs
 
 # Editor directories and files
 .vscode/*

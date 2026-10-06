@@ -139,6 +139,169 @@ if (typeof window !== 'undefined' && localStorage.getItem('crm_storage_version')
   localStorage.setItem('crm_storage_version', DATA_STORAGE_VERSION);
 }
 
+export const FEATURE_CATEGORIES = [
+  'Core CRM & Pipeline',
+  'User Directory & Team',
+  'Operations & Dispositions',
+  'Lead Ingestion & Reports',
+  'Sales & Approvals',
+  'Administration & Governance'
+];
+
+export const CRM_FEATURES = [
+  // ── Core CRM & Pipeline ─────────────────────────────
+  {
+    id: 'dashboard',
+    name: 'CRM Dashboard & Active Pipeline',
+    category: 'Core CRM & Pipeline',
+    description: 'Access the main CRM dashboard, calling actions, post-call outcome modal, and active leads pipeline table.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
+    id: 'lead-history',
+    name: 'Lead Assignment History (Block 5)',
+    category: 'Core CRM & Pipeline',
+    description: 'Access the HISTORY block to search and inspect past and current lead assignments and audit timeline.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
+    id: 'disposition-shortcuts',
+    name: 'Dynamic Disposition Shortcuts Bar',
+    category: 'Core CRM & Pipeline',
+    description: 'Use and configure personalized disposition shortcut buttons on the dashboard.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
+    id: 'request-leads',
+    name: 'Inbound Lead Request Modal',
+    category: 'Core CRM & Pipeline',
+    description: 'Submit formal requests to Super Admin for batch allocation of fresh inbound leads.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+
+  // ── User Directory & Team ──────────────────────────
+  {
+    id: 'directory',
+    name: 'User Directory',
+    category: 'User Directory & Team',
+    description: 'Access the corporate user directory and view employee profiles and contact details.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
+    id: 'user-management',
+    name: 'User Account Creation & Editing',
+    category: 'User Directory & Team',
+    description: 'Create new user profiles, edit existing user details, change passwords, and toggle active status.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
+    id: 'delete-user',
+    name: 'Delete User Accounts & Purge',
+    category: 'User Directory & Team',
+    description: 'Permanently remove user accounts and initiate mandatory lead reassignment protocols.',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'employee-documents',
+    name: 'Employee Documents & KYC Verification',
+    category: 'User Directory & Team',
+    description: 'Upload, inspect, download, and verify employee identification documents (Aadhaar, PAN, degree certificates).',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager']
+  },
+
+  // ── Operations & Dispositions ──────────────────────
+  {
+    id: 'dispositions',
+    name: 'Dispositions & Pipeline Manager (Block 2)',
+    category: 'Operations & Dispositions',
+    description: 'Create, modify, reorder, and remove CRM disposition outcomes and mandatory date/time flags.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
+    id: 'team-monitoring',
+    name: 'Team Monitoring & Performance Tracking',
+    category: 'Operations & Dispositions',
+    description: 'Monitor real-time agent presence, call duration metrics, conversion rates, and compliance logs.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader']
+  },
+  {
+    id: 'lead-reassignment',
+    name: 'Lead Reassignment & Audit Protocol',
+    category: 'Operations & Dispositions',
+    description: 'Bulk reassign leads between representatives with disposition/date filtering and audit logs.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+
+  // ── Lead Ingestion & Reports ───────────────────────
+  {
+    id: 'lead-upload',
+    name: 'Lead Upload Module (Single Entry)',
+    category: 'Lead Ingestion & Reports',
+    description: 'Access the Lead Upload Module interface to enter individual customer records.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
+    id: 'lead-upload-bulk',
+    name: 'Bulk File Upload & Assignment (Block 3)',
+    category: 'Lead Ingestion & Reports',
+    description: 'Upload CSV/Excel spreadsheets, configure column mapping, and execute automated round-robin lead allocation.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
+    id: 'lead-upload-reports',
+    name: 'Upload Reports, Batches & Deduplication Logs',
+    category: 'Lead Ingestion & Reports',
+    description: 'Inspect ingestion history, download batch audit reports, and review deduplication statistics.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager']
+  },
+
+  // ── Sales & Approvals ──────────────────────────────
+  {
+    id: 'sale-approvals',
+    name: 'Sale Approvals & eKYC Workflow Queue',
+    category: 'Sales & Approvals',
+    description: 'Inspect registered sales, verify payment proof/eKYC, and execute Final Approval or Rejection.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager']
+  },
+  {
+    id: 'register-sale',
+    name: 'Register New Customer Sale',
+    category: 'Sales & Approvals',
+    description: 'Register customer sales transactions, attach payment proof and initiate approval workflow.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+
+  // ── Administration & Governance ───────────────────
+  {
+    id: 'lead-summary',
+    name: 'Lead Summary & Super Admin Operations (Block 4)',
+    category: 'Administration & Governance',
+    description: 'Access top-level analytics, corporate lead allocation, and fulfillment of rep inbound lead requests.',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'system-settings',
+    name: 'System Settings & UI Customization',
+    category: 'Administration & Governance',
+    description: 'Configure corporate themes, accent colors, document types, and custom profile fields.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
+    id: 'custom-roles',
+    name: 'Custom Roles Builder (Annexure-I)',
+    category: 'Administration & Governance',
+    description: 'Design and deploy multi-tiered organizational custom roles and hierarchical scopes.',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'feature-access',
+    name: 'Feature Access & Permissions Control (Master Block)',
+    category: 'Administration & Governance',
+    description: 'Super Admin master control to grant or revoke individual CRM capabilities for specific users.',
+    defaultForRoles: ['Super Admin']
+  }
+];
+
 const CRMContext = createContext();
 
 export const CRMProvider = ({ children }) => {
@@ -236,6 +399,103 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
   }, [userShortcutSettings]);
+
+  // ── Feature Access & Permissions Management ─────────────────────────────
+  const [userPermissions, setUserPermissions] = useState(() => {
+    const saved = localStorage.getItem('crm_user_permissions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {}
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_user_permissions', JSON.stringify(userPermissions));
+  }, [userPermissions]);
+
+  const hasPermission = (featureId, targetUserId = null) => {
+    const targetId = targetUserId || currentUser?.id || 'usr-1';
+    const targetUser = (users || []).find(u => u.id === targetId) || currentUser;
+    const effectiveRole = targetUser?.role || (targetId === currentUser?.id ? simulatedRole : 'Executive');
+
+    // 1. Check explicit user permission set by Super Admin
+    if (userPermissions && userPermissions[targetId] && typeof userPermissions[targetId][featureId] === 'boolean') {
+      return userPermissions[targetId][featureId];
+    }
+
+    // 2. Super Admin has all permissions by default
+    if (effectiveRole === 'Super Admin') {
+      return true;
+    }
+
+    // 3. Fall back to role default baseline
+    const feature = CRM_FEATURES.find(f => f.id === featureId);
+    if (feature && Array.isArray(feature.defaultForRoles)) {
+      return feature.defaultForRoles.includes(effectiveRole);
+    }
+
+    return false;
+  };
+
+  const updateUserPermission = (userId, featureId, isEnabled) => {
+    setUserPermissions(prev => {
+      const userPerms = prev[userId] ? { ...prev[userId] } : {};
+      userPerms[featureId] = isEnabled;
+      return {
+        ...prev,
+        [userId]: userPerms
+      };
+    });
+  };
+
+  const updateUserAllPermissions = (userId, permsMap) => {
+    setUserPermissions(prev => ({
+      ...prev,
+      [userId]: { ...(prev[userId] || {}), ...permsMap }
+    }));
+  };
+
+  const grantAllPermissions = (userId) => {
+    const allGranted = {};
+    CRM_FEATURES.forEach(f => {
+      allGranted[f.id] = true;
+    });
+    setUserPermissions(prev => ({
+      ...prev,
+      [userId]: allGranted
+    }));
+  };
+
+  const revokeAllOptionalPermissions = (userId) => {
+    const revoked = {};
+    CRM_FEATURES.forEach(f => {
+      revoked[f.id] = f.id === 'dashboard'; // only keep basic dashboard
+    });
+    setUserPermissions(prev => ({
+      ...prev,
+      [userId]: revoked
+    }));
+  };
+
+  const resetUserPermissionsToDefault = (userId) => {
+    setUserPermissions(prev => {
+      const copy = { ...prev };
+      delete copy[userId];
+      return copy;
+    });
+  };
+
+  const getUserPermissionCount = (userId) => {
+    const total = CRM_FEATURES.length;
+    let enabled = 0;
+    CRM_FEATURES.forEach(f => {
+      if (hasPermission(f.id, userId)) enabled++;
+    });
+    return { enabled, total };
+  };
 
   const setSimulatedRole = (newRole, targetUserId = null) => {
     setSimulatedRoleState(newRole);
@@ -1704,7 +1964,18 @@ export const CRMProvider = ({ children }) => {
       prefetchIP,
       getUserAllowedIPs,
       resetUserIPs,
-      addIPToUser
+      addIPToUser,
+      // ─── Feature Access & Permissions Management ────────────
+      CRM_FEATURES,
+      FEATURE_CATEGORIES,
+      userPermissions,
+      hasPermission,
+      updateUserPermission,
+      updateUserAllPermissions,
+      grantAllPermissions,
+      revokeAllOptionalPermissions,
+      resetUserPermissionsToDefault,
+      getUserPermissionCount
     }}>
       {children}
     </CRMContext.Provider>

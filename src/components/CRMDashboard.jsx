@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { PhoneCall, PhoneOff, Sparkles, Tag, Calendar, UserCheck, Layers, Sliders, Send, Clock, X, Check } from 'lucide-react';
+import { LeadHistoryBlock } from './LeadHistoryBlock';
 
 export const CRMDashboard = () => {
   const { 
@@ -402,6 +403,11 @@ export const CRMDashboard = () => {
           </table>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* HISTORY BLOCK — Lead Assignment History (All Roles)         */}
+      {/* ============================================================ */}
+      <LeadHistoryBlock />
 
       {/* Post-Call Disconnect Modal */}
       {activeCallLead && (

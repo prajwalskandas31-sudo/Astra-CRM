@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 export const LeadReassignmentView = () => {
-  const { users, leads, dispositions, reassignLeadsFiltered, simulatedRole } = useCRM();
+  const { users, leads, dispositions, reassignLeadsFiltered, simulatedRole, hasPermission } = useCRM();
   const { showToast } = useToast();
 
   const [fromUser, setFromUser] = useState('');
@@ -536,7 +536,7 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
           Super Admin and Admin can reassign leads based on <strong>Quantity</strong>, <strong>Language</strong>, <strong>Disposition</strong>, and <strong>Date</strong> (Single Date or Date Range) filters.
         </p>
 
-        {simulatedRole === 'Super Admin' || simulatedRole === 'Admin' ? (
+        {hasPermission('lead-reassignment') ? (
           <form onSubmit={handleManualReassignment}>
             <div className="form-grid" style={{ marginBottom: '16px' }}>
               {/* Source User */}

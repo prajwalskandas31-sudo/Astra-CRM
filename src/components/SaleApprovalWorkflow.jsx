@@ -4,7 +4,7 @@ import { useToast } from './ToastNotification';
 import { CheckCircle, XCircle, Clock, FileCheck, ShieldCheck, ArrowRight, PlusCircle } from 'lucide-react';
 
 export const SaleApprovalWorkflow = () => {
-  const { sales, simulatedRole, registerSale, approveSale, rejectSale, users } = useCRM();
+  const { sales, simulatedRole, registerSale, approveSale, rejectSale, users, hasPermission } = useCRM();
   const { showToast } = useToast();
 
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
@@ -140,7 +140,7 @@ export const SaleApprovalWorkflow = () => {
                       </span>
                     </td>
                     <td>
-                      {simulatedRole === 'Super Admin' ? (
+                      {hasPermission('sale-approvals') ? (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button
                             className="btn-primary"
@@ -159,7 +159,7 @@ export const SaleApprovalWorkflow = () => {
                         </div>
                       ) : (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                          Awaiting Super Admin
+                          Awaiting Approval Action
                         </span>
                       )}
                     </td>

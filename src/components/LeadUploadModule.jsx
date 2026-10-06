@@ -25,6 +25,8 @@ export const LeadUploadModule = () => {
     addLead, 
     addBulkLeads, 
     simulatedRole, 
+    currentUser,
+    hasPermission,
     users = [], 
     masterRecords = [], 
     addMasterRecords, 
@@ -33,11 +35,13 @@ export const LeadUploadModule = () => {
   
   const { showToast } = useToast();
 
-  // Enforce RBAC: Non-Super Admin roles strictly limited to Single Upload
-  const isSuperAdmin = simulatedRole === 'Super Admin';
+  // Permission control: Driven by Super Admin permissions, not hardcoded role
+  const canBulkUpload = hasPermission('lead-upload-bulk');
+  const canViewReports = hasPermission('lead-upload-reports');
+  const isSuperAdmin = canBulkUpload;
 
   // Active sub-block state: 'master', 'bulk', 'single', 'report'
-  const [activeSubBlock, setActiveSubBlock] = useState(isSuperAdmin ? 'bulk' : 'single');
+  const [activeSubBlock, setActiveSubBlock] = useState(canBulkUpload ? 'bulk' : 'single');
 
   // --- 1. Data Record Upload State ---
   const [masterInputText, setMasterInputText] = useState('');
@@ -71,10 +75,10 @@ export const LeadUploadModule = () => {
   });
 
   useEffect(() => {
-    if (!isSuperAdmin && activeSubBlock !== 'single') {
+    if (!canBulkUpload && activeSubBlock !== 'single' && (activeSubBlock !== 'report' || !canViewReports)) {
       setActiveSubBlock('single');
     }
-  }, [simulatedRole, isSuperAdmin, activeSubBlock]);
+  }, [canBulkUpload, canViewReports, activeSubBlock]);
 
   useEffect(() => {
     const activeUsers = (users || []).filter(u => u.status === 'Active');
@@ -612,7 +616,7 @@ export const LeadUploadModule = () => {
               <UserPlus size={13} /> Single Upload
             </button>
 
-            {isSuperAdmin && (
+            {canViewReports && (
               <button
                 className={`btn-secondary ${activeSubBlock === 'report' ? 'active' : ''}`}
                 onClick={() => setActiveSubBlock('report')}
@@ -624,9 +628,9 @@ export const LeadUploadModule = () => {
           </div>
         </div>
 
-        {!isSuperAdmin && (
+        {!canBulkUpload && (
           <div className="alert-box alert-info" style={{ marginTop: '12px', fontSize: '0.78rem', padding: '8px 12px' }}>
-            <ShieldAlert size={14} /> <strong>Role Scoping Active:</strong> As a <strong>{simulatedRole}</strong>, access is strictly limited to the <strong>Single Upload</strong> option per Block 3 specification.
+            <ShieldAlert size={14} /> <strong>Permission Scoping Active:</strong> Bulk spreadsheet upload is disabled for your user account. Single customer entry remains available. Contact Super Admin to enable 'Bulk File Upload &amp; Assignment (Block 3)' in the Feature Access Block.
           </div>
         )}
       </div>

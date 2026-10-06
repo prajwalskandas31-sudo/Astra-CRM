@@ -1,9 +1,9 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
-  const { simulatedRole, sales, leadRequests } = useCRM();
+  const { simulatedRole, sales, leadRequests, hasPermission } = useCRM();
 
   const pendingSalesCount = sales.filter(s => s.status.includes('Pending')).length;
   const pendingRequestsCount = leadRequests?.filter(r => r.status === 'Pending').length || 0;
@@ -12,68 +12,64 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
     {
       id: 'dashboard',
       label: 'CRM Dashboard',
-      icon: LayoutDashboard,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      icon: LayoutDashboard
     },
     {
       id: 'directory',
       label: 'User Directory',
-      icon: Users,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      icon: Users
     },
     {
       id: 'dispositions',
       label: 'Dispositions (Block 2)',
-      icon: Layers,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      icon: Layers
     },
     {
       id: 'lead-upload',
       label: 'Lead Upload & Reports',
-      icon: Upload,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      icon: Upload
     },
     {
       id: 'lead-summary',
       label: 'Lead Summary (Block 4)',
       icon: PieChart,
-      badge: pendingRequestsCount > 0 ? pendingRequestsCount : null,
-      allowedRoles: ['Super Admin']
+      badge: pendingRequestsCount > 0 ? pendingRequestsCount : null
     },
     {
       id: 'team-monitoring',
       label: 'Team Monitoring',
-      icon: TrendingUp,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader']
+      icon: TrendingUp
     },
     {
       id: 'sale-approvals',
       label: 'Sale Approvals',
       icon: CheckCircle,
-      badge: pendingSalesCount > 0 ? pendingSalesCount : null,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      badge: pendingSalesCount > 0 ? pendingSalesCount : null
     },
     {
       id: 'lead-reassignment',
       label: 'Lead Reassignment',
-      icon: Layers,
-      allowedRoles: ['Super Admin', 'Admin']
+      icon: Layers
     },
     {
       id: 'system-settings',
       label: 'System & UI Settings',
-      icon: Sliders,
-      allowedRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+      icon: Sliders
     },
     {
       id: 'custom-roles',
       label: 'Custom Roles (Annexure-I)',
-      icon: Shield,
-      allowedRoles: ['Super Admin']
+      icon: Shield
+    },
+    {
+      id: 'feature-access',
+      label: 'Feature Access Block',
+      icon: Key
     }
   ];
 
-  const visibleNavItems = navItems.filter(item => item.allowedRoles.includes(simulatedRole));
+  // Role does not inherently restrict features; visibility is driven strictly by permissions
+  const visibleNavItems = navItems.filter(item => hasPermission(item.id));
 
   return (
     <aside className="sidebar">

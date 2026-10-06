@@ -30,6 +30,8 @@ import {
 export const LeadSummarySuperAdmin = () => {
   const {
     simulatedRole,
+    currentUser,
+    hasPermission,
     users,
     leads,
     dispositions,
@@ -144,18 +146,18 @@ export const LeadSummarySuperAdmin = () => {
     }
   };
 
-  // Role Security Check
-  if (simulatedRole !== 'Super Admin') {
+  // Permission Security Check: governed by Super Admin permission delegation
+  if (!hasPermission('lead-summary')) {
     return (
       <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem', marginTop: '2rem' }}>
         <div style={{ display: 'inline-flex', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '50%', color: '#ef4444', marginBottom: '1rem' }}>
           <ShieldAlert size={48} />
         </div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-          Access Restricted — Super Admin Panel Only
+          Access Restricted — Feature Permission Required
         </h2>
         <p style={{ color: 'var(--text-muted)', maxWidth: '500px', margin: '0 auto 1.5rem auto', fontSize: '0.9rem' }}>
-          Block 4: Lead Summary is strictly reserved for the Super Admin role. Please switch your active role simulator to Super Admin in the top banner to access this view.
+          Block 4: Lead Summary is governed by permissions managed by the Super Admin. Please have a Super Admin enable this capability for your user account in the Feature Access Block.
         </p>
       </div>
     );

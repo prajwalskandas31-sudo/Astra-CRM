@@ -4,7 +4,7 @@ import { useToast } from './ToastNotification';
 import { Layers, Plus, Edit2, Trash2, CheckCircle, Tag, ArrowRight, Calendar, Clock } from 'lucide-react';
 
 export const DispositionsManager = () => {
-  const { dispositions, addDisposition, updateDisposition, deleteDisposition, simulatedRole } = useCRM();
+  const { dispositions, addDisposition, updateDisposition, deleteDisposition, simulatedRole, hasPermission } = useCRM();
   const { showToast } = useToast();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -62,7 +62,7 @@ export const DispositionsManager = () => {
             </p>
           </div>
 
-          {simulatedRole === 'Super Admin' && (
+          {hasPermission('dispositions') && (
             <button className="btn-primary" onClick={() => { setEditingDisp(null); setDispForm({ name: '', requiresDateTimePicker: false, color: 'purple' }); setIsAddOpen(true); }}>
               <Plus size={15} /> Create Disposition
             </button>
@@ -119,7 +119,7 @@ export const DispositionsManager = () => {
                 <th>Date & Time Control</th>
                 <th>Dashboard Status</th>
                 <th>Authority</th>
-                {simulatedRole === 'Super Admin' && <th>Action</th>}
+                {hasPermission('dispositions') && <th>Action</th>}
               </tr>
             </thead>
             <tbody>
@@ -147,10 +147,10 @@ export const DispositionsManager = () => {
                   </td>
                   <td>
                     <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                      Super Admin Only
+                      Super Admin Managed
                     </span>
                   </td>
-                  {simulatedRole === 'Super Admin' && (
+                  {hasPermission('dispositions') && (
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button className="btn-secondary" style={{ padding: '3px 8px', fontSize: '0.76rem' }} onClick={() => handleEditClick(d)}>

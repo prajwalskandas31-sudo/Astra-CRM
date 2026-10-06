@@ -47,31 +47,38 @@ class ErrorBoundary extends React.Component {
 }
 
 import { RoleSimulatorBanner } from './components/RoleSimulatorBanner';
+import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 
 const AppContent = () => {
-  const { authToken, currentUser, simulatedRole } = useCRM();
+  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions } = useCRM();
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Enforce role-based tab guards and reset tab on logout or unauthorized role switch
+  // Enforce permission-based tab guards: user roles do not inherently restrict availability
   React.useEffect(() => {
     if (!currentUser) {
       setActiveTab('dashboard');
       return;
     }
 
-    const currentRole = simulatedRole || currentUser.role || 'Executive';
-    const superAdminOnlyTabs = ['lead-summary', 'custom-roles'];
-    const adminTabs = ['lead-reassignment'];
-    const managementTabs = ['team-monitoring'];
+    const allTabs = [
+      'dashboard',
+      'directory',
+      'dispositions',
+      'lead-upload',
+      'lead-summary',
+      'team-monitoring',
+      'sale-approvals',
+      'lead-reassignment',
+      'system-settings',
+      'custom-roles',
+      'feature-access'
+    ];
 
-    if (superAdminOnlyTabs.includes(activeTab) && currentRole !== 'Super Admin') {
-      setActiveTab('dashboard');
-    } else if (adminTabs.includes(activeTab) && !['Super Admin', 'Admin'].includes(currentRole)) {
-      setActiveTab('dashboard');
-    } else if (managementTabs.includes(activeTab) && !['Super Admin', 'Admin', 'Manager', 'Team Leader'].includes(currentRole)) {
-      setActiveTab('dashboard');
+    if (!hasPermission(activeTab)) {
+      const fallbackTab = allTabs.find(t => hasPermission(t)) || 'dashboard';
+      setActiveTab(fallbackTab);
     }
-  }, [currentUser?.id, simulatedRole, activeTab]);
+  }, [currentUser?.id, simulatedRole, activeTab, userPermissions]);
 
   if (!authToken || !currentUser) {
     return <LoginPage />;
@@ -87,7 +94,8 @@ const AppContent = () => {
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'system-settings': 'System Settings & UI Customization',
-    'custom-roles': 'Custom Roles Builder (Annexure-I)'
+    'custom-roles': 'Custom Roles Builder (Annexure-I)',
+    'feature-access': 'Feature Access & Permissions Master Block'
   };
 
   const renderTabContent = () => {
@@ -111,6 +119,8 @@ const AppContent = () => {
       case 'system-settings':
       case 'custom-roles':
         return <SystemSettings />;
+      case 'feature-access':
+        return <FeatureAccessBlock />;
       default:
         return <CRMDashboard />;
     }
