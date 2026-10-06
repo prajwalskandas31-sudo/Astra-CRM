@@ -1,507 +1,238 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { Mail, Lock, LogIn, Command, Shield, ShieldCheck, ShieldAlert, Wifi, Eye, EyeOff, Copy, Check, Key, UserCheck, ArrowUpRight } from 'lucide-react';
+import {
+  Ripple,
+  TechOrbitDisplay,
+  AnimatedForm,
+  BoxReveal,
+} from './ui/modern-animated-sign-in';
+import {
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Wifi,
+  Database,
+  Lock,
+  Users,
+  LineChart,
+  Command,
+  Cloud,
+  CheckCircle2,
+  Server
+} from 'lucide-react';
+
+const iconsArray = [
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+        <Shield size={16} />
+      </div>
+    ),
+    className: 'size-[36px] border-none bg-transparent',
+    duration: 22,
+    delay: 20,
+    radius: 95,
+    path: true,
+    reverse: false,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+        <Database size={16} />
+      </div>
+    ),
+    className: 'size-[36px] border-none bg-transparent',
+    duration: 22,
+    delay: 9,
+    radius: 95,
+    path: false,
+    reverse: false,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-9 h-9 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400">
+        <Users size={18} />
+      </div>
+    ),
+    className: 'size-[44px] border-none bg-transparent',
+    radius: 155,
+    duration: 26,
+    delay: 15,
+    path: true,
+    reverse: true,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-9 h-9 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+        <LineChart size={18} />
+      </div>
+    ),
+    className: 'size-[44px] border-none bg-transparent',
+    radius: 155,
+    duration: 26,
+    delay: 2,
+    path: false,
+    reverse: true,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+        <Command size={20} />
+      </div>
+    ),
+    className: 'size-[50px] border-none bg-transparent',
+    radius: 220,
+    duration: 32,
+    delay: 25,
+    path: true,
+    reverse: false,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+        <Server size={20} />
+      </div>
+    ),
+    className: 'size-[50px] border-none bg-transparent',
+    radius: 220,
+    duration: 32,
+    delay: 8,
+    path: false,
+    reverse: false,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]">
+        <Lock size={19} />
+      </div>
+    ),
+    className: 'size-[50px] border-none bg-transparent',
+    radius: 280,
+    duration: 38,
+    delay: 18,
+    path: true,
+    reverse: true,
+  },
+  {
+    component: () => (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 shadow-[0_0_15px_rgba(20,184,166,0.2)]">
+        <Cloud size={19} />
+      </div>
+    ),
+    className: 'size-[50px] border-none bg-transparent',
+    radius: 280,
+    duration: 38,
+    delay: 35,
+    path: false,
+    reverse: true,
+  },
+];
 
 export const LoginPage = () => {
-  const { loginError, handleLogin, users = [], leads = [], detectedIP, ipDetecting, prefetchIP } = useCRM();
+  const { loginError, handleLogin, detectedIP, ipDetecting, prefetchIP } = useCRM();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(null);
-  const [autofillNotice, setAutofillNotice] = useState('');
 
-  // Pre-fetch IP as soon as login page mounts so it's ready when user submits
+  // Pre-fetch IP as soon as login page mounts
   useEffect(() => {
     prefetchIP();
   }, []);
 
-  const defaultRoleConfigs = [
-    {
-      role: 'Super Admin',
-      name: 'Srinivas R',
-      email: 'superadmin@company.com',
-      mobile: '+91 98765 43210',
-      password: 'superadmin123',
-      altPass: 'admin123',
-      badge: 'Full Authority',
-      color: '#6e56cf',
-      scope: 'Unrestricted Access (Settings, IP Guard, Lead Deletion, Reassignments)'
-    },
-    {
-      role: 'Admin',
-      name: 'Rajesh Kumar',
-      email: 'admin@company.com',
-      mobile: '+91 98765 43211',
-      password: 'admin123',
-      badge: 'Admin Access',
-      color: '#3e63dd',
-      scope: 'Management, User Admin, Reporting, Sales Approval'
-    },
-    {
-      role: 'Manager',
-      name: 'Vikram Seth',
-      email: 'vikram.manager@company.com',
-      mobile: '+91 98765 43212',
-      password: 'manager123',
-      altPass: 'admin123',
-      badge: 'Supervision',
-      color: '#29a383',
-      scope: 'Team Oversight, Lead Reallocation, Pipeline Monitoring'
-    },
-    {
-      role: 'Team Leader',
-      name: 'Priya Nair',
-      email: 'priya.tl@company.com',
-      mobile: '+91 98765 43213',
-      password: 'tl123',
-      altPass: 'admin123',
-      badge: 'Executive Oversight',
-      color: '#d97706',
-      scope: 'Executive Supervision, Call Dispositions, Daily Targets'
-    },
-    {
-      role: 'Executive (ABHINAYA M)',
-      name: 'ABHINAYA M',
-      email: 'abhinaya@company.com',
-      mobile: '+91 98765 43214',
-      password: 'executive123',
-      altPass: 'admin123',
-      badge: 'Default Target',
-      color: '#05a2c5',
-      scope: 'Assigned Leads, Calling Shortcuts, Disposition Logging, Sale Bookings'
-    },
-    {
-      role: 'Executive (AKSHATA)',
-      name: 'AKSHATA',
-      email: 'tajayvarma76@gmail.com',
-      mobile: '+91 98765 43216',
-      password: 'executive123',
-      altPass: 'admin123',
-      badge: 'Personal Pipeline',
-      color: '#05a2c5',
-      scope: 'Personal Pipeline, Calling Shortcuts, Disposition Logging'
-    }
-  ];
-
-  // Identify newly created users (users not in the initial base 9)
-  const baseIds = ['usr-1', 'usr-2', 'usr-3', 'usr-4', 'usr-5', 'usr-6', 'usr-7', 'usr-8', 'usr-9'];
-  const customUsers = (users || []).filter(u => u.status === 'Active' && !baseIds.includes(u.id));
-
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setAutofillNotice('');
     setIsSubmitting(true);
     await handleLogin(identifier, password);
     setIsSubmitting(false);
   };
 
-  const copyToClipboard = (text, key) => {
-    if (!text) return;
-    navigator.clipboard?.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1800);
-  };
-
-  // Safe helper that ONLY loads the text into form fields without submitting
-  const loadCredentialsToForm = (ident, pass, label) => {
-    setIdentifier(ident);
-    setPassword(pass);
-    setAutofillNotice(`Credentials loaded for ${label}. Click "Sign In to CRM" to authenticate.`);
-  };
+  const formFields = [
+    {
+      label: 'Username / Email / Mobile',
+      required: true,
+      type: 'text',
+      placeholder: 'superadmin@company.com or Srinivas R',
+      value: identifier,
+      onChange: (e) => setIdentifier(e.target.value),
+    },
+    {
+      label: 'Password',
+      required: true,
+      type: 'password',
+      placeholder: 'Enter your password',
+      value: password,
+      onChange: (e) => setPassword(e.target.value),
+    },
+  ];
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'var(--bg-app)',
-      padding: '24px 20px'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '1060px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-        gap: '28px',
-        alignItems: 'start'
-      }}>
-        {/* Left Side: RBAC Role Directory & Credentials Matrix */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-            <div className="brand-logo" style={{ width: '38px', height: '38px' }}>
-              <Command size={22} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Astra CRM</h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                <span className="badge badge-disposition" style={{ fontSize: '0.72rem' }}>
-                  Enterprise RBAC Enforced
-                </span>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Manual Credential Verification
-                </span>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen w-full bg-[#090a0f] text-neutral-100 flex flex-col justify-center items-center relative overflow-hidden select-none px-4 py-8">
+      {/* Background Ambient Glows */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
 
-          <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
-            Production Role-Based Access Control is active. To authenticate, enter your assigned Username/Email and Password in the sign-in form. Single-click instant login has been disabled for audit security.
-          </p>
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-center z-10">
+        {/* Left Side: Modern Tech Orbit Display with Ripple */}
+        <div className="relative flex flex-col items-center justify-center min-h-[460px] lg:min-h-[580px] w-full overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-md">
+          <Ripple mainCircleSize={110} mainCircleOpacity={0.18} numCircles={8} />
+          <TechOrbitDisplay iconsArray={iconsArray} text="Astra CRM" />
 
-          {/* Newly Created Users Section */}
-          {customUsers.length > 0 && (
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                ✨ Custom User Profiles ({customUsers.length}):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {customUsers.map(u => {
-                  const userLeadCount = leads.filter(l => !l.isUnassigned && (l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.trim().toLowerCase() === (u.name || '').trim().toLowerCase()))).length;
-                  const userPass = u.password || '123456';
-                  return (
-                    <div
-                      key={u.id}
-                      style={{
-                        padding: '12px 14px',
-                        backgroundColor: 'var(--bg-surface)',
-                        border: '1px solid var(--accent-primary)',
-                        borderRadius: 'var(--radius-md)',
-                        transition: 'var(--transition)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                          {u.name} <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>({u.role})</span>
-                        </div>
-                        <span className="badge" style={{ backgroundColor: '#10b98118', color: '#10b981', border: '1px solid #10b98130', fontSize: '0.72rem', fontWeight: 700 }}>
-                          {userLeadCount} Assigned Leads
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem', marginTop: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-app)', padding: '4px 8px', borderRadius: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>User:</span>
-                          <code style={{ fontWeight: 600 }}>{u.email || u.name}</code>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(u.email || u.name, `c-u-${u.id}`)}
-                            title="Copy username"
-                            style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-muted)' }}
-                          >
-                            {copiedKey === `c-u-${u.id}` ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                          </button>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-app)', padding: '4px 8px', borderRadius: '4px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Pass:</span>
-                          <code style={{ fontWeight: 600, color: 'var(--accent-primary)' }}>{userPass}</code>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(userPass, `c-p-${u.id}`)}
-                            title="Copy password"
-                            style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-muted)' }}
-                          >
-                            {copiedKey === `c-p-${u.id}` ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          onClick={() => loadCredentialsToForm(u.email || u.name, userPass, u.name)}
-                          style={{
-                            fontSize: '0.72rem',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            background: 'var(--bg-app)',
-                            border: '1px solid var(--border-subtle)',
-                            color: 'var(--accent-primary)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontWeight: 600
-                          }}
-                        >
-                          <ArrowUpRight size={12} /> Fill into Form
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Standard Pre-defined Roles Directory */}
-          <div style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Profile-Based Credentials Directory:</span>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'none' }}>
-              6 System Roles
+          {/* Bottom Trust Pills */}
+          <div className="absolute bottom-6 flex items-center gap-4 text-[11px] text-neutral-400 font-medium z-10">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-400" /> End-to-End Encrypted
             </span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
-            {defaultRoleConfigs.map(cred => {
-              const matchedU = users.find(u => u.email === cred.email);
-              const count = matchedU ? leads.filter(l => !l.isUnassigned && (l.assignedToId === matchedU.id || l.assigned_user_id === matchedU.id || (l.assignedToName && l.assignedToName.trim().toLowerCase() === (matchedU.name || '').trim().toLowerCase()))).length : 0;
-
-              return (
-                <div
-                  key={cred.role}
-                  style={{
-                    padding: '10px 12px',
-                    backgroundColor: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-md)',
-                    transition: 'var(--transition)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.84rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: cred.color }} />
-                      <span>{cred.name}</span>
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 400 }}>• {cred.role}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {count > 0 && (
-                        <span className="badge" style={{ backgroundColor: '#3b82f618', color: '#3b82f6', fontSize: '0.68rem' }}>
-                          {count} Leads
-                        </span>
-                      )}
-                      <span className="badge" style={{ backgroundColor: `${cred.color}15`, color: cred.color, border: `1px solid ${cred.color}30`, fontSize: '0.68rem', fontWeight: 600 }}>
-                        {cred.badge}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '8px', fontSize: '0.74rem', marginTop: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-app)', padding: '4px 8px', borderRadius: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Login:</span>
-                      <code style={{ fontSize: '0.72rem' }}>{cred.email}</code>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(cred.email, `u-${cred.role}`)}
-                        title="Copy email"
-                        style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-muted)' }}
-                      >
-                        {copiedKey === `u-${cred.role}` ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--bg-app)', padding: '4px 8px', borderRadius: '4px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Password:</span>
-                      <code style={{ fontWeight: 600, color: cred.color, fontSize: '0.72rem' }}>{cred.password}</code>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(cred.password, `p-${cred.role}`)}
-                        title="Copy password"
-                        style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-muted)' }}
-                      >
-                        {copiedKey === `p-${cred.role}` ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '230px' }}>
-                      {cred.scope}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => loadCredentialsToForm(cred.email, cred.password, cred.name)}
-                      style={{
-                        fontSize: '0.7rem',
-                        padding: '3px 8px',
-                        borderRadius: '4px',
-                        background: 'transparent',
-                        border: '1px solid var(--border-subtle)',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontWeight: 600
-                      }}
-                    >
-                      <ArrowUpRight size={11} /> Fill Form
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <span className="text-neutral-700">•</span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={13} className="text-indigo-400" /> RBAC Enforced
+            </span>
           </div>
         </div>
 
-        {/* Right Side: Secure Login Form Card */}
-        <div className="directory-card" style={{ padding: '30px', border: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <LogIn size={20} color="var(--accent)" /> Direct Sign In
-            </h2>
-            <span className="badge" style={{ backgroundColor: '#10b98115', color: '#10b981', border: '1px solid #10b98130', fontSize: '0.72rem' }}>
-              🔒 Protected
-            </span>
-          </div>
-
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-            Enter your authorized User Name, Email, or Mobile Number and Password.
-          </p>
-
-          {/* IP Shield Status Bar */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
-            borderRadius: 'var(--radius-md)',
-            marginBottom: '16px',
-            backgroundColor: detectedIP ? '#10b98110' : '#f59e0b10',
-            border: `1px solid ${detectedIP ? '#10b98130' : '#f59e0b30'}`,
-            fontSize: '0.76rem'
-          }}>
-            {ipDetecting ? (
-              <>
-                <Wifi size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
-                <span style={{ color: '#f59e0b' }}>Detecting network IP address...</span>
-              </>
-            ) : detectedIP ? (
-              <>
-                <ShieldCheck size={13} color="#10b981" style={{ flexShrink: 0 }} />
-                <span style={{ color: 'var(--text-secondary)' }}>
-                  Your IP: <code style={{ fontWeight: 700, color: '#10b981' }}>{detectedIP}</code>
-                </span>
-                <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                  🔒 IP Guard Active
-                </span>
-              </>
-            ) : (
-              <>
-                <ShieldAlert size={13} color="#f59e0b" style={{ flexShrink: 0 }} />
-                <span style={{ color: '#f59e0b' }}>IP detection unavailable — restriction bypassed</span>
-              </>
-            )}
-          </div>
-
-          {autofillNotice && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '14px',
-              backgroundColor: 'var(--accent-primary-10, #3b82f615)',
-              border: '1px solid var(--accent-primary)',
-              fontSize: '0.76rem',
-              color: 'var(--text-primary)'
-            }}>
-              <Key size={14} color="var(--accent-primary)" />
-              <span>{autofillNotice}</span>
-            </div>
-          )}
-
-          {loginError && (
-            <div className="alert-box alert-warning" style={{
-              marginBottom: '16px',
-              borderColor: loginError.includes('Access Denied') || loginError.includes('Suspended') ? '#ef4444' : undefined,
-              backgroundColor: loginError.includes('Access Denied') || loginError.includes('Suspended') ? '#ef444410' : undefined
-            }}>
-              {loginError}
-            </div>
-          )}
-
-          <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div className="form-group">
-              <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>User Name, Email, or Mobile</label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="e.g. superadmin@company.com or Srinivas R"
-                  style={{ paddingLeft: '36px' }}
-                  required
-                  autoComplete="username"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Password</label>
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    fontSize: '0.72rem',
-                    color: 'var(--text-muted)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showPassword ? 'Hide' : 'Show'}</span>
-                </button>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter account password"
-                  style={{ paddingLeft: '36px' }}
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={isSubmitting || !identifier || !password}
-              style={{
-                justifyContent: 'center',
-                height: '42px',
-                marginTop: '8px',
-                fontSize: '0.88rem',
-                fontWeight: 600
-              }}
+        {/* Right Side: Animated Form */}
+        <div className="flex flex-col items-center justify-center w-full px-2 sm:px-6">
+          <div className="w-full max-w-[420px] rounded-2xl border border-white/10 bg-neutral-900/60 backdrop-blur-xl p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            <AnimatedForm
+              header="Welcome back"
+              subHeader="Sign in to your Astra CRM workspace"
+              fields={formFields}
+              submitButton={isSubmitting ? "Authenticating..." : "Sign in"}
+              errorField={loginError}
+              onSubmit={handleSubmit}
             >
-              {isSubmitting ? 'Verifying Credentials...' : 'Sign In to CRM'}
-            </button>
-
-            <div style={{
-              marginTop: '12px',
-              paddingTop: '14px',
-              borderTop: '1px solid var(--border-subtle)',
-              fontSize: '0.72rem',
-              color: 'var(--text-muted)',
-              lineHeight: 1.5,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '8px'
-            }}>
-              <Shield size={14} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div>
-                <strong>RBAC Compliance Policy:</strong> Instant 1-click login bypass has been removed. All sessions require valid credentials verified against company RBAC policies and IP authorization.
-              </div>
-            </div>
-          </form>
+              {/* IP Shield Status Bar */}
+              <BoxReveal boxColor="#6e56cf" duration={0.3} width="100%">
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-3 border ${
+                  detectedIP
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                }`}>
+                  {ipDetecting ? (
+                    <>
+                      <Wifi size={13} className="text-amber-400 animate-pulse flex-shrink-0" />
+                      <span>Detecting authorized network IP...</span>
+                    </>
+                  ) : detectedIP ? (
+                    <>
+                      <ShieldCheck size={13} className="text-emerald-400 flex-shrink-0" />
+                      <span className="text-neutral-300">
+                        IP: <code className="text-emerald-400 font-mono font-bold">{detectedIP}</code>
+                      </span>
+                      <span className="ml-auto text-[10px] text-neutral-400 font-medium flex items-center gap-1">
+                        🔒 IP Guard Active
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldAlert size={13} className="text-amber-400 flex-shrink-0" />
+                      <span>IP Detection Offline — Fail-Safe Active</span>
+                    </>
+                  )}
+                </div>
+              </BoxReveal>
+            </AnimatedForm>
+          </div>
         </div>
       </div>
     </div>
