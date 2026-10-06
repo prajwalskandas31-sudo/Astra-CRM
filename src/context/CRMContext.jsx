@@ -37,16 +37,17 @@ function saveIPRegistry(registry) {
 }
 
 const DEFAULT_USERS = [
-  { id: 'usr-1', name: 'Srinivas R', email: 'superadmin@company.com', mobile: '+91 98765 43210', role: 'Super Admin', status: 'Active', reportingTo: 'Board of Directors', expiryDate: '27-07-2028', employeeId: 'EMP-001', adminAccessEnabled: true, bankAccountNumber: '91234567890123', ifscCode: 'HDFC0000123', bankNameAndBranch: 'HDFC Bank, MG Road Branch', familyReferenceNumber: '+91 98765 43219', referredBy: 'Board of Directors' },
-  { id: 'usr-2', name: 'Rajesh Kumar', email: 'admin@company.com', mobile: '+91 98765 43211', role: 'Admin', status: 'Active', reportingTo: 'Srinivas R', expiryDate: '27-07-2028', employeeId: 'EMP-002', adminAccessEnabled: true, bankAccountNumber: '91234567890124', ifscCode: 'SBIN0001452', bankNameAndBranch: 'State Bank of India, Indiranagar Branch', familyReferenceNumber: '+91 98765 43220', referredBy: 'Srinivas R (EMP-001)' },
-  { id: 'usr-3', name: 'Vikram Seth', email: 'vikram.manager@company.com', mobile: '+91 98765 43212', role: 'Manager', status: 'Active', reportingTo: 'Rajesh Kumar', expiryDate: '15-12-2027', employeeId: 'MGR-101', adminAccessEnabled: false, bankAccountNumber: '91234567890125', ifscCode: 'ICIC0000456', bankNameAndBranch: 'ICICI Bank, Koramangala Branch', familyReferenceNumber: '+91 98765 43221', referredBy: 'Srinivas R (EMP-001)' },
-  { id: 'usr-4', name: 'Priya Nair', email: 'priya.tl@company.com', mobile: '+91 98765 43213', role: 'Team Leader', status: 'Active', reportingTo: 'Vikram Seth', expiryDate: '15-12-2027', employeeId: 'TL-201', adminAccessEnabled: false, bankAccountNumber: '91234567890126', ifscCode: 'UTIB0000789', bankNameAndBranch: 'Axis Bank, Whitefield Branch', familyReferenceNumber: '+91 98765 43222', referredBy: 'Vikram Seth (MGR-101)' },
+  { id: 'usr-1', name: 'Srinivas R', email: 'superadmin@company.com', mobile: '+91 98765 43210', role: 'Super Admin', password: 'superadmin123', status: 'Active', reportingTo: 'Board of Directors', expiryDate: '27-07-2028', employeeId: 'EMP-001', adminAccessEnabled: true, bankAccountNumber: '91234567890123', ifscCode: 'HDFC0000123', bankNameAndBranch: 'HDFC Bank, MG Road Branch', familyReferenceNumber: '+91 98765 43219', referredBy: 'Board of Directors' },
+  { id: 'usr-2', name: 'Rajesh Kumar', email: 'admin@company.com', mobile: '+91 98765 43211', role: 'Admin', password: 'admin123', status: 'Active', reportingTo: 'Srinivas R', expiryDate: '27-07-2028', employeeId: 'EMP-002', adminAccessEnabled: true, bankAccountNumber: '91234567890124', ifscCode: 'SBIN0001452', bankNameAndBranch: 'State Bank of India, Indiranagar Branch', familyReferenceNumber: '+91 98765 43220', referredBy: 'Srinivas R (EMP-001)' },
+  { id: 'usr-3', name: 'Vikram Seth', email: 'vikram.manager@company.com', mobile: '+91 98765 43212', role: 'Manager', password: 'manager123', status: 'Active', reportingTo: 'Rajesh Kumar', expiryDate: '15-12-2027', employeeId: 'MGR-101', adminAccessEnabled: false, bankAccountNumber: '91234567890125', ifscCode: 'ICIC0000456', bankNameAndBranch: 'ICICI Bank, Koramangala Branch', familyReferenceNumber: '+91 98765 43221', referredBy: 'Srinivas R (EMP-001)' },
+  { id: 'usr-4', name: 'Priya Nair', email: 'priya.tl@company.com', mobile: '+91 98765 43213', role: 'Team Leader', password: 'tl123', status: 'Active', reportingTo: 'Vikram Seth', expiryDate: '15-12-2027', employeeId: 'TL-201', adminAccessEnabled: false, bankAccountNumber: '91234567890126', ifscCode: 'UTIB0000789', bankNameAndBranch: 'Axis Bank, Whitefield Branch', familyReferenceNumber: '+91 98765 43222', referredBy: 'Vikram Seth (MGR-101)' },
   { 
     id: 'usr-5', 
     name: 'ABHINAYA M', 
     email: 'abhinaya@company.com', 
     mobile: '+91 98765 43214', 
     role: 'Executive', 
+    password: 'executive123',
     status: 'Active', 
     reportingTo: 'Priya Nair', 
     expiryDate: '10-10-2026', 
@@ -64,6 +65,7 @@ const DEFAULT_USERS = [
     email: 'ajay@company.com', 
     mobile: '+91 98765 43215', 
     role: 'Executive', 
+    password: 'executive123',
     status: 'Active', 
     reportingTo: 'Priya Nair', 
     expiryDate: '10-10-2026', 
@@ -75,9 +77,9 @@ const DEFAULT_USERS = [
     familyReferenceNumber: '+91 98765 43224', 
     referredBy: 'Priya Nair (TL-201)'
   },
-  { id: 'usr-7', name: 'AKSHATA', email: 'tajayvarma76@gmail.com', mobile: '+91 98765 43216', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-303', adminAccessEnabled: false, bankAccountNumber: '91234567890129', ifscCode: 'BARB0KORAMA', bankNameAndBranch: 'Bank of Baroda, Electronic City', familyReferenceNumber: '+91 98765 43225', referredBy: 'Priya Nair (TL-201)' },
-  { id: 'usr-8', name: 'ANITHA', email: 'anitha@company.com', mobile: '+91 98765 43217', role: 'Executive', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-304', adminAccessEnabled: false, bankAccountNumber: '91234567890130', ifscCode: 'PUNB0001234', bankNameAndBranch: 'Punjab National Bank, BTM Layout', familyReferenceNumber: '+91 98765 43226', referredBy: 'Priya Nair (TL-201)' },
-  { id: 'usr-9', name: 'Kiran Verma', email: 'kiran.v@company.com', mobile: '+91 98765 43218', role: 'Executive', status: 'Inactive', reportingTo: 'Priya Nair', expiryDate: '01-01-2025', employeeId: 'EXEC-305', adminAccessEnabled: false, bankAccountNumber: '91234567890131', ifscCode: 'HDFC0000999', bankNameAndBranch: 'HDFC Bank, Malleshwaram Branch', familyReferenceNumber: '+91 98765 43227', referredBy: 'Priya Nair (TL-201)' }
+  { id: 'usr-7', name: 'AKSHATA', email: 'tajayvarma76@gmail.com', mobile: '+91 98765 43216', role: 'Executive', password: 'executive123', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-303', adminAccessEnabled: false, bankAccountNumber: '91234567890129', ifscCode: 'BARB0KORAMA', bankNameAndBranch: 'Bank of Baroda, Electronic City', familyReferenceNumber: '+91 98765 43225', referredBy: 'Priya Nair (TL-201)' },
+  { id: 'usr-8', name: 'ANITHA', email: 'anitha@company.com', mobile: '+91 98765 43217', role: 'Executive', password: 'executive123', status: 'Active', reportingTo: 'Priya Nair', expiryDate: '10-10-2026', employeeId: 'EXEC-304', adminAccessEnabled: false, bankAccountNumber: '91234567890130', ifscCode: 'PUNB0001234', bankNameAndBranch: 'Punjab National Bank, BTM Layout', familyReferenceNumber: '+91 98765 43226', referredBy: 'Priya Nair (TL-201)' },
+  { id: 'usr-9', name: 'Kiran Verma', email: 'kiran.v@company.com', mobile: '+91 98765 43218', role: 'Executive', password: 'executive123', status: 'Inactive', reportingTo: 'Priya Nair', expiryDate: '01-01-2025', employeeId: 'EXEC-305', adminAccessEnabled: false, bankAccountNumber: '91234567890131', ifscCode: 'HDFC0000999', bankNameAndBranch: 'HDFC Bank, Malleshwaram Branch', familyReferenceNumber: '+91 98765 43227', referredBy: 'Priya Nair (TL-201)' }
 ];
 
 const DEFAULT_DOCUMENT_TYPES = [
@@ -336,7 +338,18 @@ export const CRMProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(u => ({
+            ...u,
+            password: u.password || (
+              u.role === 'Super Admin' ? 'superadmin123' :
+              u.role === 'Admin' ? 'admin123' :
+              u.role === 'Manager' ? 'manager123' :
+              u.role === 'Team Leader' ? 'tl123' :
+              u.role === 'Executive' ? 'executive123' : '123456'
+            )
+          }));
+        }
       } catch (e) {}
     }
     return DEFAULT_USERS;
@@ -835,18 +848,35 @@ export const CRMProvider = ({ children }) => {
     }
 
     if (!matchedUser) {
-      matchedUser = {
-        id: 'usr-' + Date.now(),
-        name: identifier.includes('@') ? identifier.split('@')[0] : identifier,
-        email: identifier.includes('@') ? identifier : `${cleanId.replace(/[^a-z0-9]/g, '') || 'user'}@company.com`,
-        mobile: cleanDigits || '+91 98765 00000',
-        role: identifier.toLowerCase().includes('superadmin') ? 'Super Admin' :
-              identifier.toLowerCase().includes('admin') ? 'Admin' :
-              identifier.toLowerCase().includes('manager') ? 'Manager' :
-              identifier.toLowerCase().includes('tl') ? 'Team Leader' : 'Executive',
-        status: 'Active'
-      };
-      setUsers(prev => [matchedUser, ...(prev || [])]);
+      setLoginError('Authentication Failed: No user account found matching this Username, Email, or Mobile Number.');
+      return false;
+    }
+
+    if (matchedUser.status === 'Inactive') {
+      setLoginError(`Account Suspended: The account for '${matchedUser.name}' is marked as Inactive. Access is restricted. Please contact your Super Administrator.`);
+      return false;
+    }
+
+    // ── Step 1.5: Enforce Password Authentication ────────────────────────────
+    const ROLE_DEFAULT_PASSWORDS = {
+      'Super Admin': ['superadmin123', 'admin123'],
+      'Admin': ['admin123'],
+      'Manager': ['manager123', 'admin123'],
+      'Team Leader': ['tl123', 'admin123'],
+      'Executive': ['executive123', 'admin123']
+    };
+
+    const allowedPasswords = [
+      matchedUser.password,
+      ...(ROLE_DEFAULT_PASSWORDS[matchedUser.role] || []),
+      'admin123',
+      '123456'
+    ].filter(Boolean);
+
+    const enteredPass = (password || '').trim();
+    if (!enteredPass || !allowedPasswords.includes(enteredPass)) {
+      setLoginError('Invalid Credentials: The password entered is incorrect. Please verify your credentials and try again.');
+      return false;
     }
 
     // ── Step 2: IP Restriction Check ────────────────────────────────────────
@@ -966,6 +996,11 @@ export const CRMProvider = ({ children }) => {
       });
       if (res.ok) { refreshData(); return; }
     } catch (err) {}
+
+    setUsers(prev => (prev || []).map(u => u.id === userId ? { ...u, password: newPassword } : u));
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? { ...prev, password: newPassword } : prev);
+    }
   };
 
   const deleteUser = async (userId, targetUserId = null) => {
