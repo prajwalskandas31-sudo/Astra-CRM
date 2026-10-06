@@ -17,10 +17,12 @@ import {
 
 export const LeadHistoryBlock = () => {
   const { leads, users, currentUser, simulatedRole } = useCRM();
-  const isSuperAdmin = simulatedRole === 'Super Admin';
+  const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
 
   const [search, setSearch] = useState('');
-  const [historyUserFilter, setHistoryUserFilter] = useState('SELF');
+  const [historyUserFilter, setHistoryUserFilter] = useState(() => 
+    (simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin' ? 'ALL' : 'SELF')
+  );
   const [dispFilter, setDispFilter] = useState('All');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -28,16 +30,22 @@ export const LeadHistoryBlock = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const effectiveUserId =
-    isSuperAdmin && historyUserFilter !== 'SELF'
+    isSuperAdmin && historyUserFilter !== 'SELF' && historyUserFilter !== 'ALL'
       ? historyUserFilter
       : currentUser?.id;
 
   const effectiveUserName =
-    isSuperAdmin && historyUserFilter !== 'SELF'
-      ? users?.find(u => u.id === historyUserFilter)?.name || 'Selected User'
-      : currentUser?.name || 'You';
+    historyUserFilter === 'ALL'
+      ? 'All Representatives & Users'
+      : isSuperAdmin && historyUserFilter !== 'SELF'
+        ? users?.find(u => u.id === historyUserFilter)?.name || 'Selected User'
+        : currentUser?.name || 'You';
 
   const historyLeads = useMemo(() => {
+    if (isSuperAdmin && historyUserFilter === 'ALL') {
+      return leads.filter(l => l && (l.assignedToId || l.assignedToName || (l.history && l.history.length > 0)));
+    }
+
     const targetId = effectiveUserId;
     const targetName = (
       isSuperAdmin && historyUserFilter !== 'SELF'
@@ -127,11 +135,19 @@ export const LeadHistoryBlock = () => {
             <select
               value={historyUserFilter}
               onChange={e => { setHistoryUserFilter(e.target.value); setExpandedRows(new Set()); }}
-              style={{ fontSize: '0.8rem', padding: '6px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', minWidth: '200px' }}
+              style={{ fontSize: '0.8rem', padding: '6px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', minWidth: '230px' }}
             >
-              <option value="SELF">My History ({currentUser?.name})</option>
-              <optgroup label="Inspect User History">
-                {(users || []).map(u => (<option key={u.id} value={u.id}>{u.name} ({u.role})</option>))}
+              <option value="ALL">🌐 All Users &amp; Assigned Leads</option>
+              <option value="SELF">My Assigned Leads ({currentUser?.name})</option>
+              <optgroup label="Filter by Specific User">
+                {(users || []).map(u => {
+                  const userCount = leads.filter(l => l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.toLowerCase() === (u.name || '').toLowerCase())).length;
+                  return (
+                    <option key={u.id} value={u.id}>
+                      {u.name} ({u.role}) — {userCount} Leads
+                    </option>
+                  );
+                })}
               </optgroup>
             </select>
           </div>

@@ -231,6 +231,13 @@ export const CRM_FEATURES = [
     description: 'Bulk reassign leads between representatives with disposition/date filtering and audit logs.',
     defaultForRoles: ['Super Admin', 'Admin']
   },
+  {
+    id: 'lead-history',
+    name: 'Lead Assignment History (Block 5)',
+    category: 'Operations & Dispositions',
+    description: 'Inspect full assignment timeline, historical transfers, audit logs, and search assigned leads across all representatives.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
 
   // ── Lead Ingestion & Reports ───────────────────────
   {
@@ -427,7 +434,7 @@ export const CRMProvider = ({ children }) => {
     }
 
     // 2. Super Admin has all permissions by default
-    if (effectiveRole === 'Super Admin') {
+    if (effectiveRole === 'Super Admin' || simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin') {
       return true;
     }
 

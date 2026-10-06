@@ -24,7 +24,10 @@ import {
   AlertCircle,
   Tag,
   AlertTriangle,
-  X
+  X,
+  Minus,
+  Plus,
+  Hash
 } from 'lucide-react';
 
 export const LeadSummarySuperAdmin = () => {
@@ -417,29 +420,217 @@ export const LeadSummarySuperAdmin = () => {
               </div>
 
               {/* Assign Quantity with Real-time Validation */}
-              <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-main)', marginBottom: '6px' }}>
-                  <span>Assign Quantity:</span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main)', marginBottom: '6px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Hash size={13} color="var(--accent-primary)" /> Assign Quantity:
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: currentLangAvailableCount > 0 ? 'var(--accent-primary)' : 'var(--text-muted)', fontWeight: currentLangAvailableCount > 0 ? 600 : 400 }}>
                     Max: <strong>{currentLangAvailableCount}</strong>
                   </span>
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={currentLangAvailableCount || 1}
-                  value={b4AssignQty}
-                  onChange={(e) => setB4AssignQty(e.target.value)}
-                  placeholder={currentLangAvailableCount > 0 ? `1 to ${currentLangAvailableCount}` : "0 available"}
+
+                {/* Custom Stepper Input Control */}
+                <div
+                  className="quantity-input-wrapper"
                   style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    background: 'var(--bg-input)',
-                    color: 'var(--text-main)',
-                    border: `1px solid ${isQtyExceeded || (isQtyEmpty && b4AssignQty !== '') ? '#ef4444' : isQtyValid ? '#10b981' : 'var(--border-color)'}`
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-input, #121318)',
+                    border: `1px solid ${isQtyExceeded || (isQtyEmpty && b4AssignQty !== '') ? '#ef4444' : isQtyValid ? '#10b981' : 'var(--border-color)'}`,
+                    borderRadius: 'var(--radius-md, 8px)',
+                    overflow: 'hidden',
+                    height: '38px',
+                    transition: 'border-color 0.2s, box-shadow 0.2s'
                   }}
-                />
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = parseInt(b4AssignQty, 10);
+                      if (isNaN(current) || current <= 1) {
+                        setB4AssignQty('');
+                      } else {
+                        setB4AssignQty(String(current - 1));
+                      }
+                    }}
+                    disabled={!b4AssignQty || parseInt(b4AssignQty, 10) <= 0 || currentLangAvailableCount === 0}
+                    title="Decrease quantity by 1"
+                    style={{
+                      width: '36px',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'transparent',
+                      border: 'none',
+                      borderRight: '1px solid var(--border-default, #2A2D37)',
+                      color: (!b4AssignQty || parseInt(b4AssignQty, 10) <= 0 || currentLangAvailableCount === 0) ? 'var(--text-muted)' : 'var(--text-secondary)',
+                      cursor: (!b4AssignQty || parseInt(b4AssignQty, 10) <= 0 || currentLangAvailableCount === 0) ? 'not-allowed' : 'pointer',
+                      opacity: (!b4AssignQty || parseInt(b4AssignQty, 10) <= 0 || currentLangAvailableCount === 0) ? 0.35 : 1,
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (b4AssignQty && parseInt(b4AssignQty, 10) > 0 && currentLangAvailableCount > 0) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = (!b4AssignQty || parseInt(b4AssignQty, 10) <= 0 || currentLangAvailableCount === 0) ? 'var(--text-muted)' : 'var(--text-secondary)';
+                    }}
+                  >
+                    <Minus size={13} />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="1"
+                    max={currentLangAvailableCount || 1}
+                    value={b4AssignQty}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setB4AssignQty('');
+                      } else {
+                        const num = Math.max(1, parseInt(val, 10) || 1);
+                        setB4AssignQty(String(num));
+                      }
+                    }}
+                    placeholder={currentLangAvailableCount > 0 ? `1 to ${currentLangAvailableCount}` : "0 available"}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      boxShadow: 'none',
+                      padding: '0 8px',
+                      textAlign: 'center',
+                      fontSize: '0.86rem',
+                      fontWeight: b4AssignQty ? 600 : 400,
+                      color: isQtyExceeded ? '#ef4444' : isQtyValid ? '#10b981' : 'var(--text-primary)',
+                      outline: 'none',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}
+                  />
+
+                  {b4AssignQty !== '' && (
+                    <button
+                      type="button"
+                      onClick={() => setB4AssignQty('')}
+                      title="Clear quantity"
+                      style={{
+                        width: '26px',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        transition: 'color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentLangAvailableCount === 0) return;
+                      const current = parseInt(b4AssignQty, 10);
+                      if (isNaN(current) || current <= 0) {
+                        setB4AssignQty('1');
+                      } else {
+                        setB4AssignQty(String(Math.min(currentLangAvailableCount, current + 1)));
+                      }
+                    }}
+                    disabled={currentLangAvailableCount === 0 || (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) >= currentLangAvailableCount)}
+                    title="Increase quantity by 1"
+                    style={{
+                      width: '36px',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'transparent',
+                      border: 'none',
+                      borderLeft: '1px solid var(--border-default, #2A2D37)',
+                      color: (currentLangAvailableCount === 0 || (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) >= currentLangAvailableCount)) ? 'var(--text-muted)' : 'var(--text-secondary)',
+                      cursor: (currentLangAvailableCount === 0 || (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) >= currentLangAvailableCount)) ? 'not-allowed' : 'pointer',
+                      opacity: (currentLangAvailableCount === 0 || (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) >= currentLangAvailableCount)) ? 0.35 : 1,
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) < currentLangAvailableCount) {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = (currentLangAvailableCount === 0 || (currentLangAvailableCount > 0 && parseInt(b4AssignQty, 10) >= currentLangAvailableCount)) ? 'var(--text-muted)' : 'var(--text-secondary)';
+                    }}
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+
+                {/* Quick Preset Pills */}
+                {currentLangAvailableCount > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 500 }}>Quick:</span>
+                    {[5, 10, 25, 50].filter(q => q <= currentLangAvailableCount).map(qty => {
+                      const isSelected = b4AssignQty === String(qty);
+                      return (
+                        <button
+                          key={qty}
+                          type="button"
+                          onClick={() => setB4AssignQty(isSelected ? '' : String(qty))}
+                          style={{
+                            padding: '2px 7px',
+                            fontSize: '0.72rem',
+                            fontWeight: isSelected ? 600 : 500,
+                            borderRadius: '5px',
+                            border: isSelected ? '1px solid var(--accent-primary, #10b981)' : '1px solid var(--border-default, #2A2D37)',
+                            background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                            color: isSelected ? 'var(--accent-primary, #10b981)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {qty}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setB4AssignQty(b4AssignQty === String(currentLangAvailableCount) ? '' : String(currentLangAvailableCount))}
+                      title="Assign all available leads in this language"
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: b4AssignQty === String(currentLangAvailableCount) ? 600 : 500,
+                        borderRadius: '5px',
+                        border: b4AssignQty === String(currentLangAvailableCount) ? '1px solid var(--accent-primary, #10b981)' : '1px solid var(--border-default, #2A2D37)',
+                        background: b4AssignQty === String(currentLangAvailableCount) ? 'rgba(16, 185, 129, 0.22)' : 'rgba(16, 185, 129, 0.08)',
+                        color: 'var(--accent-primary, #10b981)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      All ({currentLangAvailableCount})
+                    </button>
+                  </div>
+                )}
+
+                {/* Validation Status Messages */}
                 {currentLangAvailableCount === 0 && (
                   <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <AlertTriangle size={12} /> 0 unassigned leads in queue for {b4AssignLang}. Allocation prevented.

@@ -53,6 +53,7 @@ export const SystemSettings = () => {
   const [ipGuardPassword, setIpGuardPassword] = useState('');
   const [ipGuardPasswordError, setIpGuardPasswordError] = useState('');
   const [showIPGuardPassword, setShowIPGuardPassword] = useState(false);
+  const [showDefaultKey, setShowDefaultKey] = useState(false);
   const [isAuthenticatingIPGuard, setIsAuthenticatingIPGuard] = useState(false);
 
   const handleUnlockIPGuard = (e) => {
@@ -784,7 +785,7 @@ export const SystemSettings = () => {
                   <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                     <input
                       type={showIPGuardPassword ? 'text' : 'password'}
-                      placeholder="Enter administrator password (e.g. admin123)"
+                      placeholder="Enter administrator password"
                       value={ipGuardPassword}
                       onChange={(e) => {
                         setIpGuardPassword(e.target.value);
@@ -847,8 +848,40 @@ export const SystemSettings = () => {
                     {isAuthenticatingIPGuard ? 'Verifying...' : 'Unlock IP Guard'}
                   </button>
 
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                    Default Admin Key: <code style={{ color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }} onClick={() => setIpGuardPassword('admin123')}>admin123</code>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <span>Default Admin Key:</span>
+                    <code
+                      style={{
+                        color: 'var(--accent-primary)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        letterSpacing: showDefaultKey ? 'normal' : '2px',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid var(--border-color)'
+                      }}
+                      onClick={() => setIpGuardPassword('admin123')}
+                      title="Click to autofill"
+                    >
+                      {showDefaultKey ? 'admin123' : '••••••••'}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => setShowDefaultKey(!showDefaultKey)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title={showDefaultKey ? 'Hide key' : 'Reveal key'}
+                    >
+                      {showDefaultKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
                   </div>
                 </div>
               </form>

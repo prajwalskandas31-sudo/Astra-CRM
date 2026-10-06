@@ -669,6 +669,23 @@ select option {
   color: var(--text-primary, #F5F5F4) !important;
 }
 
+/* Hide default browser spinner for number inputs across the app */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Custom Stepper Input Group Focus States */
+.quantity-input-wrapper:focus-within {
+  border-color: var(--accent, #10b981) !important;
+  box-shadow: 0 0 0 2px var(--accent-glow, rgba(16, 185, 129, 0.2)) !important;
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8);
   cursor: pointer;

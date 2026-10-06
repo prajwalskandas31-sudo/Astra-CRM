@@ -6,7 +6,8 @@ import {
   Layers, ArrowRight, Calendar, Hash, Globe, Filter, CheckCircle2, Search, 
   RotateCcw, X, BookmarkCheck, FileSpreadsheet, Download, Printer, 
   Copy, Check, BarChart3, TrendingUp, Users, DollarSign, Clock, ShieldCheck, 
-  Activity, Eye, ExternalLink, RefreshCw, ChevronRight, Sparkles, Building2
+  Activity, Eye, ExternalLink, RefreshCw, ChevronRight, Sparkles, Building2,
+  Minus, Plus
 } from 'lucide-react';
 
 export const LeadReassignmentView = () => {
@@ -26,6 +27,7 @@ export const LeadReassignmentView = () => {
   // Table directory search and disposition filter state
   const [tableSearch, setTableSearch] = useState('');
   const [tableDispositionFilter, setTableDispositionFilter] = useState('ALL');
+  const [tableUserFilter, setTableUserFilter] = useState('ALL');
 
   // Extract available languages from leads
   const availableLanguages = useMemo(() => {
@@ -87,6 +89,13 @@ export const LeadReassignmentView = () => {
   // Filtered leads for the Active Lead Directory table
   const filteredTableLeads = useMemo(() => {
     return leads.filter(l => {
+      // User filter
+      if (tableUserFilter !== 'ALL') {
+        const matchesUser = l.assignedToId === tableUserFilter || 
+                            l.assigned_user_id === tableUserFilter ||
+                            (l.assignedToName && l.assignedToName.toLowerCase() === (users.find(u => u.id === tableUserFilter)?.name || '').toLowerCase());
+        if (!matchesUser) return false;
+      }
       // Disposition filter
       if (tableDispositionFilter !== 'ALL') {
         const leadDisp = (l.disposition || 'New Lead').trim().toLowerCase();
@@ -107,7 +116,7 @@ export const LeadReassignmentView = () => {
       }
       return true;
     });
-  }, [leads, tableDispositionFilter, tableSearch]);
+  }, [leads, tableDispositionFilter, tableUserFilter, tableSearch, users]);
 
   // --- END OF DAY (EOD) REPORT GENERATION ENGINE ---
   const [blockView, setBlockView] = useState('directory'); // 'directory' | 'eod-report'
@@ -564,18 +573,215 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
               {/* 3-Column Filter Row: Quantity, Language, Disposition */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', gridColumn: 'span 2' }}>
                 {/* Quantity */}
-                <div className="form-group">
-                  <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Hash size={13} /> Quantity (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={reassignQty}
-                    onChange={(e) => setReassignQty(e.target.value)}
-                    placeholder="e.g. 15 (leave empty for all)"
-                  />
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <label style={{ fontWeight: 600, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '5px', margin: 0, color: 'var(--text-primary)' }}>
+                      <Hash size={13} color="var(--accent-primary)" /> Quantity
+                      <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-muted)' }}>(Optional)</span>
+                    </label>
+                    {matchingLeadsCount > 0 && (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', fontWeight: 600, background: 'rgba(16, 185, 129, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                        {matchingLeadsCount} available
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Custom Stepper Input Control */}
+                  <div
+                    className="quantity-input-wrapper"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: 'var(--bg-input, #121318)',
+                      border: '1px solid var(--border-default, #2A2D37)',
+                      borderRadius: 'var(--radius-md, 8px)',
+                      overflow: 'hidden',
+                      height: '38px',
+                      transition: 'border-color 0.2s, box-shadow 0.2s'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = parseInt(reassignQty, 10);
+                        if (isNaN(current) || current <= 1) {
+                          setReassignQty('');
+                        } else {
+                          setReassignQty(String(current - 1));
+                        }
+                      }}
+                      disabled={!reassignQty || parseInt(reassignQty, 10) <= 0}
+                      title="Decrease quantity by 1"
+                      style={{
+                        width: '36px',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRight: '1px solid var(--border-default, #2A2D37)',
+                        color: (!reassignQty || parseInt(reassignQty, 10) <= 0) ? 'var(--text-muted)' : 'var(--text-secondary)',
+                        cursor: (!reassignQty || parseInt(reassignQty, 10) <= 0) ? 'not-allowed' : 'pointer',
+                        opacity: (!reassignQty || parseInt(reassignQty, 10) <= 0) ? 0.35 : 1,
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (reassignQty && parseInt(reassignQty, 10) > 0) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                          e.currentTarget.style.color = 'var(--text-primary)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = (!reassignQty || parseInt(reassignQty, 10) <= 0) ? 'var(--text-muted)' : 'var(--text-secondary)';
+                      }}
+                    >
+                      <Minus size={13} />
+                    </button>
+
+                    <input
+                      type="number"
+                      min="1"
+                      max={matchingLeadsCount > 0 ? matchingLeadsCount : 9999}
+                      value={reassignQty}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setReassignQty('');
+                        } else {
+                          const num = Math.max(1, parseInt(val, 10) || 1);
+                          const max = matchingLeadsCount > 0 ? matchingLeadsCount : 9999;
+                          setReassignQty(String(Math.min(num, max)));
+                        }
+                      }}
+                      placeholder={matchingLeadsCount > 0 ? `All (${matchingLeadsCount})` : "All leads (e.g. 15)"}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        height: '100%',
+                        background: 'transparent',
+                        border: 'none',
+                        boxShadow: 'none',
+                        padding: '0 8px',
+                        textAlign: 'center',
+                        fontSize: '0.86rem',
+                        fontWeight: reassignQty ? 600 : 400,
+                        color: reassignQty ? 'var(--accent-primary, #10b981)' : 'var(--text-primary)',
+                        outline: 'none',
+                        fontVariantNumeric: 'tabular-nums'
+                      }}
+                    />
+
+                    {reassignQty && (
+                      <button
+                        type="button"
+                        onClick={() => setReassignQty('')}
+                        title="Reset quantity (reassign all)"
+                        style={{
+                          width: '26px',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          transition: 'color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = parseInt(reassignQty, 10);
+                        const max = matchingLeadsCount > 0 ? matchingLeadsCount : 9999;
+                        if (isNaN(current) || current <= 0) {
+                          setReassignQty('1');
+                        } else {
+                          setReassignQty(String(Math.min(max, current + 1)));
+                        }
+                      }}
+                      title="Increase quantity by 1"
+                      style={{
+                        width: '36px',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderLeft: '1px solid var(--border-default, #2A2D37)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                      }}
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+
+                  {/* Quick Preset Pills */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)', fontWeight: 500 }}>Quick:</span>
+                    {[10, 25, 50, 100].map(qty => {
+                      const isSelected = reassignQty === String(qty);
+                      return (
+                        <button
+                          key={qty}
+                          type="button"
+                          onClick={() => setReassignQty(isSelected ? '' : String(qty))}
+                          style={{
+                            padding: '2px 7px',
+                            fontSize: '0.72rem',
+                            fontWeight: isSelected ? 600 : 500,
+                            borderRadius: '5px',
+                            border: isSelected ? '1px solid var(--accent-primary, #10b981)' : '1px solid var(--border-default, #2A2D37)',
+                            background: isSelected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                            color: isSelected ? 'var(--accent-primary, #10b981)' : 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {qty}
+                        </button>
+                      );
+                    })}
+                    {matchingLeadsCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setReassignQty(reassignQty === String(matchingLeadsCount) ? '' : String(matchingLeadsCount))}
+                        title="Select all matching leads"
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: reassignQty === String(matchingLeadsCount) ? 600 : 500,
+                          borderRadius: '5px',
+                          border: reassignQty === String(matchingLeadsCount) ? '1px solid var(--accent-primary, #10b981)' : '1px solid var(--border-default, #2A2D37)',
+                          background: reassignQty === String(matchingLeadsCount) ? 'rgba(16, 185, 129, 0.22)' : 'rgba(16, 185, 129, 0.08)',
+                          color: 'var(--accent-primary, #10b981)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        All ({matchingLeadsCount})
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Language */}
@@ -852,6 +1058,28 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
                   )}
                 </div>
 
+                {/* Table Assigned User Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Users size={15} color="var(--text-muted)" />
+                  <select
+                    className="select-filter"
+                    value={tableUserFilter}
+                    onChange={(e) => setTableUserFilter(e.target.value)}
+                    style={{ minWidth: '170px' }}
+                    title="Filter by assigned user / owner"
+                  >
+                    <option value="ALL">All Assigned Users</option>
+                    {users.filter(u => u.status === 'Active').map(u => {
+                      const uCount = leads.filter(l => l.assignedToId === u.id || l.assigned_user_id === u.id || (l.assignedToName && l.assignedToName.toLowerCase() === u.name.toLowerCase())).length;
+                      return (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role}) — {uCount}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
                 {/* Table Disposition Filter */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Filter size={15} color="var(--text-muted)" />
@@ -868,11 +1096,11 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
                   </select>
                 </div>
 
-                {(tableSearch || tableDispositionFilter !== 'ALL') && (
+                {(tableSearch || tableDispositionFilter !== 'ALL' || tableUserFilter !== 'ALL') && (
                   <button
                     type="button"
                     className="btn-secondary"
-                    onClick={() => { setTableSearch(''); setTableDispositionFilter('ALL'); }}
+                    onClick={() => { setTableSearch(''); setTableDispositionFilter('ALL'); setTableUserFilter('ALL'); }}
                     title="Reset Directory Filters"
                     style={{ padding: '6px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >

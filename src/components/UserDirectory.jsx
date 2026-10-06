@@ -33,11 +33,7 @@ export const UserDirectory = () => {
     toggleAdminAccess, 
     changeUserPassword,
     hasPermission,
-    CRM_FEATURES = [],
-    updateUserPermission,
-    grantAllPermissions,
-    revokeAllOptionalPermissions,
-    resetUserPermissionsToDefault
+    CRM_FEATURES = []
   } = useCRM();
   const { showToast } = useToast();
 
@@ -51,7 +47,6 @@ export const UserDirectory = () => {
   const [editingUser, setEditingUser] = useState(null);
   const [userToDelete, setUserToDelete] = useState(null);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
-  const [featureAccessUser, setFeatureAccessUser] = useState(null);
 
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [passwordResetUser, setPasswordResetUser] = useState(null);
@@ -337,31 +332,33 @@ export const UserDirectory = () => {
                         <span>{u.status}</span>
                       </div>
                     </td>
-                    {/* Feature Access & Permissions Column */}
+                    {/* Feature Access (Read-Only Status Display) */}
                     <td>
                       {(() => {
                         const enabledCount = CRM_FEATURES.filter(f => hasPermission(f.id, u.id)).length;
                         const isAllGranted = enabledCount === CRM_FEATURES.length;
                         return (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => setFeatureAccessUser(u)}
+                          <span
                             style={{
-                              padding: '2px 8px',
+                              padding: '3px 9px',
                               fontSize: '0.72rem',
+                              fontWeight: 600,
                               borderRadius: 'var(--radius-full)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              color: isAllGranted ? '#10b981' : 'var(--accent-primary)',
+                              color: isAllGranted ? '#10b981' : 'var(--text-secondary)',
                               borderColor: isAllGranted ? 'rgba(16,185,129,0.3)' : 'var(--border-color)',
-                              background: isAllGranted ? 'rgba(16,185,129,0.08)' : 'var(--bg-input)'
+                              background: isAllGranted ? 'rgba(16,185,129,0.08)' : 'var(--bg-input)',
+                              border: '1px solid',
+                              cursor: 'default',
+                              userSelect: 'none'
                             }}
-                            title="Click to view and configure feature permissions for this user"
+                            title={`${enabledCount} of ${CRM_FEATURES.length} features active. Feature access control is exclusively managed in the Feature Access Block.`}
                           >
-                            <Key size={11} /> {enabledCount}/{CRM_FEATURES.length} {isAllGranted ? '★ All' : 'Features'}
-                          </button>
+                            <Key size={11} color={isAllGranted ? '#10b981' : 'var(--accent-primary)'} />
+                            {enabledCount}/{CRM_FEATURES.length} {isAllGranted ? '★ All' : 'Features'}
+                          </span>
                         );
                       })()}
                     </td>
@@ -419,17 +416,6 @@ export const UserDirectory = () => {
                                 }}
                               >
                                 <Edit2 size={13} /> Edit Details
-                              </button>
-
-                              <button
-                                className="btn-secondary"
-                                style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                onClick={() => {
-                                  setFeatureAccessUser(u);
-                                  setActiveDropdownId(null);
-                                }}
-                              >
-                                <Key size={13} color="var(--accent-primary)" /> Feature Permissions
                               </button>
 
                               <button
@@ -520,119 +506,6 @@ export const UserDirectory = () => {
                 <button type="submit" className="btn-primary">Update Password</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Quick Feature Access Modal ──────────────────────────────── */}
-      {featureAccessUser && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Key size={18} color="var(--accent-primary)" />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Feature Permissions: {featureAccessUser.name}</h3>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Role: {featureAccessUser.role} • Super Admin Permission Control</span>
-                </div>
-              </div>
-              <button className="modal-close-btn" onClick={() => setFeatureAccessUser(null)}>×</button>
-            </div>
-
-            <div className="modal-body" style={{ overflowY: 'auto', flex: 1, padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Active Features: <strong>{CRM_FEATURES.filter(f => hasPermission(f.id, featureAccessUser.id)).length}</strong> of <strong>{CRM_FEATURES.length}</strong>
-                </span>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    style={{ fontSize: '0.72rem', padding: '4px 8px' }}
-                    onClick={() => {
-                      grantAllPermissions(featureAccessUser.id);
-                      showToast(`All features enabled for ${featureAccessUser.name}`, 'success');
-                    }}
-                  >
-                    Grant All
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ fontSize: '0.72rem', padding: '4px 8px' }}
-                    onClick={() => {
-                      revokeAllOptionalPermissions(featureAccessUser.id);
-                      showToast(`Optional features revoked for ${featureAccessUser.name}`, 'info');
-                    }}
-                  >
-                    Revoke Optional
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ fontSize: '0.72rem', padding: '4px 8px' }}
-                    onClick={() => {
-                      resetUserPermissionsToDefault(featureAccessUser.id);
-                      showToast(`Reset permissions for ${featureAccessUser.name}`, 'info');
-                    }}
-                  >
-                    Reset Baseline
-                  </button>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {CRM_FEATURES.map(f => {
-                  const isEnabled = hasPermission(f.id, featureAccessUser.id);
-                  return (
-                    <div
-                      key={f.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '10px 12px',
-                        borderRadius: 'var(--radius-md)',
-                        background: isEnabled ? 'var(--bg-input)' : 'rgba(0,0,0,0.15)',
-                        border: '1px solid ' + (isEnabled ? 'var(--border-color)' : 'rgba(239,68,68,0.2)')
-                      }}
-                    >
-                      <div style={{ flex: 1, paddingRight: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.82rem', color: isEnabled ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                            {f.name}
-                          </span>
-                          <span className="badge" style={{ fontSize: '0.65rem', padding: '0px 5px', color: isEnabled ? '#10b981' : '#ef4444' }}>
-                            {isEnabled ? 'ON' : 'OFF'}
-                          </span>
-                        </div>
-                        <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                          {f.description}
-                        </p>
-                      </div>
-
-                      <input
-                        type="checkbox"
-                        checked={isEnabled}
-                        disabled={!isSuperAdmin}
-                        onChange={() => {
-                          updateUserPermission(featureAccessUser.id, f.id, !isEnabled);
-                          showToast(`${!isEnabled ? 'Enabled' : 'Disabled'} '${f.name}' for ${featureAccessUser.name}`, !isEnabled ? 'success' : 'info');
-                        }}
-                        style={{ width: '18px', height: '18px', accentColor: 'var(--accent-primary)', cursor: isSuperAdmin ? 'pointer' : 'not-allowed' }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="button" className="btn-primary" onClick={() => setFeatureAccessUser(null)}>
-                Done
-              </button>
-            </div>
           </div>
         </div>
       )}
