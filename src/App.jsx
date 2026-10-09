@@ -47,7 +47,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-import { RoleSimulatorBanner } from './components/RoleSimulatorBanner';
 import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 
@@ -138,7 +137,6 @@ const AppContent = () => {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="main-content">
         <Navbar currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} />
-        <RoleSimulatorBanner />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
             {renderTabContent()}
