@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, Tag, Lock, Unlock, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, Tag, Lock, Unlock, KeyRound, Eye, EyeOff, X, ExternalLink } from 'lucide-react';
+import Demo from './ui/demo';
 
 export const SystemSettings = () => {
   const { 
@@ -35,6 +36,7 @@ export const SystemSettings = () => {
   const [ipPanelUser, setIPPanelUser] = useState(null); // userId being viewed
   const [manualIPInput, setManualIPInput] = useState('');
   const [ipForceRefresh, setIPForceRefresh] = useState(0); // trigger re-render after mutations
+  const [showSaaSDemo, setShowSaaSDemo] = useState(false); // live preview for SaaS template
 
   // IP Guard Password Authentication Gate
   const [isIPGuardUnlocked, setIsIPGuardUnlocked] = useState(() => {
@@ -235,6 +237,38 @@ export const SystemSettings = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* SaaS Template Showcase Card */}
+        <div style={{
+          marginTop: '20px',
+          padding: '16px 20px',
+          borderRadius: 'var(--radius-lg)',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.05) 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '0.88rem', color: '#fff' }}>
+              <Sparkles size={16} className="text-indigo-400" />
+              <span>SaaS Landing & Design Kit Component (@/components/ui/saa-s-template.tsx)</span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Built according to Shadcn UI, Tailwind CSS & TypeScript specifications. Consistent with Animated Login.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-gradient"
+            onClick={() => setShowSaaSDemo(true)}
+            style={{ fontSize: '0.8rem', padding: '7px 16px', borderRadius: '8px' }}
+          >
+            <ExternalLink size={14} /> Preview Live Template
+          </button>
         </div>
       </div>
 
@@ -976,6 +1010,47 @@ export const SystemSettings = () => {
             </div>
           </div>
         )
+      )}
+
+      {/* Fullscreen Modal Preview for SaaS Template */}
+      {showSaaSDemo && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          backgroundColor: '#000000',
+          overflowY: 'auto'
+        }}>
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 24px',
+            backgroundColor: 'rgba(9, 10, 15, 0.92)',
+            backdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#fff' }}>
+                Preview Mode: @/components/ui/saa-s-template.tsx
+              </span>
+              <span style={{ fontSize: '0.72rem', background: 'rgba(99, 102, 241, 0.18)', color: '#a5b4fc', padding: '2px 8px', borderRadius: '9999px', border: '1px solid rgba(99, 102, 241, 0.35)', fontWeight: 500 }}>
+                Shadcn + Tailwind + TypeScript
+              </span>
+            </div>
+            <button
+              onClick={() => setShowSaaSDemo(false)}
+              className="btn-secondary"
+              style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '0.8rem' }}
+            >
+              <X size={15} /> Return to CRM
+            </button>
+          </div>
+          <Demo />
+        </div>
       )}
     </div>
   );

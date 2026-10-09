@@ -53,13 +53,14 @@ export const RoleSimulatorBanner = () => {
             onChange={(e) => switchUser(e.target.value)}
             style={{
               fontSize: '0.76rem',
-              padding: '4px 10px',
-              borderRadius: '4px',
-              backgroundColor: 'var(--bg-input)',
-              border: '1px solid var(--accent-primary)',
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              backgroundColor: 'rgba(12, 13, 19, 0.9)',
+              border: '1px solid var(--accent-border, rgba(99, 102, 241, 0.35))',
               color: 'var(--text-primary)',
               cursor: 'pointer',
-              fontWeight: 600
+              fontWeight: 600,
+              outline: 'none'
             }}
           >
             {users?.filter(u => u.status === 'Active').map(u => {

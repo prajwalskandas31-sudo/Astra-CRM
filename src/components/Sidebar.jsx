@@ -107,7 +107,15 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       </nav>
 
       <div className="sidebar-footer">
-        <div style={{ fontSize: '0.74rem', color: '#9A9A96', textAlign: 'center' }}>
+        <div style={{ 
+          fontSize: '0.73rem', 
+          color: '#9A9A96', 
+          textAlign: 'center',
+          padding: '6px 12px',
+          background: 'rgba(255, 255, 255, 0.03)',
+          borderRadius: '9999px',
+          border: '1px solid rgba(255, 255, 255, 0.06)'
+        }}>
           Role: <strong style={{ color: 'var(--accent)', fontWeight: 600 }}>{simulatedRole}</strong>
         </div>
       </div>

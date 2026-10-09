@@ -24,12 +24,14 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node": "^26.6.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
     "gh-pages": "^6.3.0",
     "puppeteer-core": "^25.12.0",
     "tailwindcss": "^3.4.19",
+    "typescript": "^7.0.2",
     "vite": "^5.4.10"
   }
 }

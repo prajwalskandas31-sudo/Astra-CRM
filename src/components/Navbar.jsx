@@ -17,23 +17,24 @@ export const Navbar = ({ currentTabTitle }) => {
         {/* Pending Sales Notification for Super Admin */}
         {currentUser?.role === 'Super Admin' && (
           <div style={{ position: 'relative' }}>
-            <button className="btn-secondary" style={{ padding: '6px', borderRadius: 'var(--radius-md)' }} title="Pending Approvals">
-              <Bell size={16} />
+            <button className="btn-secondary" style={{ padding: '8px', borderRadius: '9999px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Pending Approvals">
+              <Bell size={15} />
               {pendingSalesCount > 0 && (
                 <span style={{
                   position: 'absolute',
-                  top: '-3px',
-                  right: '-3px',
-                  backgroundColor: '#e11d48',
+                  top: '-2px',
+                  right: '-2px',
+                  backgroundColor: '#f43f5e',
                   color: '#fff',
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                   fontWeight: 700,
                   width: '16px',
                   height: '16px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: '0 0 8px rgba(244, 63, 94, 0.6)'
                 }}>
                   {pendingSalesCount}
                 </span>
@@ -43,7 +44,17 @@ export const Navbar = ({ currentTabTitle }) => {
         )}
 
         {/* Logged in User Profile Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-surface)', padding: '5px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px', 
+          background: 'rgba(16, 18, 26, 0.85)', 
+          padding: '4px 14px 4px 6px', 
+          borderRadius: '9999px', 
+          border: '1px solid rgba(255, 255, 255, 0.09)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+          backdropFilter: 'blur(10px)'
+        }}>
           <div className="avatar-circle">
             <User size={14} />
           </div>
@@ -51,7 +62,7 @@ export const Navbar = ({ currentTabTitle }) => {
             <div style={{ fontSize: '0.82rem', fontWeight: 600, lineHeight: 1.1, color: 'var(--text-primary)' }}>
               {currentUser?.name || 'User'}
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 500 }}>
+            <div style={{ fontSize: '0.71rem', color: 'var(--accent)', fontWeight: 500 }}>
               {currentUser?.role}
             </div>
           </div>
