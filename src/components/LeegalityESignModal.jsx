@@ -34,7 +34,11 @@ import {
   FileSignature,
   Eye,
   UserCheck,
-  Shield
+  Shield,
+  Menu,
+  RefreshCw,
+  Users,
+  PenTool
 } from 'lucide-react';
 import { HarshalParmarESign } from './HarshalParmarESign';
 
@@ -556,6 +560,9 @@ export const LeegalityESignModal = ({
   // Step 3 state
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
+  const [showViewInviteesModal, setShowViewInviteesModal] = useState(false);
+  const [isSendingDoc, setIsSendingDoc] = useState(false);
+  const [isDocSent, setIsDocSent] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -624,6 +631,9 @@ export const LeegalityESignModal = ({
         setDate1Iso(new Date().toISOString().split('T')[0]);
         setInviteSent(false);
         setIsCompleted(false);
+        setIsSendingDoc(false);
+        setIsDocSent(false);
+        setShowViewInviteesModal(false);
         setOtpInput('');
         setDocumentId('LEEG-' + Date.now().toString().slice(-8));
         setActiveDocTab('mitc');
@@ -772,11 +782,47 @@ export const LeegalityESignModal = ({
       : (primary.contact || phoneVal || emailVal);
 
     setActiveStep(3);
-    setIsSendingInvite(true);
+    showToast(`Step 3: Finalize — Review document and select Send to dispatch.`, 'info');
+  };
+
+  // Step 3: Send Document (User Request: "now send must be selected")
+  const handleSendDocument = () => {
+    const primary = invitees[0];
+    const signerName = primary?.name || clientName;
+    const phoneVal = (primary?.phone || (primary?.contact && !primary.contact.includes('@') ? primary.contact : '') || phone).trim();
+    const emailVal = (primary?.email || (primary?.contact && primary.contact.includes('@') ? primary.contact : '') || email).trim();
+    const displayContact = [phoneVal, emailVal].filter(Boolean).join(' & ');
+
+    setIsSendingDoc(true);
+    showToast(`Dispatching Leegality e-sign package to ${signerName} (${displayContact})...`, 'info');
+
     setTimeout(() => {
-      setIsSendingInvite(false);
-      setInviteSent(true);
-      showToast(`Leegality E-Sign package dispatched to ${primary.name} (${displayContact}).`, 'success');
+      setIsSendingDoc(false);
+      setIsDocSent(true);
+      setIsCompleted(true);
+
+      const signMetadata = {
+        documentId,
+        date1: date1,
+        signedAt: new Date().toISOString(),
+        signedBy: signerName,
+        pan: panNumber,
+        serviceName,
+        serviceTenure: tenure,
+        grossSales,
+        netSales,
+        gst,
+        iWantToSignDisabled: true, // Persist compliance flag
+        signers: invitees,
+        status: 'Sent & E-Signed'
+      };
+
+      completeESignProcess(sale.id, signMetadata);
+      showToast(`Leegality E-Sign package successfully sent to ${signerName}!`, 'success');
+
+      if (onComplete) {
+        onComplete(signMetadata);
+      }
     }, 1000);
   };
 
@@ -1952,219 +1998,400 @@ export const LeegalityESignModal = ({
           </div>
         )}
 
-        {/* ─── STEP 3: FINALIZE VIEW (DOCUMENT PREVIEW + AADHAAR OTP E-SIGN) ─── */}
+        {/* ─── STEP 3: FINALIZE VIEW (MATCHING EXACT LEEGALITY SCREENSHOT) ─── */}
         {activeStep === 3 && (
-          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-            <LeegalityDocumentPreview
-              activeDocTab={activeDocTab}
-              setActiveDocTab={setActiveDocTab}
-              tenure={tenure}
-              clientInfo={clientInfo}
-              clientName={invitees[0]?.name || clientName}
-              panNumber={panNumber}
-              phone={invitees[0]?.phone || invitees[0]?.contact || phone}
-              email={invitees[0]?.email || email}
-              serviceName={serviceName}
-              grossSales={grossSales}
-              netSales={netSales}
-              gst={gst}
-              date1={date1}
-              paymentDate={paymentDate}
-              isSignAffixed={true}
-              activeStep={activeStep}
-              isCompleted={isCompleted}
-              documentId={documentId}
-            />
-
-            {/* RIGHT COLUMN: STEP 3 FINALIZE SIGNING */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
+            
+            {/* Centered Document Wrapper matching Leegality Preview */}
             <div style={{
-              width: '380px',
-              backgroundColor: '#ffffff',
-              borderLeft: '1px solid #e2e8f0',
+              flex: 1,
+              width: '100%',
+              maxWidth: '860px',
+              margin: '18px auto 0 auto',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minHeight: 0,
+              padding: '0 20px'
             }}>
-              <div style={{ flex: 1, padding: '24px 22px', overflowY: 'auto' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                  <ShieldCheck size={20} color="#2b5c7d" />
-                  <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                    Finalize Digital E-Sign
-                  </h3>
+              {/* Tab Header Bar above document */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                padding: '0 2px'
+              }}>
+                {/* Left Blue Tab: "Preview" */}
+                <div style={{
+                  backgroundColor: '#2b5c7d', // Exact Leegality dark slate blue
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  padding: '7px 24px',
+                  borderRadius: '4px 4px 0 0',
+                  userSelect: 'none'
+                }}>
+                  Preview
                 </div>
 
-                {!isCompleted ? (
-                  <form onSubmit={handleFinalizeSigning}>
-                    <div style={{
-                      padding: '14px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      marginBottom: '16px',
-                      fontSize: '0.76rem',
-                      color: '#475569',
-                      lineHeight: 1.5
-                    }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-                        Leegality Aadhaar ESP Gateway (Live)
-                      </div>
-                      An authenticated Aadhaar OTP e-sign request for <strong>{tenure}</strong> tenure has been dispatched to:
-                      <div style={{ marginTop: '6px', fontWeight: 600, color: '#0f172a' }}>
-                        • Signer: {invitees[0]?.name || clientName}<br />
-                        • Phone: {invitees[0]?.phone || invitees[0]?.contact || phone}<br />
-                        • Email: {invitees[0]?.email || email}
-                      </div>
-                      <div style={{ marginTop: '6px', fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>
-                        ✓ Harshal Parmar signature pre-stamped
-                      </div>
-                    </div>
-
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px' }}>
-                        Enter Aadhaar OTP (Demo: 123456) *
-                      </label>
-                      <input
-                        type="text"
-                        value={otpInput}
-                        onChange={(e) => setOtpInput(e.target.value)}
-                        placeholder="123456"
-                        maxLength={6}
-                        autoFocus
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          fontSize: '1.05rem',
-                          letterSpacing: '4px',
-                          textAlign: 'center',
-                          border: '1px solid #2b5c7d',
-                          borderRadius: '4px',
-                          fontWeight: 700,
-                          backgroundColor: '#f8fafc'
-                        }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isVerifyingOtp}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        backgroundColor: '#10b981',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontWeight: 600,
-                        fontSize: '0.84rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
-                      }}
-                    >
-                      {isVerifyingOtp ? 'Verifying OTP & Affixing Signature...' : 'Confirm & Affix Digital Signature'}
-                    </button>
-                  </form>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                    <div style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '50%',
-                      backgroundColor: '#dcfce7',
-                      color: '#166534',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 12px auto'
-                    }}>
-                      <CheckCircle2 size={26} />
-                    </div>
-                    <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#166534', fontWeight: 700 }}>
-                      Agreement E-Signed!
-                    </h4>
-                    <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
-                      MITC and Contract document sealed with Leegality cryptographic audit certificate for <strong>{tenure}</strong> tenure. Auto-synced to Dedicated E-Sign Block.
-                    </p>
-
-                    <div style={{
-                      padding: '10px 12px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '6px',
-                      fontSize: '0.74rem',
-                      color: '#475569',
-                      textAlign: 'left',
-                      marginBottom: '16px',
-                      lineHeight: 1.5
-                    }}>
-                      <div>• <strong>Document ID:</strong> <code>{documentId}</code></div>
-                      <div>• <strong>Signer:</strong> {invitees[0]?.name || clientName}</div>
-                      <div>• <strong>Service Tenure:</strong> {tenure}</div>
-                      <div>• <strong>Creator Self-Sign:</strong> Disabled (InvestEQ omitted)</div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      style={{
-                        width: '100%',
-                        padding: '9px 14px',
-                        backgroundColor: '#2b5c7d',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        fontWeight: 600,
-                        fontSize: '0.84rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Return to CRM Dashboard
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Back Button */}
-              <div style={{
-                padding: '14px 18px',
-                borderTop: '1px solid #e2e8f0',
-                backgroundColor: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(2)}
+                {/* Right Menu Icon */}
+                <div 
+                  title="Document Menu"
                   style={{
-                    padding: '6px 14px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: '#64748b',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
+                    color: '#475569',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    display: 'flex',
+                    alignItems: 'center'
                   }}
                 >
-                  Back to Invitees
-                </button>
+                  <Menu size={18} />
+                </div>
+              </div>
+
+              {/* White Document Paper Frame */}
+              <div style={{
+                flex: 1,
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0 4px 4px 4px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                overflowY: 'auto',
+                padding: '36px 44px',
+                fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
+              }}>
+                {/* Top bullet text matching user screenshot */}
+                <div style={{ fontSize: '0.84rem', color: '#1e293b', marginBottom: '14px', lineHeight: 1.5 }}>
+                  • do not have any other material conflict of interest.
+                </div>
+
+                {/* Signature will display here placeholder box matching screenshot */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 18px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '4px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '4px',
+                    backgroundColor: '#e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#475569'
+                  }}>
+                    <FileSignature size={18} />
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.3, fontWeight: 500 }}>
+                    <div>Signature will</div>
+                    <div>display here</div>
+                  </div>
+                </div>
+
+                {/* Page indicator text matching screenshot */}
+                <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500, margin: '14px 0 16px 0' }}>
+                  Page 8 of 14
+                </div>
+
+                {/* Points 7 through 11 matching screenshot */}
+                <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.65, textAlign: 'justify' }}>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    7. Harshal Parmar or its associates are not affiliated with any other intermediaries or have received any brokerage or commission from any third party.
+                  </p>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    8. Harshal Parmar or its associates have not received any compensation from the Company covered by Research Analyst during the past twelve months.
+                  </p>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    9. Harshal Parmar or its associates have not managed or co-managed public offering of securities of the Company during the past twelve months.
+                  </p>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    10. Harshal Parmar or its associates has not served as an officer, director or employee of the Company and has not been engaged in the market making activity of the Company.
+                  </p>
+                  <p style={{ margin: '0 0 12px 0' }}>
+                    11. Harshal Parmar have ensured that the facts mentioned in the research report are taken from the reliable source and information. However, the investors are advised to independently evaluate the market conditions/ risks involved before making the investment decision.
+                  </p>
+                </div>
+
+                {/* Interlinked Signatures Notice */}
+                <div style={{
+                  marginTop: '28px',
+                  paddingTop: '18px',
+                  borderTop: '1px dashed #cbd5e1',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '20px'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                      Signer 1 (SEBI Research Analyst):
+                    </div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a' }}>
+                      Mr Harshal Parmar
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 600, marginTop: '3px' }}>
+                      ✓ Digitally Pre-Stamped (SEBI INH000002099)
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1, textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
+                      Signer 2 (Client Invitee):
+                    </div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a' }}>
+                      {invitees[0]?.name || clientName}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, marginTop: '2px' }}>
+                      {invitees[0]?.phone || phone} • {invitees[0]?.email || email}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                      Aadhaar E-Sign target via UIDAI ESP
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ─── BOTTOM FOOTER BAR (MATCHING USER SCREENSHOT: Back, View Invitees, Send) ─── */}
+            <div style={{
+              padding: '16px 36px',
+              borderTop: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '14px',
+              marginTop: '16px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveStep(2)}
+                style={{
+                  padding: '8px 24px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  color: '#475569',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Back
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowViewInviteesModal(true)}
+                style={{
+                  padding: '8px 20px',
+                  backgroundColor: '#2b5c7d', // Exact Leegality dark slate blue
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(43, 92, 125, 0.25)'
+                }}
+              >
+                View Invitees
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSendDocument}
+                disabled={isSendingDoc}
+                style={{
+                  padding: '8px 30px',
+                  backgroundColor: '#2b5c7d', // Exact Leegality dark slate blue
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: isSendingDoc ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(43, 92, 125, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {isSendingDoc ? (
+                  <>
+                    <RefreshCw size={14} className="spin" /> Sending...
+                  </>
+                ) : (
+                  'Send'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL: DOCUMENT SENT SUCCESS ─── */}
+        {isDocSent && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1700,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            backdropFilter: 'blur(3px)'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '28px 28px 24px 28px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              textAlign: 'center',
+              fontFamily: "'Inter', sans-serif"
+            }}>
+              <div style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '50%',
+                backgroundColor: '#dcfce7',
+                color: '#16a34a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px auto'
+              }}>
+                <CheckCircle2 size={32} />
+              </div>
+
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
+                Document Sent Successfully!
+              </h3>
+
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.82rem', color: '#475569', lineHeight: 1.5 }}>
+                The Leegality e-sign package has been dispatched to all invitees for Aadhaar verification.
+              </p>
+
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                padding: '14px 18px',
+                textAlign: 'left',
+                fontSize: '0.8rem',
+                color: '#334155',
+                lineHeight: 1.6,
+                marginBottom: '20px'
+              }}>
+                <div>• <strong>Document ID:</strong> <code>{documentId}</code></div>
+                <div>• <strong>Signer:</strong> {invitees[0]?.name || clientName}</div>
+                <div>• <strong>Dispatched To:</strong> {invitees[0]?.phone || phone} (SMS) & {invitees[0]?.email || email} (Email)</div>
+                <div>• <strong>Service Tenure:</strong> {tenure}</div>
+                <div>• <strong>Dedicated E-Sign Block:</strong> <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Auto-Synced & Recorded</span></div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button
                   type="button"
                   onClick={onClose}
                   style={{
-                    padding: '6px 14px',
-                    backgroundColor: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
+                    flex: 1,
+                    padding: '10px 18px',
+                    backgroundColor: '#2b5c7d',
+                    color: '#ffffff',
+                    border: 'none',
                     borderRadius: '4px',
-                    color: '#475569',
+                    fontSize: '0.86rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(43, 92, 125, 0.3)'
+                  }}
+                >
+                  Close & View in CRM
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL: VIEW INVITEES (MATCHING STEP 3 BUTTON) ─── */}
+        {showViewInviteesModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1700,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '22px 24px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+              fontFamily: "'Inter', sans-serif"
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+                  Document Invitees ({invitees.length})
+                </h4>
+                <button
+                  onClick={() => setShowViewInviteesModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {invitees.map((inv, idx) => (
+                  <div key={inv.id || idx} style={{
+                    padding: '12px 14px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    color: '#334155'
+                  }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                      {idx + 1}. {inv.name || clientName} ({inv.role || 'Signer'})
+                    </div>
+                    <div style={{ color: '#475569', lineHeight: 1.5 }}>
+                      • <strong>Email:</strong> {inv.email || email || 'None'}<br />
+                      • <strong>Phone:</strong> {inv.phone || phone || 'None'}<br />
+                      • <strong>Signature Type:</strong> {inv.signatureType || 'Aadhaar E-Sign (OTP)'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: '20px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowViewInviteesModal(false)}
+                  style={{
+                    padding: '7px 20px',
+                    backgroundColor: '#2b5c7d',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
                     fontSize: '0.82rem',
                     fontWeight: 600,
                     cursor: 'pointer'
                   }}
                 >
-                  Close
+                  Back to Preview
                 </button>
               </div>
             </div>
