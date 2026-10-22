@@ -14,7 +14,8 @@ import {
   FileSignature, 
   Paperclip,
   FastForward,
-  Bot
+  Bot,
+  Sparkles
 } from 'lucide-react';
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
@@ -36,6 +37,7 @@ export const SaleApprovalWorkflow = () => {
   const [selectedReviewSale, setSelectedReviewSale] = useState(null);
   const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
   const [selectedESignSale, setSelectedESignSale] = useState(null);
+  const [isAutoRunMode, setIsAutoRunMode] = useState(false);
 
   const [newSale, setNewSale] = useState({
     clientName: '',
@@ -272,13 +274,37 @@ export const SaleApprovalWorkflow = () => {
                       </td>
                       <td>
                         {isReadyForESign ? (
-                          <button
-                            className="btn-primary"
-                            style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#10b981', gap: '4px' }}
-                            onClick={() => setSelectedESignSale(s)}
-                          >
-                            <FileSignature size={12} /> Execute E-Sign
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <button
+                              className="btn-primary"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.74rem',
+                                background: '#10b981',
+                                gap: '5px',
+                                fontWeight: 700,
+                                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                              }}
+                              onClick={() => {
+                                setSelectedESignSale(s);
+                                setIsAutoRunMode(true);
+                              }}
+                              title="Single-click execution: Auto-read Client Info, Date stamp, Affix E-signs & timestamps, and Dispatch via Leegality API"
+                            >
+                              <Sparkles size={12} /> ⚡ 1-Click E-Sign
+                            </button>
+                            <button
+                              className="btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.74rem' }}
+                              onClick={() => {
+                                setSelectedESignSale(s);
+                                setIsAutoRunMode(false);
+                              }}
+                              title="Manual Step-by-Step Leegality Inspector"
+                            >
+                              Manual
+                            </button>
+                          </div>
                         ) : isESigned ? (
                           <button
                             className="btn-secondary"
@@ -372,7 +398,11 @@ export const SaleApprovalWorkflow = () => {
       <LeegalityESignModal
         isOpen={!!selectedESignSale}
         sale={selectedESignSale}
-        onClose={() => setSelectedESignSale(null)}
+        autoRun={isAutoRunMode}
+        onClose={() => {
+          setSelectedESignSale(null);
+          setIsAutoRunMode(false);
+        }}
       />
     </div>
   );

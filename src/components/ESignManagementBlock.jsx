@@ -24,7 +24,8 @@ import {
   Layers,
   ArrowRight,
   Send,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 
 export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
@@ -59,7 +60,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
 
   // Pending sales ready for e-sign
   const pendingESignSales = sales.filter(s =>
-    s.status.includes('Ready for E-Sign') ||
+    s.status?.includes('Ready for E-Sign') ||
     s.stage === 'Ready for E-Sign' ||
     s.eSignStatus === 'Ready'
   );
@@ -368,37 +369,64 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
         {/* Pending E-Sign Alert Banner if any */}
         {pendingESignSales.length > 0 && (
           <div style={{
-            padding: '10px 20px',
-            backgroundColor: 'rgba(2, 132, 199, 0.12)',
-            borderBottom: '1px solid rgba(2, 132, 199, 0.25)',
+            padding: '12px 20px',
+            backgroundColor: 'rgba(2, 132, 199, 0.14)',
+            borderBottom: '1px solid rgba(2, 132, 199, 0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            fontSize: '0.78rem',
-            color: '#38bdf8'
+            fontSize: '0.8rem',
+            color: '#38bdf8',
+            flexWrap: 'wrap',
+            gap: '12px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clock size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Clock size={16} />
               <span>
-                <strong>{pendingESignSales.length} sale{pendingESignSales.length > 1 ? 's' : ''}</strong> currently awaiting final E-Sign execution.
+                <strong>{pendingESignSales.length} sale{pendingESignSales.length > 1 ? 's' : ''}</strong> currently awaiting final E-Sign execution:{' '}
+                <span style={{ color: '#ffffff', fontWeight: 600 }}>
+                  {pendingESignSales.map(s => s.clientName).join(', ')}
+                </span>
               </span>
             </div>
             {onOpenLeegalityModal && (
-              <button
-                onClick={() => onOpenLeegalityModal(pendingESignSales[0])}
-                style={{
-                  padding: '4px 10px',
-                  backgroundColor: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  fontSize: '0.74rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Launch Leegality Session
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={() => onOpenLeegalityModal(pendingESignSales[0], true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
+                  }}
+                  title="Executes template document access, auto-reads client info, sets date, affixes Harshal Parmar signature & timestamps, and dispatches via Leegality API in 1 click"
+                >
+                  <Zap size={14} /> ⚡ 1-Click Auto Execute Leegality ({pendingESignSales[0].clientName})
+                </button>
+                <button
+                  onClick={() => onOpenLeegalityModal(pendingESignSales[0], false)}
+                  style={{
+                    padding: '6px 12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    color: '#e2e8f0',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '6px',
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Manual Inspector
+                </button>
+              </div>
             )}
           </div>
         )}

@@ -518,7 +518,8 @@ export const LeegalityESignModal = ({
   isOpen,
   onClose,
   sale = null,
-  onComplete = null
+  onComplete = null,
+  autoRun = false
 }) => {
   const { currentUser, leads, completeESignProcess, leegalityConfig, updateLeegalityConfig } = useCRM();
   const { showToast } = useToast();
@@ -575,6 +576,11 @@ export const LeegalityESignModal = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [documentId, setDocumentId] = useState('');
 
+  // ─── 1-CLICK AUTOMATED EXECUTION PIPELINE STATE ──────────────────────────
+  const [isAutoRunning, setIsAutoRunning] = useState(false);
+  const [autoProgressPhase, setAutoProgressPhase] = useState(0); // 0: Idle, 1: Step 1 (Doc & Date), 2: Step 2 (Client Info Auto-read), 3: Step 3 (Signatures & Timestamps), 4: Complete
+  const autoRunTimerRef = useRef([]);
+
   // Extract client & sale info strictly from the Client Information Page previously filled
   const matchingLead = (leads || []).find(l => 
     (sale?.leadId && l.id === sale.leadId) ||
@@ -628,6 +634,17 @@ export const LeegalityESignModal = ({
 
   const modalInitializedRef = useRef(null);
 
+  const clearAutoRunTimers = () => {
+    if (autoRunTimerRef.current && autoRunTimerRef.current.length > 0) {
+      autoRunTimerRef.current.forEach(t => clearTimeout(t));
+      autoRunTimerRef.current = [];
+    }
+  };
+
+  useEffect(() => {
+    return () => clearAutoRunTimers();
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       if (modalInitializedRef.current !== sale?.id) {
@@ -669,10 +686,11 @@ export const LeegalityESignModal = ({
       }
     } else {
       modalInitializedRef.current = null;
+      setIsAutoRunning(false);
+      setAutoProgressPhase(0);
+      clearAutoRunTimers();
     }
   }, [isOpen, sale?.id, clientName, phone, email]);
-
-  if (!isOpen || !sale) return null;
 
   const handleDateIsoChange = (e) => {
     const val = e.target.value;
@@ -684,6 +702,117 @@ export const LeegalityESignModal = ({
       }
     }
   };
+
+  // ─── 1-CLICK AUTOMATED EXECUTION PIPELINE ─────────────────────────────────
+  // User Requirement:
+  // 1. Access document present inside Leegality (Templates: MITC / SEBI Agreement)
+  // 2. Add the date when it is being done (auto-stamped into Date 1)
+  // 3. Name, Phone number, and Email filled as per Client Information Page (auto read)
+  // 4. "I want to sign this document" disabled, "Enter both" selected
+  // 5. Proceed further where E-signatures and time stamps are added
+  // 6. All happens in a single click!
+  const handleStartAutoRun = () => {
+    clearAutoRunTimers();
+    setIsAutoRunning(true);
+    setAutoProgressPhase(1);
+
+    // ── Phase 1: Access Document present inside Leegality (Step 1) & Set Execution Date
+    setActiveStep(1);
+    setActiveTab('Templates');
+    const dynamicDate = getDynamicDateFormatted();
+    setDate1(dynamicDate);
+    setDate1Iso(new Date().toISOString().split('T')[0]);
+    setCheckboxOptions({ option1: true, option2: true, option3: true });
+
+    showToast(`⚡ 1-Click Auto-Execution [Step 1]: Document accessed & execution date stamped (${dynamicDate})`, 'info');
+
+    // ── Phase 2 (after 750ms): Auto-read Name, Phone, Email from Client Info Page & activate Enter Both
+    const t1 = setTimeout(() => {
+      setAutoProgressPhase(2);
+      setActiveStep(2);
+      setRequestFixedOrder(false);
+      setIWantToSign(false); // MUST BE DISABLED as per screenshot 1
+      setPreviewLegacyInvestEQ(false);
+
+      const targetInvitees = [
+        {
+          id: 'inv-client-1',
+          name: clientName,
+          phone: phone,
+          email: email,
+          contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+          enterBoth: true, // "once disabled, 'enter both' must be selected"
+          signatureType: 'Aadhaar E-Sign (OTP)',
+          role: 'Signer'
+        }
+      ];
+      setInvitees(targetInvitees);
+
+      showToast(`⚡ 1-Click Auto-Execution [Step 2]: Client Information auto-read (${clientName} • ${phone} • ${email}) with 'Enter both' active & 'I want to sign' disabled!`, 'info');
+
+      // ── Phase 3 (after 750ms): Proceed further where E-signatures and time stamps are added
+      const t2 = setTimeout(() => {
+        setAutoProgressPhase(3);
+        setActiveStep(3);
+        setIsSignAffixed(true);
+
+        showToast(`⚡ 1-Click Auto-Execution [Step 3]: E-Signatures & official SEBI timestamps affixed onto document!`, 'info');
+
+        // ── Phase 4 (after 800ms): Dispatch via Leegality API v2.1
+        const t3 = setTimeout(async () => {
+          setAutoProgressPhase(4);
+          try {
+            await handleSendDocument(targetInvitees, dynamicDate);
+            setIsAutoRunning(false);
+            showToast(`⚡ 1-Click Execution Complete! E-Signed agreement certified and recorded in Dedicated E-Sign Block.`, 'success');
+          } catch (err) {
+            setIsAutoRunning(false);
+            showToast(`Leegality dispatch notice: ${err.message}`, 'error');
+          }
+        }, 850);
+        autoRunTimerRef.current.push(t3);
+
+      }, 850);
+      autoRunTimerRef.current.push(t2);
+
+    }, 850);
+    autoRunTimerRef.current.push(t1);
+  };
+
+  const handleInstantComplete = async () => {
+    clearAutoRunTimers();
+    setIsAutoRunning(false);
+    setAutoProgressPhase(4);
+    setActiveStep(3);
+    const dynamicDate = getDynamicDateFormatted();
+    setDate1(dynamicDate);
+    setIWantToSign(false);
+    setIsSignAffixed(true);
+    const targetInvitees = [
+      {
+        id: 'inv-client-1',
+        name: clientName,
+        phone: phone,
+        email: email,
+        contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+        enterBoth: true,
+        signatureType: 'Aadhaar E-Sign (OTP)',
+        role: 'Signer'
+      }
+    ];
+    setInvitees(targetInvitees);
+    await handleSendDocument(targetInvitees, dynamicDate);
+  };
+
+  // Auto-trigger if modal opened with autoRun=true
+  useEffect(() => {
+    if (isOpen && autoRun && !isCompleted && !isDocSent) {
+      const timer = setTimeout(() => {
+        handleStartAutoRun();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, autoRun, sale?.id]);
 
   // Step 1: Create Document -> Moves to Step 2 (Invite)
   const handleCreateDocument = () => {
@@ -793,8 +922,10 @@ export const LeegalityESignModal = ({
   };
 
   // Step 3: Send Document via Live Leegality API Integration
-  const handleSendDocument = async () => {
-    const primary = invitees[0];
+  const handleSendDocument = async (customInvitees = null, customDate1 = null) => {
+    const activeInvitees = (customInvitees && customInvitees.length > 0) ? customInvitees : invitees;
+    const activeDate1 = customDate1 || date1;
+    const primary = activeInvitees[0] || {};
     const signerName = primary?.name || clientName;
     const phoneVal = (primary?.phone || (primary?.contact && !primary.contact.includes('@') ? primary.contact : '') || phone).trim();
     const emailVal = (primary?.email || (primary?.contact && primary.contact.includes('@') ? primary.contact : '') || email).trim();
@@ -806,9 +937,9 @@ export const LeegalityESignModal = ({
     try {
       const apiResult = await dispatchLeegalitySignRequest({
         sale,
-        invitees,
+        invitees: activeInvitees,
         tenure,
-        date1
+        date1: activeDate1
       });
 
       const actualDocId = apiResult.data.documentId || documentId;
@@ -817,7 +948,7 @@ export const LeegalityESignModal = ({
 
       const signMetadata = {
         documentId: actualDocId,
-        date1: date1,
+        date1: activeDate1,
         signedAt: new Date().toISOString(),
         signedBy: signerName,
         pan: panNumber,
@@ -827,7 +958,7 @@ export const LeegalityESignModal = ({
         netSales,
         gst,
         iWantToSignDisabled: true, // Persist compliance flag
-        signers: invitees,
+        signers: activeInvitees,
         status: 'Sent & E-Signed',
         authTokenMasked: apiResult.data.authTokenMasked,
         webhookMac: apiResult.data.webhookMac,
@@ -845,6 +976,7 @@ export const LeegalityESignModal = ({
       if (onComplete) {
         onComplete(signMetadata);
       }
+      return signMetadata;
     } catch (err) {
       setIsSendingDoc(false);
       showToast(`Leegality API Error: ${err.message}`, 'error');
@@ -899,6 +1031,8 @@ export const LeegalityESignModal = ({
     alignItems: 'center',
     justifyContent: 'center'
   };
+
+  if (!isOpen || !sale) return null;
 
   return (
     <div 
@@ -1086,6 +1220,32 @@ export const LeegalityESignModal = ({
               <span>API: {maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')}</span>
             </div>
 
+            {/* ⚡ 1-Click Auto Execute Header Button */}
+            <button
+              type="button"
+              onClick={handleStartAutoRun}
+              disabled={isAutoRunning || isDocSent || isCompleted}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 14px',
+                backgroundColor: isAutoRunning ? '#64748b' : '#10b981',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '0.76rem',
+                fontWeight: 700,
+                cursor: isAutoRunning ? 'not-allowed' : 'pointer',
+                boxShadow: isAutoRunning ? 'none' : '0 2px 8px rgba(16, 185, 129, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+              title="Execute full Leegality journey in a single click: Document access, date stamping, client info auto-read with 'Enter both', E-signatures & timestamps, and API dispatch"
+            >
+              <Sparkles size={13} />
+              {isAutoRunning ? '⚡ Running 1-Click Flow...' : '⚡ 1-Click Auto Execute'}
+            </button>
+
             {activeStep === 1 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', fontWeight: 500 }}>
                 <span 
@@ -1132,6 +1292,68 @@ export const LeegalityESignModal = ({
           </div>
         </div>
 
+        {/* ─── 1-CLICK PIPELINE LIVE STATUS BANNER ─── */}
+        {isAutoRunning && (
+          <div style={{
+            backgroundColor: '#0f172a',
+            borderBottom: '2px solid #0284c7',
+            padding: '10px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: '#ffffff'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#0284c7',
+                color: '#ffffff',
+                padding: '3px 10px',
+                borderRadius: '20px',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                letterSpacing: '0.3px'
+              }}>
+                <Sparkles size={12} /> 1-CLICK PIPELINE ACTIVE
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#e2e8f0', fontWeight: 500 }}>
+                {autoProgressPhase === 1 && (
+                  <span><strong>Step 1:</strong> Accessing Leegality template document & stamping execution date (<strong>{date1}</strong>)...</span>
+                )}
+                {autoProgressPhase === 2 && (
+                  <span><strong>Step 2:</strong> Auto-reading Client Info (<strong>{clientName}</strong> • <strong>{phone}</strong> • <strong>{email}</strong>) with 'Enter both' active & 'I want to sign' disabled...</span>
+                )}
+                {autoProgressPhase === 3 && (
+                  <span><strong>Step 3:</strong> Affixing Harshal Parmar DSC E-Sign, Client Aadhaar E-Signature & live timestamps...</span>
+                )}
+                {autoProgressPhase === 4 && (
+                  <span><strong>Step 4:</strong> Dispatched via Leegality API v2.1! 1 Credit consumed • Saved to Dedicated E-Sign Block.</span>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleInstantComplete}
+                style={{
+                  padding: '4px 12px',
+                  backgroundColor: 'rgba(2, 132, 199, 0.25)',
+                  border: '1px solid #38bdf8',
+                  color: '#38bdf8',
+                  borderRadius: '4px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                ⚡ Skip Animation (Instant)
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ─── STEP 1: CREATE VIEW (SPLIT: PREVIEW VS FORM FIELDS) ─── */}
         {activeStep === 1 && (
           <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
@@ -1165,9 +1387,54 @@ export const LeegalityESignModal = ({
               flexDirection: 'column'
             }}>
               <div style={{ flex: 1, padding: '22px 20px', overflowY: 'auto' }}>
-                <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 16px 0' }}>
+                <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 14px 0' }}>
                   Template Form Fields
                 </h3>
+
+                {/* 1-Click Execution Quick Action Banner */}
+                <div style={{
+                  backgroundColor: '#f0f9ff',
+                  border: '1.5px solid #0284c7',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <Sparkles size={14} color="#0284c7" />
+                      <strong style={{ fontSize: '0.8rem', color: '#0369a1' }}>Single-Click Full Execution</strong>
+                    </div>
+                    <div style={{ fontSize: '0.71rem', color: '#475569', lineHeight: 1.35 }}>
+                      Date stamped ➔ Client Info auto-read ('Enter both') ➔ E-signatures & timestamps ➔ Dispatched via API.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStartAutoRun}
+                    disabled={isAutoRunning || isDocSent || isCompleted}
+                    style={{
+                      padding: '6px 14px',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: isAutoRunning ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      flexShrink: 0,
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                    }}
+                  >
+                    <Sparkles size={12} /> 1-Click Run
+                  </button>
+                </div>
 
                 {/* Date 1 Field */}
                 <div style={{ marginBottom: '18px' }}>
@@ -2125,34 +2392,77 @@ export const LeegalityESignModal = ({
                   • do not have any other material conflict of interest.
                 </div>
 
-                {/* Signature will display here placeholder box matching screenshot */}
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 18px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  marginBottom: '16px'
-                }}>
+                {/* Signature will display here / Affixed E-Signature & Timestamp Box */}
+                {(isSignAffixed || isDocSent || isCompleted || isAutoRunning) ? (
                   <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '4px',
-                    backgroundColor: '#e2e8f0',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#475569'
+                    gap: '14px',
+                    padding: '10px 18px',
+                    backgroundColor: isDocSent || isCompleted ? 'rgba(16, 185, 129, 0.08)' : 'rgba(2, 132, 199, 0.06)',
+                    border: isDocSent || isCompleted ? '1.5px solid #10b981' : '1.5px solid #0284c7',
+                    borderRadius: '6px',
+                    marginBottom: '16px',
+                    boxShadow: isDocSent || isCompleted ? '0 0 12px rgba(16, 185, 129, 0.2)' : '0 0 10px rgba(2, 132, 199, 0.15)'
                   }}>
-                    <FileSignature size={18} />
+                    <div style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '6px',
+                      backgroundColor: isDocSent || isCompleted ? '#ecfdf5' : '#e0f2fe',
+                      color: isDocSent || isCompleted ? '#059669' : '#0284c7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <ShieldCheck size={22} />
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: '#0f172a', lineHeight: 1.4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong style={{ color: isDocSent || isCompleted ? '#059669' : '#0284c7', fontSize: '0.82rem' }}>
+                          ✓ Aadhaar E-Signature & Time Stamp Affixed
+                        </strong>
+                        <span style={{ fontSize: '0.64rem', backgroundColor: '#dcfce7', padding: '1px 5px', borderRadius: '3px', color: '#166534', fontWeight: 700 }}>
+                          UIDAI OTP
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 600, color: '#334155' }}>
+                        Signer: {invitees[0]?.name || clientName} ({invitees[0]?.phone || phone})
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        Time Stamp: <strong>{date1} {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} IST</strong> • Leegality Ref: <strong>{documentId || 'LEEG-LIVE'}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.3, fontWeight: 500 }}>
-                    <div>Signature will</div>
-                    <div>display here</div>
+                ) : (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px 18px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '4px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '4px',
+                      backgroundColor: '#e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569'
+                    }}>
+                      <FileSignature size={18} />
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.3, fontWeight: 500 }}>
+                      <div>Signature will</div>
+                      <div>display here</div>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Page indicator text matching screenshot */}
                 <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 500, margin: '14px 0 16px 0' }}>

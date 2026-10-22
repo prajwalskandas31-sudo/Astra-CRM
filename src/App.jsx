@@ -60,6 +60,7 @@ const AppContent = () => {
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
   const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
   const [globalESignSale, setGlobalESignSale] = useState(null);
+  const [globalESignAutoRun, setGlobalESignAutoRun] = useState(false);
 
   // Enforce permission-based tab guards: user roles do not inherently restrict availability
   React.useEffect(() => {
@@ -129,7 +130,14 @@ const AppContent = () => {
       case 'sale-approvals':
         return <SaleApprovalWorkflow />;
       case 'esign-block':
-        return <ESignManagementBlock onOpenLeegalityModal={(sale) => setGlobalESignSale(sale)} />;
+        return (
+          <ESignManagementBlock
+            onOpenLeegalityModal={(sale, autoRun = false) => {
+              setGlobalESignSale(sale);
+              setGlobalESignAutoRun(!!autoRun);
+            }}
+          />
+        );
       case 'lead-reassignment':
         return <LeadReassignmentView />;
       case 'system-settings':
@@ -150,7 +158,10 @@ const AppContent = () => {
         <Navbar 
           currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} 
           onOpenReviewModal={(sale) => setGlobalReviewSale(sale)}
-          onOpenESignModal={(sale) => setGlobalESignSale(sale)}
+          onOpenESignModal={(sale, autoRun = false) => {
+            setGlobalESignSale(sale);
+            setGlobalESignAutoRun(!!autoRun);
+          }}
         />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
@@ -165,7 +176,10 @@ const AppContent = () => {
         sale={globalReviewSale}
         onClose={() => setGlobalReviewSale(null)}
         onExecuteVoiceCall={(sale) => setGlobalVoiceSale(sale)}
-        onSkipVoiceCall={(sale) => setGlobalESignSale(sale)}
+        onSkipVoiceCall={(sale) => {
+          setGlobalESignSale(sale);
+          setGlobalESignAutoRun(false);
+        }}
       />
 
       {/* Global Automated Voice Agent Verification Modal */}
@@ -173,14 +187,21 @@ const AppContent = () => {
         isOpen={!!globalVoiceSale}
         sale={globalVoiceSale}
         onClose={() => setGlobalVoiceSale(null)}
-        onProceedToESign={(sale) => setGlobalESignSale(sale)}
+        onProceedToESign={(sale) => {
+          setGlobalESignSale(sale);
+          setGlobalESignAutoRun(true);
+        }}
       />
 
       {/* Global Leegality E-Sign Execution Modal */}
       <LeegalityESignModal
         isOpen={!!globalESignSale}
         sale={globalESignSale}
-        onClose={() => setGlobalESignSale(null)}
+        autoRun={globalESignAutoRun}
+        onClose={() => {
+          setGlobalESignSale(null);
+          setGlobalESignAutoRun(false);
+        }}
       />
     </div>
   );
