@@ -169,10 +169,29 @@ const DEFAULT_LEADS = [
     assigned_user_id: 'usr-1',
     assignedToName: 'Srinivas R',
     sourceFileName: 'Master_Enterprise_Records.xlsx',
-    disposition: 'New Lead',
+    disposition: 'Ready for E-Sign',
     dispositionScheduledAt: '',
-    value: '₹5,00,000',
-    history: [{ date: '2026-10-22', text: 'Uploaded & assigned with default disposition [New Lead].' }]
+    value: '₹75,000',
+    clientInfoSubmitted: true,
+    clientInfo: {
+      clientPrefix: 'Mr.',
+      clientName: 'Vikramaditya Rao',
+      firmName: 'Apex Capital Hub',
+      panNumber: 'ABCDE1234F',
+      clientCategory: 'Individual',
+      email: 'vikram.rao@apexcapital.in',
+      phone1: '+91 98451 98210',
+      phone2: '',
+      serviceName: 'Nifty & BankNifty Options Alpha',
+      serviceTenure: '6 months',
+      grossSales: '75000',
+      netSales: '63559.32',
+      gst: '11440.68',
+      transactionNumbers: ['TXN-8841920'],
+      clientState: 'Karnataka',
+      paymentDate: '2026-10-22'
+    },
+    history: [{ date: '2026-10-22', text: 'Client Information Page filled and approved. Ready for Leegality E-Sign.' }]
   },
   {
     id: 'LD-102',
@@ -230,7 +249,54 @@ export const isPaidOrConvertedDisposition = (name) => {
   return s.includes('paid') || s.includes('converted');
 };
 
-const DEFAULT_SALES = [];
+const DEFAULT_SALES = [
+  {
+    id: 'SL-8841',
+    date: '2026-10-22',
+    clientName: 'Vikramaditya Rao',
+    contactPerson: 'Vikramaditya Rao',
+    amount: '₹75,000',
+    grossSales: '75000',
+    netSales: '63559.32',
+    gst: '11440.68',
+    employeeName: 'Srinivas R',
+    submittedByUserId: 'usr-1',
+    leadId: 'LD-101',
+    panNumber: 'ABCDE1234F',
+    serviceOpted: 'Nifty & BankNifty Options Alpha',
+    serviceTenure: '6 months',
+    transactionNumbers: ['TXN-8841920'],
+    clientCategory: 'Individual',
+    clientState: 'Karnataka',
+    phone1: '+91 98451 98210',
+    phone2: '',
+    email: 'vikram.rao@apexcapital.in',
+    mitcStatus: 'Verified',
+    complianceStatus: 'Compliant',
+    status: 'Verified (Ready for E-Sign)',
+    stage: 'Ready for E-Sign',
+    voiceCallStatus: 'Completed / Verified',
+    eSignStatus: 'Ready',
+    fullClientInfo: {
+      clientPrefix: 'Mr.',
+      clientName: 'Vikramaditya Rao',
+      firmName: 'Apex Capital Hub',
+      panNumber: 'ABCDE1234F',
+      clientCategory: 'Individual',
+      email: 'vikram.rao@apexcapital.in',
+      phone1: '+91 98451 98210',
+      phone2: '',
+      serviceName: 'Nifty & BankNifty Options Alpha',
+      serviceTenure: '6 months',
+      grossSales: '75000',
+      netSales: '63559.32',
+      gst: '11440.68',
+      transactionNumbers: ['TXN-8841920'],
+      clientState: 'Karnataka',
+      paymentDate: '2026-10-22'
+    }
+  }
+];
 
 const DEFAULT_CUSTOM_ROLES = [
   { id: 'cr-1', roleName: 'Senior Regional Manager', level: 'Level 1 (Top)', accessScope: 'Regional' },

@@ -561,24 +561,55 @@ export const LeegalityESignModal = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [documentId, setDocumentId] = useState('');
 
-  // Extract client & sale info
-  const clientInfo = sale?.fullClientInfo || sale?.clientInfo || {};
-  const matchingLead = (leads || []).find(l => l.id === sale?.leadId);
-  const clientName = clientInfo.clientName || sale?.clientName || 'Client';
-  const panNumber = sale?.panNumber || clientInfo.panNumber || 'ABCDE1234F';
-  const phone = sale?.phone1 || clientInfo.phone1 || '+91 98765 43210';
-  const email = sale?.email || clientInfo.email || 'client@example.com';
-  const serviceName = sale?.serviceOpted || clientInfo.serviceName || 'Equity Advisory';
+  // Extract client & sale info strictly from the Client Information Page previously filled
+  const matchingLead = (leads || []).find(l => 
+    (sale?.leadId && l.id === sale.leadId) ||
+    (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
+    (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
+  );
+
+  const clientInfo = sale?.fullClientInfo 
+    || sale?.clientInfo 
+    || matchingLead?.clientInfo 
+    || {};
+
+  // Exact Name taken from Client Information Page
+  const clientName = clientInfo.clientName 
+    || (clientInfo.clientPrefix && clientInfo.clientName ? `${clientInfo.clientPrefix} ${clientInfo.clientName}` : '')
+    || clientInfo.fullName 
+    || clientInfo.companyName 
+    || sale?.clientName 
+    || sale?.contactPerson 
+    || matchingLead?.contactPerson 
+    || matchingLead?.clientName 
+    || 'Client Name';
+
+  // Exact Email taken from Client Information Page
+  const email = clientInfo.email 
+    || sale?.email 
+    || matchingLead?.email 
+    || '';
+
+  // Exact Phone number taken from Client Information Page
+  const phone = clientInfo.phone1 
+    || clientInfo.phone 
+    || sale?.phone1 
+    || sale?.phone 
+    || matchingLead?.phone 
+    || '';
+
+  const panNumber = clientInfo.panNumber || sale?.panNumber || 'ABCDE1234F';
+  const serviceName = clientInfo.serviceName || sale?.serviceOpted || 'Equity Advisory';
   
-  const tenure = sale?.serviceTenure 
-    || clientInfo.serviceTenure 
+  const tenure = clientInfo.serviceTenure 
+    || sale?.serviceTenure 
     || matchingLead?.clientInfo?.serviceTenure 
     || '3 months';
 
-  const grossSales = sale?.amount || ('₹' + (sale?.grossSales || '50,000'));
-  const rawGrossNum = parseFloat(String(sale?.grossSales || (sale?.amount ? String(sale.amount).replace(/[^0-9.]/g, '') : '50000'))) || 50000;
-  const netSales = sale?.netSales || clientInfo.netSales || (rawGrossNum / 1.18).toFixed(2);
-  const gst = sale?.gst || clientInfo.gst || (rawGrossNum - parseFloat(netSales)).toFixed(2);
+  const grossSales = sale?.amount || ('₹' + (clientInfo.grossSales || sale?.grossSales || '50,000'));
+  const rawGrossNum = parseFloat(String(clientInfo.grossSales || sale?.grossSales || (sale?.amount ? String(sale.amount).replace(/[^0-9.]/g, '') : '50000'))) || 50000;
+  const netSales = clientInfo.netSales || sale?.netSales || (rawGrossNum / 1.18).toFixed(2);
+  const gst = clientInfo.gst || sale?.gst || (rawGrossNum - parseFloat(netSales)).toFixed(2);
   const paymentDate = clientInfo.paymentDate || sale?.date || date1;
 
   useEffect(() => {
@@ -600,20 +631,22 @@ export const LeegalityESignModal = ({
       setRequestFixedOrder(false);
       setIWantToSign(false); // MUST BE DISABLED
       setPreviewLegacyInvestEQ(false);
+
+      // Pre-fill Name, Phone number, and Email strictly from the Client Information Page
       setInvitees([
         {
           id: 'inv-client-1',
           name: clientName,
           phone: phone,
           email: email,
-          contact: phone || email,
-          enterBoth: true, // User Requirement: once disabled, "enter both" must be selected
+          contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+          enterBoth: true, // "once disabled, 'enter both' must be selected"
           signatureType: 'Aadhaar E-Sign (OTP)',
           role: 'Signer'
         }
       ]);
     }
-  }, [isOpen, sale]);
+  }, [isOpen, sale, clientName, phone, email]);
 
   if (!isOpen || !sale) return null;
 
@@ -1529,102 +1562,33 @@ export const LeegalityESignModal = ({
                     </div>
                   </div>
 
-                  {/* Form Inputs (Name, Phone number, Email) — Supports "Enter both" vs single field */}
+                  {/* Form Inputs (Name, Email, Phone number) — Pixel-Perfect match to Leegality screenshot */}
                   {inv.enterBoth ? (
                     <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                            Name
-                          </label>
-                          <input
-                            type="text"
-                            value={inv.name}
-                            onChange={(e) => handleUpdateInvitee(inv.id, 'name', e.target.value)}
-                            placeholder="Full Name"
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              fontSize: '0.86rem',
-                              backgroundColor: '#f1f5f9',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              color: '#0f172a',
-                              fontWeight: 500
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                            Phone number
-                          </label>
-                          <input
-                            type="text"
-                            value={inv.phone || (inv.contact && !inv.contact.includes('@') ? inv.contact : '')}
-                            onChange={(e) => handleUpdateInvitee(inv.id, 'phone', e.target.value)}
-                            placeholder="e.g. 9845198210"
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              fontSize: '0.86rem',
-                              backgroundColor: '#f1f5f9',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              color: '#0f172a',
-                              fontWeight: 500
-                            }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={inv.email || (inv.contact && inv.contact.includes('@') ? inv.contact : '')}
-                            onChange={(e) => handleUpdateInvitee(inv.id, 'email', e.target.value)}
-                            placeholder="e.g. client@example.com"
-                            style={{
-                              width: '100%',
-                              padding: '9px 12px',
-                              fontSize: '0.86rem',
-                              backgroundColor: '#f1f5f9',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              color: '#0f172a',
-                              fontWeight: 500
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* "Enter either" link when Enter both is selected */}
-                      <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateInvitee(inv.id, 'enterBoth', false)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#0284c7',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            padding: 0
-                          }}
-                        >
-                          Enter either
-                        </button>
-                        <span style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Check size={12} /> "Enter both" selected: SMS & Email verification active
+                      {/* Sync Indicator */}
+                      <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          backgroundColor: '#ecfdf5',
+                          color: '#059669',
+                          border: '1px solid #a7f3d0',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <Check size={12} /> Pre-filled from Client Information Page (Name, Email, Phone)
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          Two-factor Aadhaar OTP will be dispatched to both Email & SMS
                         </span>
                       </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+                      {/* 2-Column Layout matching screenshot */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'flex-start' }}>
+                        {/* Left Column: Name */}
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
                             Name
@@ -1638,7 +1602,102 @@ export const LeegalityESignModal = ({
                               width: '100%',
                               padding: '9px 12px',
                               fontSize: '0.86rem',
-                              backgroundColor: '#f1f5f9',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '4px',
+                              color: '#0f172a',
+                              fontWeight: 500
+                            }}
+                          />
+                        </div>
+
+                        {/* Right Column: Email, "Enter one of the fields", Phone */}
+                        <div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                              Email
+                            </label>
+                            <input
+                              type="email"
+                              value={inv.email}
+                              onChange={(e) => handleUpdateInvitee(inv.id, 'email', e.target.value)}
+                              placeholder="Email"
+                              style={{
+                                width: '100%',
+                                padding: '9px 12px',
+                                fontSize: '0.86rem',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                color: '#0f172a',
+                                fontWeight: 500
+                              }}
+                            />
+                          </div>
+
+                          {/* EXACT link from screenshot: "Enter one of the fields" */}
+                          <div style={{ marginTop: '5px', marginBottom: '14px' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleUpdateInvitee(inv.id, 'enterBoth', false);
+                                showToast('Switched to single Email/Phone field mode.', 'info');
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#0284c7',
+                                fontSize: '0.78rem',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                padding: 0
+                              }}
+                            >
+                              Enter one of the fields
+                            </button>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                              Phone
+                            </label>
+                            <input
+                              type="text"
+                              value={inv.phone}
+                              onChange={(e) => handleUpdateInvitee(inv.id, 'phone', e.target.value)}
+                              placeholder="Phone number"
+                              style={{
+                                width: '100%',
+                                padding: '9px 12px',
+                                fontSize: '0.86rem',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                color: '#0f172a',
+                                fontWeight: 500
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'flex-start' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                            Name
+                          </label>
+                          <input
+                            type="text"
+                            value={inv.name}
+                            onChange={(e) => handleUpdateInvitee(inv.id, 'name', e.target.value)}
+                            placeholder="Name"
+                            style={{
+                              width: '100%',
+                              padding: '9px 12px',
+                              fontSize: '0.86rem',
+                              backgroundColor: '#ffffff',
                               border: '1px solid #cbd5e1',
                               borderRadius: '4px',
                               color: '#0f172a',
@@ -1660,7 +1719,7 @@ export const LeegalityESignModal = ({
                               width: '100%',
                               padding: '9px 12px',
                               fontSize: '0.86rem',
-                              backgroundColor: '#f1f5f9',
+                              backgroundColor: '#ffffff',
                               border: '1px solid #cbd5e1',
                               borderRadius: '4px',
                               color: '#0f172a',
@@ -1674,7 +1733,7 @@ export const LeegalityESignModal = ({
                               type="button"
                               onClick={() => {
                                 handleUpdateInvitee(inv.id, 'enterBoth', true);
-                                showToast('"Enter both" selected! Both Phone number and Email are now active.', 'info');
+                                showToast('"Enter both" selected! Populating Name, Email, and Phone number from Client Information Page.', 'info');
                               }}
                               style={{
                                 background: 'none',
