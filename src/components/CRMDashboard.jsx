@@ -1,8 +1,28 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, isPaidOrConvertedDisposition } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { PhoneCall, PhoneOff, Sparkles, Tag, Calendar, UserCheck, Layers, Sliders, Send, Clock, X, Check, History } from 'lucide-react';
+import { 
+  PhoneCall, 
+  PhoneOff, 
+  Sparkles, 
+  Tag, 
+  Calendar, 
+  UserCheck, 
+  Layers, 
+  Sliders, 
+  Send, 
+  Clock, 
+  X, 
+  Check, 
+  History,
+  Lock,
+  ShieldCheck,
+  FileText,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
 import { LeadHistoryBlock } from './LeadHistoryBlock';
+import { ClientInformationModal } from './ClientInformationModal';
 
 export const CRMDashboard = () => {
   const { 
@@ -29,6 +49,12 @@ export const CRMDashboard = () => {
   const [timeHour, setTimeHour] = useState('10');
   const [timeMinute, setTimeMinute] = useState('00');
   const [timeAmPm, setTimeAmPm] = useState('AM');
+
+  // Client Information & Locked Selection States (Block 2 Core Requirement)
+  const [isSelectionLocked, setIsSelectionLocked] = useState(false);
+  const [showClientInfoModal, setShowClientInfoModal] = useState(false);
+  const [clientInfoLead, setClientInfoLead] = useState(null);
+  const [clientInfoCompleted, setClientInfoCompleted] = useState(false);
 
   // Manage Shortcuts & Request Leads Modals
   const [showManageShortcuts, setShowManageShortcuts] = useState(false);
@@ -91,6 +117,15 @@ export const CRMDashboard = () => {
       : (enabledDisps[0]?.name || '');
     setSelectedOutcomeDisp(initialDisp);
     
+    // Check if initial disposition is already Paid or Converted
+    if (isPaidOrConvertedDisposition(initialDisp)) {
+      setIsSelectionLocked(true);
+      setClientInfoCompleted(!!lead.clientInfoSubmitted);
+    } else {
+      setIsSelectionLocked(false);
+      setClientInfoCompleted(false);
+    }
+
     // Parse existing scheduled time if present
     if (lead.dispositionScheduledAt) {
       const parts = lead.dispositionScheduledAt.split(' ');
@@ -123,9 +158,63 @@ export const CRMDashboard = () => {
     setCallNotes('');
   };
 
+  // Outcome Selection with Automatic Locking & Client Information Launch
+  const handleSelectOutcomeDisp = (dispName) => {
+    // If selection is already locked to a Paid/Converted disposition, block changing to any other disposition
+    if (isSelectionLocked && selectedOutcomeDisp !== dispName) {
+      showToast(`Selection is locked to '${selectedOutcomeDisp}'. Changing disposition is prevented.`, 'warning');
+      return;
+    }
+
+    setSelectedOutcomeDisp(dispName);
+
+    // When an agent selects a "Paid" or "Converted" disposition:
+    if (isPaidOrConvertedDisposition(dispName)) {
+      setIsSelectionLocked(true);
+      setClientInfoLead(activeCallLead);
+      setShowClientInfoModal(true);
+      showToast(`'${dispName}' selected: Selection locked to prevent changes. Launching Client Information Page...`, 'info');
+    }
+  };
+
+  // Direct quick conversion trigger from leads table
+  const handleDirectConvertToPaid = (lead) => {
+    setActiveCallLead(lead);
+    setSelectedOutcomeDisp('Paid / Converted');
+    setIsSelectionLocked(true);
+    setClientInfoLead(lead);
+    setShowClientInfoModal(true);
+    showToast(`Launching Client Information Page for '${lead.contactPerson}' (Selection Locked: Paid / Converted).`, 'info');
+  };
+
+  // View Client Information for converted leads
+  const handleViewClientInfo = (lead) => {
+    setClientInfoLead(lead);
+    setSelectedOutcomeDisp(lead.disposition || 'Paid / Converted');
+    setShowClientInfoModal(true);
+  };
+
+  // Close post-call modal and clean up state
+  const handleClosePostCallModal = () => {
+    setActiveCallLead(null);
+    setIsSelectionLocked(false);
+    setClientInfoCompleted(false);
+    setCallNotes('');
+    setPostCallDate('');
+    setPostCallTime('');
+  };
+
   const handlePostCallSubmit = (e) => {
     e.preventDefault();
     if (!activeCallLead || !selectedOutcomeDisp) return;
+
+    // Strict Enforcement: If Paid or Converted, mandatory Client Information must be completed
+    if (isPaidOrConvertedDisposition(selectedOutcomeDisp) && !clientInfoCompleted && !activeCallLead.clientInfoSubmitted) {
+      showToast('Please submit the Client Information Page to finalize Paid / Converted disposition.', 'warning');
+      setClientInfoLead(activeCallLead);
+      setShowClientInfoModal(true);
+      return;
+    }
 
     const selectedOutcomeObj = dispositions.find(d => d.name === selectedOutcomeDisp);
     if (selectedOutcomeObj && !isShortcutEnabled(currentUser?.id, selectedOutcomeObj.id)) {
@@ -146,10 +235,7 @@ export const CRMDashboard = () => {
 
     updateLeadDisposition(activeCallLead.id, selectedOutcomeDisp, callNotes, formattedDateTime);
     showToast(`Lead '${activeCallLead.contactPerson}' updated to disposition [${selectedOutcomeDisp}].`, 'success');
-    setActiveCallLead(null);
-    setCallNotes('');
-    setPostCallDate('');
-    setPostCallTime('');
+    handleClosePostCallModal();
   };
 
   const handleLeadRequestSubmit = (e) => {
@@ -391,15 +477,45 @@ export const CRMDashboard = () => {
 
                     {/* 4. CURRENT DISPOSITION + Scheduled Date/Time directly underneath */}
                     <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <span className="badge badge-disposition" style={{ fontSize: '0.8rem' }}>
-                          <Tag size={11} /> {l.disposition || 'New Lead'}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}>
+                        <span 
+                          className="badge badge-disposition" 
+                          style={{ 
+                            fontSize: '0.8rem',
+                            backgroundColor: isPaidOrConvertedDisposition(l.disposition) ? 'rgba(16, 185, 129, 0.15)' : undefined,
+                            color: isPaidOrConvertedDisposition(l.disposition) ? '#10b981' : undefined,
+                            borderColor: isPaidOrConvertedDisposition(l.disposition) ? 'rgba(16, 185, 129, 0.35)' : undefined
+                          }}
+                        >
+                          {isPaidOrConvertedDisposition(l.disposition) ? <ShieldCheck size={11} color="#10b981" /> : <Tag size={11} />} {l.disposition || 'New Lead'}
                         </span>
+
+                        {/* View Client Info Button if converted or details submitted */}
+                        {(isPaidOrConvertedDisposition(l.disposition) || l.clientInfoSubmitted || l.clientInfo) && (
+                          <button
+                            type="button"
+                            onClick={() => handleViewClientInfo(l)}
+                            className="btn-secondary"
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: '#10b981',
+                              borderColor: 'rgba(16, 185, 129, 0.3)'
+                            }}
+                            title="View submitted client information form"
+                          >
+                            <FileText size={11} /> Client Info
+                          </button>
+                        )}
+
                         {l.dispositionScheduledAt && (
                           <div style={{
                             fontSize: '0.74rem',
                             color: 'var(--text-muted)',
-                            marginTop: '4px',
+                            marginTop: '2px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px'
@@ -412,13 +528,33 @@ export const CRMDashboard = () => {
 
                     {/* 5. POST CALL ACTION */}
                     <td>
-                      <button
-                        className="btn-primary"
-                        style={{ padding: '6px 14px', fontSize: '0.78rem' }}
-                        onClick={() => handleSimulateCallDisconnect(l)}
-                      >
-                        <PhoneOff size={13} /> Call Disconnect
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          className="btn-primary"
+                          style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                          onClick={() => handleSimulateCallDisconnect(l)}
+                        >
+                          <PhoneOff size={13} /> Call Disconnect
+                        </button>
+
+                        {!isPaidOrConvertedDisposition(l.disposition) && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{
+                              padding: '6px 10px',
+                              fontSize: '0.78rem',
+                              color: '#10b981',
+                              borderColor: 'rgba(16, 185, 129, 0.35)',
+                              background: 'rgba(16, 185, 129, 0.08)'
+                            }}
+                            onClick={() => handleDirectConvertToPaid(l)}
+                            title="Lock selection to Paid / Converted and open Client Information Page"
+                          >
+                            <Lock size={12} /> Convert to Paid
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -436,12 +572,12 @@ export const CRMDashboard = () => {
       {/* Post-Call Disconnect Modal */}
       {activeCallLead && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <PhoneCall size={18} color="var(--accent-primary)" /> Post-Call Outcome & Disposition
               </h3>
-              <button className="modal-close-btn" onClick={() => setActiveCallLead(null)}>×</button>
+              <button className="modal-close-btn" onClick={handleClosePostCallModal} title="Exit Workflow / Close">×</button>
             </div>
             <form onSubmit={handlePostCallSubmit}>
               <div className="modal-body">
@@ -449,17 +585,106 @@ export const CRMDashboard = () => {
                   Updating outcome for: <strong>{activeCallLead.contactPerson}</strong> ({activeCallLead.phone}) • Language: <strong>{activeCallLead.language || 'English'}</strong>
                 </div>
 
+                {/* Locked Selection Notification Banner */}
+                {isSelectionLocked && (
+                  <div style={{
+                    marginBottom: '16px',
+                    padding: '12px 16px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        background: 'rgba(16, 185, 129, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#10b981',
+                        flexShrink: 0
+                      }}>
+                        <Lock size={16} />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <strong style={{ fontSize: '0.84rem', color: '#10b981' }}>Selection Locked: {selectedOutcomeDisp}</strong>
+                        </div>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          {clientInfoCompleted 
+                            ? '✓ Mandatory Client Information submitted.' 
+                            : 'Selection is locked to prevent changes. Complete mandatory client details to proceed.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => {
+                          setClientInfoLead(activeCallLead);
+                          setShowClientInfoModal(true);
+                        }}
+                        style={{
+                          fontSize: '0.76rem',
+                          padding: '6px 12px',
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          borderColor: '#10b981',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                        }}
+                        title="Open Client Information Page"
+                      >
+                        <FileText size={12} /> {clientInfoCompleted ? 'Review Client Form' : 'Launch Client Page'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => {
+                          setIsSelectionLocked(false);
+                          setClientInfoCompleted(false);
+                          setSelectedOutcomeDisp('Interested');
+                          showToast('Selection unlocked. Exited client conversion workflow.', 'info');
+                        }}
+                        style={{ fontSize: '0.74rem', padding: '6px 10px' }}
+                        title="Unlock disposition selection to select another outcome"
+                      >
+                        Unlock
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="form-group" style={{ marginBottom: '16px' }}>
-                  <label style={{ fontWeight: 600 }}>Select Disposition Outcome:</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontWeight: 600, margin: 0 }}>Select Disposition Outcome:</label>
+                    {isSelectionLocked && (
+                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Lock size={11} /> Locked to prevent changes
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                     {visibleDispositions.map(d => {
                       const isSelected = selectedOutcomeDisp === d.name;
+                      const isButtonLocked = isSelectionLocked && !isSelected;
 
                       return (
                         <button
                           key={d.id}
                           type="button"
-                          onClick={() => setSelectedOutcomeDisp(d.name)}
+                          disabled={isButtonLocked}
+                          onClick={() => handleSelectOutcomeDisp(d.name)}
                           style={{
                             padding: '9px 12px',
                             borderRadius: 'var(--radius-md)',
@@ -469,18 +694,24 @@ export const CRMDashboard = () => {
                             fontWeight: isSelected ? 600 : 400,
                             textAlign: 'left',
                             fontSize: '0.82rem',
-                            cursor: 'pointer',
+                            cursor: isButtonLocked ? 'not-allowed' : 'pointer',
+                            opacity: isButtonLocked ? 0.45 : 1,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '6px',
                             transition: 'all 0.15s ease'
                           }}
-                          title={d.name}
+                          title={isButtonLocked ? `Selection is locked to '${selectedOutcomeDisp}'` : d.name}
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Tag size={12} /> {d.name}
                           </span>
+                          {isSelected && isSelectionLocked && isPaidOrConvertedDisposition(selectedOutcomeDisp) && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#10b981', fontSize: '0.72rem', fontWeight: 700 }}>
+                              <Lock size={12} /> Locked
+                            </span>
+                          )}
                           {d.requiresDateTimePicker && (
                             <Calendar size={12} color="var(--warning-color, #f59e0b)" title="Requires Date & Time Picker" />
                           )}
@@ -614,7 +845,7 @@ export const CRMDashboard = () => {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setActiveCallLead(null)}>Cancel</button>
+                <button type="button" className="btn-secondary" onClick={handleClosePostCallModal}>Cancel</button>
                 <button 
                   type="submit" 
                   className="btn-primary"
@@ -793,6 +1024,27 @@ export const CRMDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* CLIENT INFORMATION PAGE MODAL (BLOCK 2 MANDATORY WORKFLOW)  */}
+      {/* ============================================================ */}
+      <ClientInformationModal
+        isOpen={showClientInfoModal}
+        lead={clientInfoLead || activeCallLead}
+        dispositionName={selectedOutcomeDisp || 'Paid / Converted'}
+        onClose={() => setShowClientInfoModal(false)}
+        onSuccess={(submittedData) => {
+          setClientInfoCompleted(true);
+          if (activeCallLead) {
+            setActiveCallLead(prev => ({
+              ...prev,
+              disposition: selectedOutcomeDisp || 'Paid / Converted',
+              clientInfo: submittedData,
+              clientInfoSubmitted: true
+            }));
+          }
+        }}
+      />
     </div>
   );
 };

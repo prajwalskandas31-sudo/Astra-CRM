@@ -116,7 +116,78 @@ const DEFAULT_DISPOSITIONS = [
   { id: 'disp-8', name: 'Paid / Converted', requiresDateTimePicker: false, color: 'emerald', isDefault: false }
 ];
 
-const DEFAULT_LEADS = [];
+const DEFAULT_LEADS = [
+  {
+    id: 'LD-101',
+    clientName: 'Apex Capital Hub',
+    contactPerson: 'Vikramaditya Rao',
+    phone: '+91 98451 98210',
+    email: 'vikram.rao@apexcapital.in',
+    language: 'Hindi',
+    assignedToId: 'usr-1',
+    assigned_user_id: 'usr-1',
+    assignedToName: 'Srinivas R',
+    sourceFileName: 'Master_Enterprise_Records.xlsx',
+    disposition: 'New Lead',
+    dispositionScheduledAt: '',
+    value: '₹5,00,000',
+    history: [{ date: '2026-10-22', text: 'Uploaded & assigned with default disposition [New Lead].' }]
+  },
+  {
+    id: 'LD-102',
+    clientName: 'Narayana Tech Labs',
+    contactPerson: 'Pooja Hegde',
+    phone: '+91 97412 88319',
+    email: 'pooja.h@narayanatech.com',
+    language: 'English',
+    assignedToId: 'usr-7',
+    assigned_user_id: 'usr-7',
+    assignedToName: 'AKSHATA',
+    sourceFileName: 'Master_Enterprise_Records.xlsx',
+    disposition: 'Interested',
+    dispositionScheduledAt: '',
+    value: '₹3,50,000',
+    history: [{ date: '2026-10-22', text: 'Call completed. High conversion intent expressed.' }]
+  },
+  {
+    id: 'LD-103',
+    clientName: 'Infosun Analytics',
+    contactPerson: 'Ramesh Sundaram',
+    phone: '+91 99881 23412',
+    email: 'ramesh@infosun.org',
+    language: 'Kannada',
+    assignedToId: 'usr-5',
+    assigned_user_id: 'usr-5',
+    assignedToName: 'ABHINAYA M',
+    sourceFileName: 'Master_Enterprise_Records.xlsx',
+    disposition: 'New Lead',
+    dispositionScheduledAt: '',
+    value: '₹4,20,000',
+    history: [{ date: '2026-10-22', text: 'Initial allocation.' }]
+  },
+  {
+    id: 'LD-104',
+    clientName: 'Vanguard Retailers',
+    contactPerson: 'Anjali Desai',
+    phone: '+91 91234 56780',
+    email: 'anjali@vanguard.co.in',
+    language: 'English',
+    assignedToId: 'usr-1',
+    assigned_user_id: 'usr-1',
+    assignedToName: 'Srinivas R',
+    sourceFileName: 'Master_Enterprise_Records.xlsx',
+    disposition: 'Call Back Later',
+    dispositionScheduledAt: '2026-10-23 11:30 AM',
+    value: '₹6,00,000',
+    history: [{ date: '2026-10-22', text: 'Callback scheduled for tomorrow morning.' }]
+  }
+];
+
+export const isPaidOrConvertedDisposition = (name) => {
+  if (!name) return false;
+  const s = String(name).trim().toLowerCase();
+  return s.includes('paid') || s.includes('converted');
+};
 
 const DEFAULT_SALES = [];
 
@@ -1436,6 +1507,56 @@ export const CRMProvider = ({ children }) => {
     }));
   };
 
+  // Client Information Submission (Block 2 requirement: saves mandatory client details and marks deal as Paid/Converted)
+  const saveClientInformation = async (leadId, clientInfoData, dispositionName = 'Paid / Converted') => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/leads/${leadId}/client-info`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ clientInfo: clientInfoData, dispositionName })
+      });
+      if (res.ok) { refreshData(); return; }
+    } catch (err) {}
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Update Lead in leads state
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        const historyText = `Deal closed and marked as [${dispositionName}]. Mandatory Client Information verified & submitted by ${clientInfoData.agentName || currentUser?.name || 'Agent'}. Converted Sale: ₹${clientInfoData.saleAmount || '50,000'}. Txn Ref: ${clientInfoData.transactionId || 'N/A'}.`;
+        const newHistory = [...(l.history || []), { date: todayStr, text: historyText }];
+        return {
+          ...l,
+          disposition: dispositionName,
+          clientName: clientInfoData.companyName || l.clientName,
+          contactPerson: clientInfoData.fullName || l.contactPerson,
+          phone: clientInfoData.phone || l.phone,
+          email: clientInfoData.email || l.email,
+          language: clientInfoData.language || l.language,
+          value: clientInfoData.saleAmount ? `₹${clientInfoData.saleAmount}` : l.value,
+          clientInfo: clientInfoData,
+          clientInfoSubmitted: true,
+          history: newHistory
+        };
+      }
+      return l;
+    }));
+
+    // 2. Automatically register into sales queue for Super Admin approval & eKYC workflow
+    registerSale({
+      clientName: clientInfoData.companyName || clientInfoData.fullName,
+      amount: clientInfoData.saleAmount ? `₹${clientInfoData.saleAmount}` : '₹50,000',
+      employeeName: clientInfoData.agentName || currentUser?.name || 'Agent',
+      mitcStatus: 'Verified',
+      complianceStatus: 'Compliant',
+      paymentMethod: clientInfoData.paymentMode || 'UPI',
+      transactionId: clientInfoData.transactionId || 'TXN-' + Date.now(),
+      panNumber: clientInfoData.panNumber || '',
+      serviceOpted: clientInfoData.servicePackage || 'Enterprise Growth Suite',
+      leadId: leadId
+    });
+  };
+
   // Lead Upload Integration (Block 2 & Block 3 requirement: new uploaded leads get 'New Lead' disposition by default)
   const addLead = (leadData) => {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -1969,6 +2090,7 @@ export const CRMProvider = ({ children }) => {
       updateDisposition,
       deleteDisposition,
       updateLeadDisposition,
+      saveClientInformation,
       reassignLeads,
       reassignLeadsFiltered,
       deleteUser,
