@@ -6,7 +6,8 @@ import {
   AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, 
   Tag, Lock, Unlock, KeyRound, Eye, EyeOff, X, ExternalLink, FileSignature,
   FileSpreadsheet, CreditCard, Bot, Copy, CheckCheck, HelpCircle, ChevronDown, 
-  ChevronRight, ArrowLeft, Power, Zap, Send, Settings as SettingsIcon
+  ChevronRight, ArrowLeft, Power, Zap, Send, Settings as SettingsIcon,
+  Building2, CheckCircle2
 } from 'lucide-react';
 import { computeHmacSha1, maskToken } from '../services/leegalityService';
 import Demo from './ui/demo';
