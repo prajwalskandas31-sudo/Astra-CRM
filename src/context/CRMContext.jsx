@@ -116,6 +116,47 @@ const DEFAULT_DISPOSITIONS = [
   { id: 'disp-8', name: 'Paid / Converted', requiresDateTimePicker: false, color: 'emerald', isDefault: false }
 ];
 
+export const DEFAULT_SERVICES = [
+  { id: 'srv-1', name: 'Equity Cash & Intraday Pro', description: 'Real-time NSE cash market intraday calls with strict risk-reward' },
+  { id: 'srv-2', name: 'Nifty & BankNifty Options Alpha', description: 'Index weekly & monthly option strategies under SEBI RA guidelines' },
+  { id: 'srv-3', name: 'Commodity Gold & Silver Super', description: 'Precious metals and base metals breakout research' },
+  { id: 'srv-4', name: 'HNI Momentum Wealth Portfolio', description: 'High net-worth delivery & positional momentum stocks' },
+  { id: 'srv-5', name: 'Index Special Delivery Advise', description: 'Positional index holding strategies with structured hedging' }
+];
+
+export const DEFAULT_VOICE_AGENT_SETTINGS = {
+  enabled: true,
+  botName: 'Astra AI Compliance Voice Bot',
+  autoTrigger: true,
+  provider: 'Leegality Voice API',
+  voiceLanguage: 'English / Hindi',
+  questions: [
+    { id: 'q1', text: 'Hello, this is Astra CRM Automated Compliance Verification. Am I speaking with the client?' },
+    { id: 'q2', text: 'Do you confirm subscribing to research services with full understanding of market risk disclosures?' },
+    { id: 'q3', text: 'Do you confirm paying the subscription fee directly via valid banking channels?' },
+    { id: 'q4', text: 'Do you consent to proceed to the Leegality digital e-sign of the terms and conditions agreement?' }
+  ]
+};
+
+export const DEFAULT_FINANCIAL_SETTINGS = {
+  maxGrossSales: 200000,
+  adminOverridePassword: 'admin123',
+  cDivisorFactor: 1.18,
+  cDivisorPassword: 'admin123'
+};
+
+export const DEFAULT_NOTIFICATIONS = [
+  {
+    id: 'notif-1',
+    title: 'sCRM Platform 2.4.0 Active',
+    message: 'System loaded with Client Information Page, Voice Agent Verification & Leegality E-Sign API integration.',
+    timestamp: 'Today',
+    read: false,
+    type: 'system'
+  }
+];
+
+
 const DEFAULT_LEADS = [
   {
     id: 'LD-101',
@@ -752,6 +793,71 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_master_records', JSON.stringify(masterRecords));
   }, [masterRecords]);
+
+  // ─── Services Master (Super Admin Managed) ──────────────────────────────
+  const [services, setServices] = useState(() => {
+    const saved = localStorage.getItem('crm_services');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_SERVICES;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_services', JSON.stringify(services));
+  }, [services]);
+
+  // ─── Voice Agent Settings ────────────────────────────────────────────────
+  const [voiceAgentSettings, setVoiceAgentSettings] = useState(() => {
+    const saved = localStorage.getItem('crm_voice_agent_settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_VOICE_AGENT_SETTINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_voice_agent_settings', JSON.stringify(voiceAgentSettings));
+  }, [voiceAgentSettings]);
+
+  // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
+  const [financialSettings, setFinancialSettings] = useState(() => {
+    const saved = localStorage.getItem('crm_financial_settings');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_FINANCIAL_SETTINGS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_financial_settings', JSON.stringify(financialSettings));
+  }, [financialSettings]);
+
+  // ─── Persistent System Notifications (Notification Bar) ─────────────────
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem('crm_notifications');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return DEFAULT_NOTIFICATIONS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -1898,6 +2004,320 @@ export const CRMProvider = ({ children }) => {
     setSales(prev => prev.map(s => s.id === saleId ? { ...s, status: 'Rejected by Super Admin', stage: 'Rejected' } : s));
   };
 
+  // ─── Services Master CRUD ──────────────────────────────────────────────
+  const addService = (serviceData) => {
+    const newService = {
+      id: 'srv-' + Date.now(),
+      name: (serviceData.name || '').trim(),
+      description: (serviceData.description || '').trim()
+    };
+    setServices(prev => [...prev, newService]);
+    return newService;
+  };
+
+  const updateService = (id, updatedFields) => {
+    setServices(prev => prev.map(s => s.id === id ? { ...s, ...updatedFields } : s));
+  };
+
+  const deleteService = (id) => {
+    setServices(prev => prev.filter(s => s.id !== id));
+  };
+
+  // ─── Voice Agent & Financial Settings Mutators ──────────────────────────
+  const updateVoiceAgentSettings = (updated) => {
+    setVoiceAgentSettings(prev => ({ ...prev, ...updated }));
+  };
+
+  const updateFinancialSettings = (updated) => {
+    setFinancialSettings(prev => ({ ...prev, ...updated }));
+  };
+
+  // ─── Notification Bar Management ────────────────────────────────────────
+  const addNotification = ({
+    title,
+    message,
+    type = 'info',
+    actionType = null,
+    actionPayload = null,
+    targetUserId = null,
+    targetRole = null
+  }) => {
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newNotif = {
+      id: 'notif-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      title,
+      message,
+      type, // 'info', 'success', 'warning', 'review', 'system'
+      timestamp: nowTime,
+      read: false,
+      actionType,
+      actionPayload,
+      targetUserId,
+      targetRole
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+    return newNotif;
+  };
+
+  const markNotificationRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const dismissNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  // ─── Duplicate Checking for Phone Number 2 ──────────────────────────────
+  const checkDuplicatePhone2 = (phone2, currentLeadId = null) => {
+    if (!phone2 || String(phone2).trim() === '') return { isDuplicate: false };
+    const cleanP2 = String(phone2).replace(/[^0-9]/g, '');
+    if (cleanP2.length < 5) return { isDuplicate: false };
+
+    const match = (leads || []).find(l => {
+      if (currentLeadId && l.id === currentLeadId) return false;
+      const lPhone1 = String(l.phone || '').replace(/[^0-9]/g, '');
+      const lPhone2 = String(l.clientInfo?.phone2 || l.phone2 || '').replace(/[^0-9]/g, '');
+      return (lPhone1 && lPhone1.slice(-10) === cleanP2.slice(-10)) ||
+             (lPhone2 && lPhone2.slice(-10) === cleanP2.slice(-10));
+    });
+
+    if (match) {
+      const originalOwner = users.find(u => u.id === match.assignedToId) || {
+        name: match.assignedToName || 'Original Lead Owner',
+        id: match.assignedToId
+      };
+
+      // Alert the original lead owner per specification
+      addNotification({
+        title: 'Lead Owner Alert: Duplicate Phone Detected',
+        message: `Secondary phone number (${phone2}) entered for another client matches your assigned lead '${match.contactPerson || match.clientName}'.`,
+        type: 'warning',
+        targetUserId: originalOwner?.id,
+        actionPayload: { leadId: match.id }
+      });
+
+      return {
+        isDuplicate: true,
+        matchedLead: match,
+        originalOwner
+      };
+    }
+    return { isDuplicate: false };
+  };
+
+  // ─── Client Information Submission & Review Trigger ─────────────────────
+  const submitClientInformationReview = async (leadId, clientInfoData, transactionAttachments = []) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayDateObj = new Date();
+    const formattedDate = `${String(todayDateObj.getDate()).padStart(2, '0')}/${String(todayDateObj.getMonth() + 1).padStart(2, '0')}/${todayDateObj.getFullYear()}`;
+
+    // 1. Update lead record
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. Sent to Super Admin for Review.`;
+        return {
+          ...l,
+          disposition: 'Under Review by Super Admin',
+          clientName: clientInfoData.firmName || clientInfoData.clientName || l.clientName,
+          contactPerson: clientInfoData.clientName || l.contactPerson,
+          phone: clientInfoData.phone1 || l.phone,
+          email: clientInfoData.email || l.email,
+          value: clientInfoData.grossSales ? `₹${Number(clientInfoData.grossSales).toLocaleString('en-IN')}` : l.value,
+          clientInfo: {
+            ...clientInfoData,
+            transactionAttachments,
+            submissionDate: todayStr,
+            eSignDate: formattedDate
+          },
+          clientInfoSubmitted: true,
+          history: [...(l.history || []), { date: todayStr, text: historyText }]
+        };
+      }
+      return l;
+    }));
+
+    // 2. Register sale record in pending state
+    const newSale = {
+      id: 'SL-' + Math.floor(1000 + Math.random() * 9000),
+      date: todayStr,
+      clientName: clientInfoData.firmName || clientInfoData.clientName,
+      contactPerson: clientInfoData.clientName,
+      amount: `₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')}`,
+      grossSales: clientInfoData.grossSales,
+      netSales: clientInfoData.netSales,
+      gst: clientInfoData.gst,
+      employeeName: currentUser?.name || 'Executive',
+      submittedByUserId: currentUser?.id || 'usr-5',
+      leadId: leadId,
+      panNumber: clientInfoData.panNumber,
+      serviceOpted: clientInfoData.serviceName,
+      serviceTenure: clientInfoData.serviceTenure,
+      transactionNumbers: clientInfoData.transactionNumbers || [clientInfoData.transactionId],
+      transactionAttachments: transactionAttachments,
+      clientCategory: clientInfoData.clientCategory,
+      clientState: clientInfoData.clientState,
+      phone1: clientInfoData.phone1,
+      phone2: clientInfoData.phone2 || '',
+      email: clientInfoData.email,
+      mitcStatus: 'Verified',
+      complianceStatus: 'Compliant',
+      status: 'Pending Super Admin Review',
+      stage: 'Under Review by Super Admin',
+      voiceCallStatus: 'Pending Super Admin Decision',
+      eSignStatus: 'Not Started',
+      fullClientInfo: clientInfoData
+    };
+
+    setSales(prev => [newSale, ...prev.filter(s => s.leadId !== leadId)]);
+
+    // 3. Trigger approval email notification to Super Admin
+    addNotification({
+      title: 'Review Required: New Sale Submission',
+      message: `${currentUser?.name || 'Executive'} submitted sale for '${clientInfoData.clientName}' (Gross: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')}) with ${transactionAttachments.length} transaction attachment(s).`,
+      type: 'review',
+      actionType: 'review_sale',
+      actionPayload: { saleId: newSale.id, leadId: leadId },
+      targetRole: 'Super Admin'
+    });
+
+    return newSale;
+  };
+
+  // ─── Super Admin Approval Workflow (Voice Call / Skip) ──────────────────
+  const superAdminApproveSale = (saleId, { executeVoiceCall = true } = {}) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Automated notification back to submitting user stating: "Super admin has approved your sale."
+    addNotification({
+      title: 'Sale Approved',
+      message: 'Super admin has approved your sale.',
+      type: 'success',
+      targetUserId: sale.submittedByUserId,
+      actionPayload: { saleId }
+    });
+
+    if (executeVoiceCall) {
+      // Moves to automated voice call verification stage
+      setSales(prev => prev.map(s => s.id === saleId ? {
+        ...s,
+        status: 'Super Admin Approved (Voice Call Pending)',
+        stage: 'Voice Verification In Progress',
+        voiceCallStatus: 'Calling Client...'
+      } : s));
+
+      if (sale.leadId) {
+        setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+          ...l,
+          disposition: 'Voice Verification In Progress',
+          history: [...(l.history || []), { date: todayStr, text: 'Sale approved by Super Admin. Automated Voice Agent verification initiated.' }]
+        } : l));
+      }
+    } else {
+      // Skipped by Super Admin -> moves directly to E-Sign step
+      setSales(prev => prev.map(s => s.id === saleId ? {
+        ...s,
+        status: 'Super Admin Approved (Voice Skipped)',
+        stage: 'Ready for E-Sign',
+        voiceCallStatus: 'Skipped by Super Admin',
+        eSignStatus: 'Ready'
+      } : s));
+
+      if (sale.leadId) {
+        setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+          ...l,
+          disposition: 'Ready for E-Sign',
+          history: [...(l.history || []), { date: todayStr, text: 'Sale approved by Super Admin. Voice verification skipped by Super Admin. Direct move to Leegality E-Sign.' }]
+        } : l));
+      }
+
+      addNotification({
+        title: 'Ready for E-Sign',
+        message: `Voice call skipped by Super Admin for ${sale.clientName}. Kindly proceed to E-Sign.`,
+        type: 'info',
+        targetUserId: sale.submittedByUserId,
+        actionType: 'proceed_to_esign',
+        actionPayload: { saleId, leadId: sale.leadId }
+      });
+    }
+  };
+
+  // ─── Automated Voice Call Completion ────────────────────────────────────
+  const completeVoiceCallVerification = (saleId) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    setSales(prev => prev.map(s => s.id === saleId ? {
+      ...s,
+      status: 'Verified (Ready for E-Sign)',
+      stage: 'Verification Completed',
+      voiceCallStatus: 'Completed / Verified',
+      eSignStatus: 'Ready'
+    } : s));
+
+    if (sale.leadId) {
+      setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+        ...l,
+        disposition: 'Ready for E-Sign',
+        history: [...(l.history || []), { date: todayStr, text: 'Automated Voice Agent verification completed successfully. Proceed to Leegality E-Sign.' }]
+      } : l));
+    }
+
+    // Specification: "If the AI Call is completed: A pop-up appears in the CRM stating, 'Client details got verified, kindly proceed to E-Sign' (this notification will also remain in the notification bar)."
+    addNotification({
+      title: 'Client Verified',
+      message: 'Client details got verified, kindly proceed to E-Sign',
+      type: 'success',
+      targetUserId: sale.submittedByUserId,
+      actionType: 'proceed_to_esign',
+      actionPayload: { saleId, leadId: sale.leadId }
+    });
+  };
+
+  // ─── Leegality E-Sign Completion ────────────────────────────────────────
+  const completeESignProcess = (saleId, eSignDetails = {}) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const docId = eSignDetails.documentId || 'LEEG-DOC-' + Date.now();
+
+    setSales(prev => prev.map(s => s.id === saleId ? {
+      ...s,
+      status: 'E-Signed & Converted',
+      stage: 'Deal Finalized & Active',
+      eSignStatus: 'Completed',
+      eSignDocumentId: docId,
+      eSignedAt: eSignDetails.signedAt || new Date().toISOString(),
+      eSignDetails
+    } : s));
+
+    if (sale.leadId) {
+      setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+        ...l,
+        disposition: 'Paid / Converted',
+        eSignCompleted: true,
+        history: [...(l.history || []), { date: todayStr, text: `Leegality E-Sign executed successfully (Ref: ${docId}). Service Tenure: ${eSignDetails.serviceTenure || sale.serviceTenure || '3 months'}. MITC & Contract Agreement signed. Date 1 dynamically recorded as ${eSignDetails.date1 || todayStr}.` }]
+      } : l));
+    }
+
+    addNotification({
+      title: 'E-Sign Completed',
+      message: `Agreement digitally signed via Leegality for '${sale.clientName}'. Deal successfully converted!`,
+      type: 'success',
+      targetUserId: sale.submittedByUserId,
+      actionPayload: { saleId }
+    });
+  };
+
+
   // Custom Roles
   const addCustomRole = async (roleData) => {
     try {
@@ -2144,7 +2564,30 @@ export const CRMProvider = ({ children }) => {
       grantAllPermissions,
       revokeAllOptionalPermissions,
       resetUserPermissionsToDefault,
-      getUserPermissionCount
+      getUserPermissionCount,
+      // ─── Services Master (Super Admin) ──────────────────────
+      services,
+      addService,
+      updateService,
+      deleteService,
+      // ─── Voice Agent Settings ───────────────────────────────
+      voiceAgentSettings,
+      updateVoiceAgentSettings,
+      // ─── Financial Settings & Limits ────────────────────────
+      financialSettings,
+      updateFinancialSettings,
+      // ─── Notification Bar ───────────────────────────────────
+      notifications,
+      addNotification,
+      markNotificationRead,
+      dismissNotification,
+      clearAllNotifications,
+      // ─── Verification & E-Sign Workflows ────────────────────
+      checkDuplicatePhone2,
+      submitClientInformationReview,
+      superAdminApproveSale,
+      completeVoiceCallVerification,
+      completeESignProcess
     }}>
       {children}
     </CRMContext.Provider>

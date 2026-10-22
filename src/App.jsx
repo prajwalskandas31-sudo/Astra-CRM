@@ -49,10 +49,16 @@ class ErrorBoundary extends React.Component {
 
 import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 import { LeadHistoryBlock } from './components/LeadHistoryBlock';
+import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
+import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
+import { LeegalityESignModal } from './components/LeegalityESignModal';
 
 const AppContent = () => {
   const { authToken, currentUser, simulatedRole, hasPermission, userPermissions } = useCRM();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [globalReviewSale, setGlobalReviewSale] = useState(null);
+  const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
+  const [globalESignSale, setGlobalESignSale] = useState(null);
 
   // Enforce permission-based tab guards: user roles do not inherently restrict availability
   React.useEffect(() => {
@@ -136,13 +142,41 @@ const AppContent = () => {
     <div className="app-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       <div className="main-content">
-        <Navbar currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} />
+        <Navbar 
+          currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} 
+          onOpenReviewModal={(sale) => setGlobalReviewSale(sale)}
+          onOpenESignModal={(sale) => setGlobalESignSale(sale)}
+        />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
             {renderTabContent()}
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Global Super Admin Email Review Modal */}
+      <SuperAdminEmailReviewModal
+        isOpen={!!globalReviewSale}
+        sale={globalReviewSale}
+        onClose={() => setGlobalReviewSale(null)}
+        onExecuteVoiceCall={(sale) => setGlobalVoiceSale(sale)}
+        onSkipVoiceCall={(sale) => setGlobalESignSale(sale)}
+      />
+
+      {/* Global Automated Voice Agent Verification Modal */}
+      <VoiceAgentCallModal
+        isOpen={!!globalVoiceSale}
+        sale={globalVoiceSale}
+        onClose={() => setGlobalVoiceSale(null)}
+        onProceedToESign={(sale) => setGlobalESignSale(sale)}
+      />
+
+      {/* Global Leegality E-Sign Execution Modal */}
+      <LeegalityESignModal
+        isOpen={!!globalESignSale}
+        sale={globalESignSale}
+        onClose={() => setGlobalESignSale(null)}
+      />
     </div>
   );
 };

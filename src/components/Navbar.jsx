@@ -1,47 +1,82 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { Bell, User, LogOut } from 'lucide-react';
+import { NotificationBar } from './NotificationBar';
 
-export const Navbar = ({ currentTabTitle }) => {
-  const { currentUser, handleLogout, sales } = useCRM();
+export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignModal = null }) => {
+  const { currentUser, simulatedRole, handleLogout, notifications = [] } = useCRM();
+  const [showNotificationBar, setShowNotificationBar] = useState(false);
 
-  const pendingSalesCount = sales.filter(s => s.status.includes('Pending')).length;
+  const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
+
+  const userNotifications = notifications.filter(n => {
+    if (n.targetUserId && n.targetUserId !== currentUser?.id && !isSuperAdmin) {
+      return false;
+    }
+    if (n.targetRole === 'Super Admin' && !isSuperAdmin) {
+      return false;
+    }
+    return true;
+  });
+
+  const unreadCount = userNotifications.filter(n => !n.read).length;
 
   return (
-    <header className="top-header">
+    <header className="top-header" style={{ position: 'relative' }}>
       <div className="header-title-section">
         <h2>{currentTabTitle}</h2>
       </div>
 
       <div className="header-controls">
-        {/* Pending Sales Notification for Super Admin */}
-        {currentUser?.role === 'Super Admin' && (
-          <div style={{ position: 'relative' }}>
-            <button className="btn-secondary" style={{ padding: '8px', borderRadius: '9999px', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Pending Approvals">
-              <Bell size={15} />
-              {pendingSalesCount > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  right: '-2px',
-                  backgroundColor: '#f43f5e',
-                  color: '#fff',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 8px rgba(244, 63, 94, 0.6)'
-                }}>
-                  {pendingSalesCount}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Persistent Notifications Tray Button */}
+        <div style={{ position: 'relative' }}>
+          <button 
+            className="btn-secondary" 
+            onClick={() => setShowNotificationBar(!showNotificationBar)}
+            style={{ 
+              padding: '8px', 
+              borderRadius: '9999px', 
+              width: '36px', 
+              height: '36px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              backgroundColor: showNotificationBar ? 'var(--accent-soft)' : undefined,
+              borderColor: showNotificationBar ? 'var(--accent)' : undefined
+            }} 
+            title="System Notifications & Alerts"
+          >
+            <Bell size={16} color={unreadCount > 0 ? 'var(--accent)' : 'currentColor'} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-2px',
+                right: '-2px',
+                backgroundColor: '#f43f5e',
+                color: '#fff',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 8px rgba(244, 63, 94, 0.6)'
+              }}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Slide-out Notification Bar Panel */}
+          <NotificationBar
+            isOpen={showNotificationBar}
+            onClose={() => setShowNotificationBar(false)}
+            onOpenReviewModal={onOpenReviewModal}
+            onOpenESignModal={onOpenESignModal}
+          />
+        </div>
 
         {/* Logged in User Profile Badge */}
         <div style={{ 
@@ -68,7 +103,7 @@ export const Navbar = ({ currentTabTitle }) => {
           </div>
         </div>
 
-        {/* Sign Out Button (Plain Text-Button Treatment) */}
+        {/* Sign Out Button */}
         <button
           onClick={handleLogout}
           className="btn-text-danger"

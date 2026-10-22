@@ -24,9 +24,18 @@ export const SystemSettings = () => {
     detectedIP,
     getUserAllowedIPs,
     resetUserIPs,
-    addIPToUser
+    addIPToUser,
+    services = [],
+    addService,
+    updateService,
+    deleteService,
+    voiceAgentSettings = {},
+    updateVoiceAgentSettings,
+    financialSettings = {},
+    updateFinancialSettings
   } = useCRM();
   const { showToast } = useToast();
+
 
   const canManageSettings = hasPermission('system-settings');
   const [docTypeForm, setDocTypeForm] = useState({ name: '', required: false, description: '' });
@@ -37,6 +46,16 @@ export const SystemSettings = () => {
   const [manualIPInput, setManualIPInput] = useState('');
   const [ipForceRefresh, setIPForceRefresh] = useState(0); // trigger re-render after mutations
   const [showSaaSDemo, setShowSaaSDemo] = useState(false); // live preview for SaaS template
+
+  // Services Master form state
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServiceDesc, setNewServiceDesc] = useState('');
+
+  // Financial Settings form state
+  const [maxGrossInput, setMaxGrossInput] = useState(financialSettings?.maxGrossSales || 200000);
+  const [cFactorInput, setCFactorInput] = useState(financialSettings?.cDivisorFactor || 1.18);
+  const [overridePassInput, setOverridePassInput] = useState(financialSettings?.adminOverridePassword || 'admin123');
+
 
   // IP Guard Password Authentication Gate
   const [isIPGuardUnlocked, setIsIPGuardUnlocked] = useState(() => {
@@ -625,6 +644,235 @@ export const SystemSettings = () => {
           </table>
         </div>
       </div>
+
+      {/* ── Services Master (Super Admin Managed) ────────────────────────── */}
+      <div className="directory-card" style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileSpreadsheet size={18} color="var(--accent-primary)" /> Services Master (Client Information Page)
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Super Admin manages the official list of advisory and research services available in the Client Information dropdown.
+            </p>
+          </div>
+          <span className="badge" style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--accent)' }}>
+            {services.length} Active Services
+          </span>
+        </div>
+
+        {canManageSettings && (
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newServiceName.trim()) return;
+              addService({ name: newServiceName, description: newServiceDesc });
+              showToast(`Service '${newServiceName}' added to catalog.`, 'success');
+              setNewServiceName('');
+              setNewServiceDesc('');
+            }}
+            style={{ margin: '14px 0 18px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}
+          >
+            <input
+              type="text"
+              value={newServiceName}
+              onChange={(e) => setNewServiceName(e.target.value)}
+              placeholder="New Service Name (e.g. Commodity Energy Alpha)"
+              style={{ flex: 2, minWidth: '220px', padding: '8px 12px', fontSize: '0.84rem' }}
+              required
+            />
+            <input
+              type="text"
+              value={newServiceDesc}
+              onChange={(e) => setNewServiceDesc(e.target.value)}
+              placeholder="Short Description..."
+              style={{ flex: 3, minWidth: '240px', padding: '8px 12px', fontSize: '0.84rem' }}
+            />
+            <button type="submit" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Plus size={14} /> Add Service
+            </button>
+          </form>
+        )}
+
+        <div className="table-responsive">
+          <table className="crm-table">
+            <thead>
+              <tr>
+                <th>Service Name</th>
+                <th>Description</th>
+                {canManageSettings && <th>Action</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {services.map(srv => (
+                <tr key={srv.id}>
+                  <td style={{ fontWeight: 600 }}>{srv.name}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{srv.description || '—'}</td>
+                  {canManageSettings && (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                        onClick={() => {
+                          if (services.length <= 1) {
+                            showToast('At least one service must remain in the catalog.', 'warning');
+                            return;
+                          }
+                          deleteService(srv.id);
+                          showToast(`Service '${srv.name}' removed.`, 'info');
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Financial Limits & Formula Settings (Password Protected) ───────── */}
+      <div className="directory-card" style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CreditCard size={18} color="#10b981" /> Financial Calculation & Gross Sales Limit Rules
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Configure maximum gross sale ceiling before blocking with <em>"Kindly contact administrator"</em> and formula parameter <strong>C</strong> for Net Sales calculation (<code>Net = A ÷ C</code>, <code>GST = A - B</code>).
+            </p>
+          </div>
+          <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+            Protected Formula
+          </span>
+        </div>
+
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            updateFinancialSettings({
+              maxGrossSales: parseFloat(maxGrossInput) || 200000,
+              cDivisorFactor: parseFloat(cFactorInput) || 1.18,
+              adminOverridePassword: overridePassInput.trim() || 'admin123'
+            });
+            showToast('Financial limits and formula parameters updated successfully.', 'success');
+          }}
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginTop: '14px' }}
+        >
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Maximum Allowed Gross Sale (A) ₹</label>
+            <input
+              type="number"
+              value={maxGrossInput}
+              onChange={(e) => setMaxGrossInput(e.target.value)}
+              placeholder="e.g. 200000"
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
+              disabled={!canManageSettings}
+            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+              Amounts exceeding this trigger: "Kindly contact administrator"
+            </span>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Value C (Formula Divisor: A ÷ C)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={cFactorInput}
+              onChange={(e) => setCFactorInput(e.target.value)}
+              placeholder="e.g. 1.18"
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
+              disabled={!canManageSettings}
+            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+              Default: 1.18 (Applicable for 18% GST back-calculation)
+            </span>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Admin Override Password</label>
+            <input
+              type="text"
+              value={overridePassInput}
+              onChange={(e) => setOverridePassInput(e.target.value)}
+              placeholder="e.g. admin123"
+              style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
+              disabled={!canManageSettings}
+            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
+              Used to authorize gross sale override directly in Client Info form
+            </span>
+          </div>
+
+          {canManageSettings && (
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button type="submit" className="btn-primary" style={{ height: '38px', padding: '0 18px', fontSize: '0.82rem' }}>
+                Save Financial Rules
+              </button>
+            </div>
+          )}
+        </form>
+      </div>
+
+      {/* ── Voice Agent Settings (Super Admin Controlled) ──────────────────── */}
+      <div className="directory-card" style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Bot size={18} color="var(--accent-primary)" /> Automated Voice Agent Settings
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              When enabled, Super Admin approval emails include options to either execute or skip automated compliance voice calls to the client.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: voiceAgentSettings.enabled ? '#10b981' : '#f43f5e' }}>
+              {voiceAgentSettings.enabled ? 'Voice Agent Enabled' : 'Voice Agent Disabled'}
+            </span>
+            {canManageSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  const toggled = !voiceAgentSettings.enabled;
+                  updateVoiceAgentSettings({ enabled: toggled });
+                  showToast(`Automated Voice Agent ${toggled ? 'Enabled' : 'Disabled'}.`, toggled ? 'success' : 'info');
+                }}
+                className={voiceAgentSettings.enabled ? 'btn-primary' : 'btn-secondary'}
+                style={{
+                  fontSize: '0.78rem',
+                  padding: '6px 14px',
+                  background: voiceAgentSettings.enabled ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : undefined
+                }}
+              >
+                {voiceAgentSettings.enabled ? 'Turn OFF Voice Agent' : 'Turn ON Voice Agent'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: '12px',
+          padding: '12px 14px',
+          backgroundColor: 'var(--bg-input)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: '0.78rem',
+          color: 'var(--text-muted)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          <div>• <strong>Bot Name:</strong> {voiceAgentSettings.botName || 'Astra AI Compliance Voice Bot'}</div>
+          <div>• <strong>Telephony VoIP Provider:</strong> {voiceAgentSettings.provider || 'Leegality Voice API Integration'}</div>
+          <div>• <strong>Voice Verification Questions:</strong> 4 Compliance Checks (Identity, Service/Tenure, Banking Payment, and Leegality E-Sign Consent).</div>
+        </div>
+      </div>
+
       {/* ── IP Guard Management — Governed by System Settings Permission & Password Authentication ────── */}
       {canManageSettings && (
         !isIPGuardUnlocked ? (

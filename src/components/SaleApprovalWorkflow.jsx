@@ -1,13 +1,42 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { CheckCircle, XCircle, Clock, FileCheck, ShieldCheck, ArrowRight, PlusCircle } from 'lucide-react';
+import { 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  FileCheck, 
+  ShieldCheck, 
+  ArrowRight, 
+  PlusCircle, 
+  Mail, 
+  PhoneCall, 
+  FileSignature, 
+  Paperclip,
+  FastForward,
+  Bot
+} from 'lucide-react';
+import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
+import { VoiceAgentCallModal } from './VoiceAgentCallModal';
+import { LeegalityESignModal } from './LeegalityESignModal';
 
 export const SaleApprovalWorkflow = () => {
-  const { sales, simulatedRole, registerSale, approveSale, rejectSale, users, hasPermission } = useCRM();
+  const { 
+    sales, 
+    simulatedRole, 
+    registerSale, 
+    rejectSale, 
+    users, 
+    hasPermission,
+    voiceAgentSettings
+  } = useCRM();
   const { showToast } = useToast();
 
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
+  const [selectedReviewSale, setSelectedReviewSale] = useState(null);
+  const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
+  const [selectedESignSale, setSelectedESignSale] = useState(null);
+
   const [newSale, setNewSale] = useState({
     clientName: '',
     amount: '',
@@ -28,18 +57,13 @@ export const SaleApprovalWorkflow = () => {
     setNewSale({ clientName: '', amount: '', employeeName: 'AKSHATA', mitcStatus: 'Verified', complianceStatus: 'Compliant' });
   };
 
-  const handleApprove = (id, name) => {
-    approveSale(id);
-    showToast(`Sale for '${name}' approved and moved to eKYC workflow stage.`, 'success');
-  };
-
   const handleReject = (id, name) => {
     rejectSale(id, 'Super Admin declined sale details.');
     showToast(`Sale for '${name}' rejected.`, 'info');
   };
 
-  const pendingSales = sales.filter(s => s.status.includes('Pending'));
-  const processedSales = sales.filter(s => !s.status.includes('Pending'));
+  const pendingSales = sales.filter(s => s.status.includes('Pending') || s.status.includes('Voice Call Pending'));
+  const processedSales = sales.filter(s => !s.status.includes('Pending') && !s.status.includes('Voice Call Pending'));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -56,11 +80,13 @@ export const SaleApprovalWorkflow = () => {
 
         <div className="metric-card">
           <div className="metric-info">
-            <h4>Moved to eKYC Stage</h4>
-            <div className="value" style={{ color: 'var(--status-success)' }}>{sales.filter(s => s.status.includes('eKYC')).length}</div>
+            <h4>E-Signed & Finalized</h4>
+            <div className="value" style={{ color: 'var(--status-success)' }}>
+              {sales.filter(s => s.status.includes('E-Signed') || s.eSignStatus === 'Completed').length}
+            </div>
           </div>
           <div className="metric-icon" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success)', borderColor: 'var(--status-success-border)' }}>
-            <ShieldCheck size={18} />
+            <FileSignature size={18} />
           </div>
         </div>
 
@@ -78,8 +104,8 @@ export const SaleApprovalWorkflow = () => {
       <div className="directory-card">
         <div className="directory-toolbar">
           <div className="directory-title-area">
-            <h3>Sale Approval & eKYC Workflow Queue</h3>
-            <p>Employee sales require Super Admin approval to finalize and transition to the eKYC stage.</p>
+            <h3>Sale Approval & Automated Verification Queue</h3>
+            <p>Super Admin reviews submissions, manages Voice Agent verification, and monitors Leegality digital E-Sign.</p>
           </div>
 
           <button className="btn-primary" onClick={() => setIsSubmitOpen(true)}>
@@ -88,10 +114,13 @@ export const SaleApprovalWorkflow = () => {
         </div>
 
         {/* Pending Approvals Table */}
-        <div style={{ padding: '12px 20px', background: 'var(--bg-table-head)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <h4 style={{ fontSize: '0.86rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ padding: '12px 20px', background: 'var(--bg-table-head)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h4 style={{ fontSize: '0.86rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
             <Clock size={15} /> Pending Super Admin Approval Queue ({pendingSales.length})
           </h4>
+          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+            Voice Agent: <strong>{voiceAgentSettings?.enabled ? 'Enabled' : 'Disabled'}</strong>
+          </span>
         </div>
 
         <div className="table-responsive">
@@ -102,78 +131,92 @@ export const SaleApprovalWorkflow = () => {
                 <th>Client Name</th>
                 <th>Sale Amount</th>
                 <th>Submitted By</th>
-                <th>MITC Status</th>
-                <th>Compliance</th>
-                <th>Workflow State</th>
+                <th>Attachments</th>
+                <th>Workflow Stage</th>
                 <th>Super Admin Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingSales.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No pending sales awaiting Super Admin approval.
                   </td>
                 </tr>
               ) : (
-                pendingSales.map(s => (
-                  <tr key={s.id}>
-                    <td>{s.date}</td>
-                    <td style={{ fontWeight: 600 }}>{s.clientName}</td>
-                    <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.amount}</td>
-                    <td>{s.employeeName}</td>
-                    <td>
-                      <div className="status-indicator">
-                        <span className="status-dot active" />
-                        <span>{s.mitcStatus}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="status-indicator">
-                        <span className="status-dot active" />
-                        <span>{s.complianceStatus}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning)', border: '1px solid var(--status-warning-border)' }}>
-                        {s.status}
-                      </span>
-                    </td>
-                    <td>
-                      {hasPermission('sale-approvals') ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            className="btn-primary"
-                            style={{ padding: '3px 8px', fontSize: '0.76rem' }}
-                            onClick={() => handleApprove(s.id, s.clientName)}
-                          >
-                            <CheckCircle size={12} /> Approve & Send to eKYC
-                          </button>
-                          <button
-                            className="btn-danger"
-                            style={{ padding: '3px 8px', fontSize: '0.76rem' }}
-                            onClick={() => handleReject(s.id, s.clientName)}
-                          >
-                            <XCircle size={12} /> Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                          Awaiting Approval Action
+                pendingSales.map(s => {
+                  const attachmentsCount = (s.transactionAttachments || s.fullClientInfo?.transactionAttachments || []).length;
+                  const isVoicePending = s.status.includes('Voice Call Pending');
+
+                  return (
+                    <tr key={s.id}>
+                      <td>{s.date}</td>
+                      <td style={{ fontWeight: 600 }}>{s.clientName}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--accent)' }}>{s.amount}</td>
+                      <td>{s.employeeName}</td>
+                      <td>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.76rem', color: attachmentsCount > 0 ? '#10b981' : 'var(--text-muted)' }}>
+                          <Paperclip size={12} /> {attachmentsCount} File{attachmentsCount === 1 ? '' : 's'}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td>
+                        <span className="badge" style={{ 
+                          background: isVoicePending ? 'rgba(59, 130, 246, 0.15)' : 'var(--status-warning-bg)', 
+                          color: isVoicePending ? '#60a5fa' : 'var(--status-warning)', 
+                          border: `1px solid ${isVoicePending ? 'rgba(59, 130, 246, 0.3)' : 'var(--status-warning-border)'}` 
+                        }}>
+                          {s.stage || s.status}
+                        </span>
+                      </td>
+                      <td>
+                        {hasPermission('sale-approvals') ? (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {/* Open Review Email Modal */}
+                            <button
+                              className="btn-primary"
+                              style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
+                              onClick={() => setSelectedReviewSale(s)}
+                              title="Inspect Approval Email and decide Voice Call / Skip options"
+                            >
+                              <Mail size={12} /> Review Email
+                            </button>
+
+                            {isVoicePending ? (
+                              <button
+                                className="btn-secondary"
+                                style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px', borderColor: '#10b981', color: '#10b981' }}
+                                onClick={() => setSelectedVoiceSale(s)}
+                              >
+                                <PhoneCall size={12} /> Launch Voice Call
+                              </button>
+                            ) : null}
+
+                            <button
+                              className="btn-danger"
+                              style={{ padding: '3px 8px', fontSize: '0.74rem' }}
+                              onClick={() => handleReject(s.id, s.clientName)}
+                            >
+                              <XCircle size={12} /> Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                            Awaiting Approval Action
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
 
-        {/* Processed / eKYC Pipeline Table */}
+        {/* Processed / Finalized Pipeline Table */}
         <div style={{ padding: '12px 20px', background: 'var(--bg-table-head)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)', marginTop: '20px' }}>
           <h4 style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ShieldCheck size={15} /> Processed & eKYC Pipeline ({processedSales.length})
+            <ShieldCheck size={15} /> Verified & E-Sign Finalized Pipeline ({processedSales.length})
           </h4>
         </div>
 
@@ -185,30 +228,73 @@ export const SaleApprovalWorkflow = () => {
                 <th>Client Name</th>
                 <th>Amount</th>
                 <th>Submitted By</th>
-                <th>Final Stage</th>
-                <th>Approval Decision</th>
+                <th>Current Stage</th>
+                <th>E-Sign Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {processedSales.map(s => (
-                <tr key={s.id}>
-                  <td>{s.date}</td>
-                  <td style={{ fontWeight: 600 }}>{s.clientName}</td>
-                  <td>{s.amount}</td>
-                  <td>{s.employeeName}</td>
-                  <td>
-                    <span className="badge badge-disposition">
-                      <ArrowRight size={11} /> {s.stage || 'eKYC Approved'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="status-indicator">
-                      <span className="status-dot active" />
-                      <span>Approved by Super Admin</span>
-                    </div>
+              {processedSales.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    No finalized sales yet.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                processedSales.map(s => {
+                  const isReadyForESign = s.stage?.includes('Ready for E-Sign') || s.status?.includes('Ready for E-Sign');
+                  const isESigned = s.status?.includes('E-Signed') || s.eSignStatus === 'Completed';
+
+                  return (
+                    <tr key={s.id}>
+                      <td>{s.date}</td>
+                      <td style={{ fontWeight: 600 }}>{s.clientName}</td>
+                      <td>{s.amount}</td>
+                      <td>{s.employeeName}</td>
+                      <td>
+                        <span className="badge badge-disposition">
+                          <ArrowRight size={11} /> {s.stage || 'Approved'}
+                        </span>
+                      </td>
+                      <td>
+                        {isESigned ? (
+                          <div className="status-indicator">
+                            <span className="status-dot active" />
+                            <span style={{ color: '#10b981', fontWeight: 600 }}>Leegality E-Signed</span>
+                          </div>
+                        ) : isReadyForESign ? (
+                          <span className="badge" style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f630' }}>
+                            Awaiting E-Sign
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{s.status}</span>
+                        )}
+                      </td>
+                      <td>
+                        {isReadyForESign ? (
+                          <button
+                            className="btn-primary"
+                            style={{ padding: '3px 8px', fontSize: '0.74rem', background: '#10b981', gap: '4px' }}
+                            onClick={() => setSelectedESignSale(s)}
+                          >
+                            <FileSignature size={12} /> Execute E-Sign
+                          </button>
+                        ) : isESigned ? (
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
+                            onClick={() => setSelectedESignSale(s)}
+                          >
+                            <ShieldCheck size={12} color="#10b981" /> View Agreement
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Approved</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -264,6 +350,30 @@ export const SaleApprovalWorkflow = () => {
           </div>
         </div>
       )}
+
+      {/* Super Admin Email Review Modal */}
+      <SuperAdminEmailReviewModal
+        isOpen={!!selectedReviewSale}
+        sale={selectedReviewSale}
+        onClose={() => setSelectedReviewSale(null)}
+        onExecuteVoiceCall={(sale) => setSelectedVoiceSale(sale)}
+        onSkipVoiceCall={(sale) => setSelectedESignSale(sale)}
+      />
+
+      {/* Automated Voice Agent Verification Modal */}
+      <VoiceAgentCallModal
+        isOpen={!!selectedVoiceSale}
+        sale={selectedVoiceSale}
+        onClose={() => setSelectedVoiceSale(null)}
+        onProceedToESign={(sale) => setSelectedESignSale(sale)}
+      />
+
+      {/* Leegality E-Sign Execution Modal */}
+      <LeegalityESignModal
+        isOpen={!!selectedESignSale}
+        sale={selectedESignSale}
+        onClose={() => setSelectedESignSale(null)}
+      />
     </div>
   );
 };
