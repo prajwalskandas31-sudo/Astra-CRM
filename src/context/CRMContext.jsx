@@ -1,4 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { 
+  getLeegalityConfig, 
+  saveLeegalityConfig, 
+  deductCredit, 
+  DEFAULT_LEEGALITY_CONFIG 
+} from '../services/leegalityService';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -620,6 +626,14 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_user_permissions', JSON.stringify(userPermissions));
   }, [userPermissions]);
+
+  // ─── Leegality API Integration Config ──────────────────────────────────────
+  const [leegalityConfig, setLeegalityConfigState] = useState(() => getLeegalityConfig());
+
+  const updateLeegalityConfig = (newConfig) => {
+    const updated = saveLeegalityConfig(newConfig);
+    setLeegalityConfigState(updated);
+  };
 
   const hasPermission = (featureId, targetUserId = null) => {
     const targetId = targetUserId || currentUser?.id || 'usr-1';
@@ -2440,7 +2454,11 @@ export const CRMProvider = ({ children }) => {
       documentsInterlinked: [
         'Document 1: Most Important Terms & Conditions (MITC) - Image 1 Ref',
         'Document 2: Terms and Conditions Agreement (Page 14 of 14) - Image 2 Ref'
-      ]
+      ],
+      leegalityAuthToken: eSignDetails.authTokenMasked || 'JsAEa0...RbxM',
+      leegalityMac: eSignDetails.webhookMac || 'hFBCLu...RAhG',
+      apiGateway: 'POST https://api.leegality.com/api/v2.1/sign/request',
+      creditsRemaining: eSignDetails.creditsRemaining !== undefined ? eSignDetails.creditsRemaining : (leegalityConfig?.creditsLeft || 40)
     };
 
     setESignRecords(prev => {
@@ -2816,7 +2834,10 @@ export const CRMProvider = ({ children }) => {
       // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ────────
       eSignRecords,
       simulateConfirmESign,
-      deleteESignRecord
+      deleteESignRecord,
+      // ─── Leegality API Integration Config & Credentials ────────
+      leegalityConfig,
+      updateLeegalityConfig
     }}>
       {children}
     </CRMContext.Provider>

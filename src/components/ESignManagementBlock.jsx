@@ -34,7 +34,8 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
     leads = [],
     eSignRecords = [],
     simulateConfirmESign,
-    deleteESignRecord
+    deleteESignRecord,
+    leegalityConfig
   } = useCRM();
 
   const { showToast } = useToast();
@@ -238,8 +239,9 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0284c7' }}>
               API v2.1 Live
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)' }}>
-              Class 3 Paperless DSC Stamping
+            <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+              <span>● Token: {leegalityConfig?.legacyAuthToken ? `${leegalityConfig.legacyAuthToken.slice(0, 6)}...` : 'JsAEa0...'}</span>
+              <span>• {leegalityConfig?.creditsLeft ?? 40} Credits Left</span>
             </div>
           </div>
         </div>
@@ -634,6 +636,11 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                   </h3>
                   <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                     Ref ID: {selectedRecordForInspection.documentId} • Date: {selectedRecordForInspection.date1} • Service Tenure: {selectedRecordForInspection.serviceTenure}
+                    {selectedRecordForInspection.leegalityAuthToken && (
+                      <span style={{ marginLeft: '8px', color: '#38bdf8' }}>
+                        • Leegality Token: {selectedRecordForInspection.leegalityAuthToken}
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>

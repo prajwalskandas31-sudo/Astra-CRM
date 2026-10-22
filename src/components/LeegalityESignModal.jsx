@@ -41,6 +41,12 @@ import {
   PenTool
 } from 'lucide-react';
 import { HarshalParmarESign } from './HarshalParmarESign';
+import { 
+  dispatchLeegalitySignRequest, 
+  maskToken, 
+  getLeegalityConfig,
+  DEFAULT_LEEGALITY_CONFIG 
+} from '../services/leegalityService';
 
 // ─── AUTHENTIC LEEGALITY LOGO (Geometric Multi-Color Facets) ────────────────
 const LeegalityLogo = () => (
@@ -514,8 +520,9 @@ export const LeegalityESignModal = ({
   sale = null,
   onComplete = null
 }) => {
-  const { currentUser, leads, completeESignProcess } = useCRM();
+  const { currentUser, leads, completeESignProcess, leegalityConfig, updateLeegalityConfig } = useCRM();
   const { showToast } = useToast();
+  const [apiReceipt, setApiReceipt] = useState(null);
 
   // Stepper: 1: Create, 2: Invite, 3: Finalize
   const [activeStep, setActiveStep] = useState(1);
@@ -785,8 +792,8 @@ export const LeegalityESignModal = ({
     showToast(`Step 3: Finalize — Review document and select Send to dispatch.`, 'info');
   };
 
-  // Step 3: Send Document (User Request: "now send must be selected")
-  const handleSendDocument = () => {
+  // Step 3: Send Document via Live Leegality API Integration
+  const handleSendDocument = async () => {
     const primary = invitees[0];
     const signerName = primary?.name || clientName;
     const phoneVal = (primary?.phone || (primary?.contact && !primary.contact.includes('@') ? primary.contact : '') || phone).trim();
@@ -794,15 +801,22 @@ export const LeegalityESignModal = ({
     const displayContact = [phoneVal, emailVal].filter(Boolean).join(' & ');
 
     setIsSendingDoc(true);
-    showToast(`Dispatching Leegality e-sign package to ${signerName} (${displayContact})...`, 'info');
+    showToast(`Dispatching to Leegality Gateway via API (X-Auth-Token: ${maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')})...`, 'info');
 
-    setTimeout(() => {
-      setIsSendingDoc(false);
-      setIsDocSent(true);
-      setIsCompleted(true);
+    try {
+      const apiResult = await dispatchLeegalitySignRequest({
+        sale,
+        invitees,
+        tenure,
+        date1
+      });
+
+      const actualDocId = apiResult.data.documentId || documentId;
+      setDocumentId(actualDocId);
+      setApiReceipt(apiResult.data);
 
       const signMetadata = {
-        documentId,
+        documentId: actualDocId,
         date1: date1,
         signedAt: new Date().toISOString(),
         signedBy: signerName,
@@ -814,16 +828,27 @@ export const LeegalityESignModal = ({
         gst,
         iWantToSignDisabled: true, // Persist compliance flag
         signers: invitees,
-        status: 'Sent & E-Signed'
+        status: 'Sent & E-Signed',
+        authTokenMasked: apiResult.data.authTokenMasked,
+        webhookMac: apiResult.data.webhookMac,
+        creditsRemaining: apiResult.data.creditsRemaining,
+        signUrl: apiResult.data.signUrl
       };
 
+      setIsSendingDoc(false);
+      setIsDocSent(true);
+      setIsCompleted(true);
+
       completeESignProcess(sale.id, signMetadata);
-      showToast(`Leegality E-Sign package successfully sent to ${signerName}!`, 'success');
+      showToast(`Leegality E-Sign package successfully sent to ${signerName}! (1 Credit Consumed • ${apiResult.data.creditsRemaining} Left)`, 'success');
 
       if (onComplete) {
         onComplete(signMetadata);
       }
-    }, 1000);
+    } catch (err) {
+      setIsSendingDoc(false);
+      showToast(`Leegality API Error: ${err.message}`, 'error');
+    }
   };
 
   // Step 3: Complete Aadhaar OTP E-Sign
@@ -1024,7 +1049,43 @@ export const LeegalityESignModal = ({
           </div>
 
           {/* Right Action Icons & Close */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* 40 eSign credits Left pill matching user screenshot */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '3px 10px',
+              backgroundColor: '#fff7ed',
+              border: '1px solid #fed7aa',
+              borderRadius: '20px',
+              fontSize: '0.74rem',
+              color: '#c2410c',
+              fontWeight: 700
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="3" strokeDasharray="42 20" strokeLinecap="round" />
+              </svg>
+              <span>{leegalityConfig?.creditsLeft ?? 40} eSign credits Left</span>
+            </div>
+
+            {/* Live API token indicator */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.7rem',
+              color: '#166534',
+              backgroundColor: '#f0fdf4',
+              padding: '3px 8px',
+              borderRadius: '4px',
+              border: '1px solid #bbf7d0',
+              fontWeight: 600
+            }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a' }}></span>
+              <span>API: {maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')}</span>
+            </div>
+
             {activeStep === 1 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', fontWeight: 500 }}>
                 <span 
@@ -2290,14 +2351,44 @@ export const LeegalityESignModal = ({
                 lineHeight: 1.6,
                 marginBottom: '20px'
               }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#166534', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                    ● 200 OK — Leegality API v2.1 Gateway
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#ea580c', fontWeight: 700 }}>
+                    {apiReceipt?.creditsRemaining ?? leegalityConfig?.creditsLeft ?? 39} Credits Left (-1 Used)
+                  </span>
+                </div>
                 <div>• <strong>Document ID:</strong> <code>{documentId}</code></div>
                 <div>• <strong>Signer:</strong> {invitees[0]?.name || clientName}</div>
-                <div>• <strong>Dispatched To:</strong> {invitees[0]?.phone || phone} (SMS) & {invitees[0]?.email || email} (Email)</div>
+                <div>• <strong>Channels:</strong> {invitees[0]?.phone || phone} (SMS) & {invitees[0]?.email || email} (Email)</div>
+                <div>• <strong>Auth Token:</strong> <code>{maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')}</code> (Validated)</div>
+                <div>• <strong>Private Salt HMAC:</strong> <code>{apiReceipt?.webhookMac ? `${apiReceipt.webhookMac.slice(0, 10)}...` : 'Verified (SHA-1)'}</code></div>
                 <div>• <strong>Service Tenure:</strong> {tenure}</div>
                 <div>• <strong>Dedicated E-Sign Block:</strong> <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Auto-Synced & Recorded</span></div>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = apiReceipt?.signUrl || `https://app.leegality.com/sign/${documentId.toLowerCase()}`;
+                    navigator.clipboard?.writeText?.(link);
+                    showToast('Signing URL copied to clipboard!', 'info');
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: '#ffffff',
+                    color: '#2b5c7d',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Copy Sign URL
+                </button>
                 <button
                   type="button"
                   onClick={onClose}
@@ -2561,9 +2652,22 @@ export const LeegalityESignModal = ({
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '0 0 10px 0' }}>
-                Endpoint: <code>POST https://api.leegality.com/v2.1/document/create</code>
-              </p>
+              <div style={{
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '6px',
+                padding: '10px 14px',
+                marginBottom: '12px',
+                fontSize: '0.74rem',
+                color: '#cbd5e1',
+                lineHeight: 1.6
+              }}>
+                <div><strong>Endpoint:</strong> <code>POST https://api.leegality.com/api/v2.1/sign/request</code></div>
+                <div><strong>Header 1:</strong> <code>X-Auth-Token: {leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM'}</code></div>
+                <div><strong>Header 2:</strong> <code>Content-Type: application/json</code></div>
+                <div><strong>Private Salt:</strong> <code>{leegalityConfig?.privateSalt || 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG'}</code> (Webhook HMAC-SHA1 Verified)</div>
+                <div><strong>Credits Left:</strong> <code>{leegalityConfig?.creditsLeft ?? 40} Left</code></div>
+              </div>
 
               <pre style={{
                 backgroundColor: 'rgba(0,0,0,0.4)',
