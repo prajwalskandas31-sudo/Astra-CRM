@@ -385,6 +385,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager']
   },
   {
+    id: 'esign-block',
+    name: 'Dedicated E-Sign Block (Leegality SEBI Master)',
+    category: 'Sales & Approvals',
+    description: 'Centralized E-Sign block in the CRM filled after confirmation, storing executed agreements with Harshal Parmar official e-sign.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
     id: 'register-sale',
     name: 'Register New Customer Sale',
     category: 'Sales & Approvals',
@@ -858,6 +865,22 @@ export const CRMProvider = ({ children }) => {
     localStorage.setItem('crm_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
+
+  // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ──────────
+  const [eSignRecords, setESignRecords] = useState(() => {
+    const saved = localStorage.getItem('crm_esign_records');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_esign_records', JSON.stringify(eSignRecords));
+  }, [eSignRecords]);
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -2281,7 +2304,7 @@ export const CRMProvider = ({ children }) => {
     });
   };
 
-  // ─── Leegality E-Sign Completion ────────────────────────────────────────
+  // ─── Leegality E-Sign Completion (Fills Dedicated E-Sign Block) ──────────
   const completeESignProcess = (saleId, eSignDetails = {}) => {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) return;
@@ -2308,6 +2331,57 @@ export const CRMProvider = ({ children }) => {
       } : l));
     }
 
+    // Build the completed E-Sign registry record to fill the dedicated E-Sign block
+    const clientInfo = sale.fullClientInfo || sale.clientInfo || {};
+    const matchingLead = (leads || []).find(l => l.id === sale.leadId);
+    const tenure = eSignDetails.serviceTenure || sale.serviceTenure || clientInfo.serviceTenure || matchingLead?.clientInfo?.serviceTenure || '3 months';
+    const clientName = clientInfo.clientName || sale.clientName || 'Client';
+    const panNumber = eSignDetails.pan || sale.panNumber || clientInfo.panNumber || 'ABCDE1234F';
+    const grossVal = eSignDetails.grossSales || sale.amount || ('₹' + (sale.grossSales || '50,000'));
+    const date1Val = eSignDetails.date1 || todayStr;
+
+    const newRecord = {
+      id: 'esign-' + Date.now(),
+      saleId: sale.id,
+      leadId: sale.leadId,
+      documentId: docId,
+      clientName,
+      clientPrefix: clientInfo.clientPrefix || 'Mr.',
+      panNumber,
+      phone: sale.phone1 || clientInfo.phone1 || '+91 98765 43210',
+      email: sale.email || clientInfo.email || 'client@example.com',
+      serviceName: eSignDetails.serviceName || sale.serviceOpted || clientInfo.serviceName || 'Equity Advisory',
+      serviceTenure: tenure,
+      grossSales: grossVal,
+      netSales: eSignDetails.netSales || sale.netSales || '₹42,372.88',
+      gst: eSignDetails.gst || sale.gst || '₹7,627.12',
+      date1: date1Val,
+      confirmedAt: eSignDetails.signedAt || new Date().toISOString(),
+      status: 'Confirmed & Sealed',
+      signerOfficer: {
+        name: 'Mr Harshal Parmar',
+        designation: 'Principal Officer',
+        sebiReg: 'INH000002099',
+        entity: 'Research Analyst',
+        eSignStatus: 'Affixed & Verified',
+        signatureMarked: true
+      },
+      clientSigner: {
+        name: clientName,
+        eSignStatus: 'Aadhaar OTP Verified',
+        signatureMarked: true
+      },
+      documentsInterlinked: [
+        'Document 1: Most Important Terms & Conditions (MITC) - Image 1 Ref',
+        'Document 2: Terms and Conditions Agreement (Page 14 of 14) - Image 2 Ref'
+      ]
+    };
+
+    setESignRecords(prev => {
+      const filtered = prev.filter(r => r.saleId !== sale.id && r.documentId !== docId);
+      return [newRecord, ...filtered];
+    });
+
     addNotification({
       title: 'E-Sign Completed',
       message: `Agreement digitally signed via Leegality for '${sale.clientName}'. Deal successfully converted!`,
@@ -2315,6 +2389,91 @@ export const CRMProvider = ({ children }) => {
       targetUserId: sale.submittedByUserId,
       actionPayload: { saleId }
     });
+  };
+
+  const simulateConfirmESign = (customData = {}) => {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const date1Str = `${dd}/${mm}/${yyyy}`;
+    const docId = 'LEEG-DOC-' + Math.floor(10000000 + Math.random() * 90000000);
+
+    const testSaleId = 'sale-sim-' + Date.now();
+    const clientName = customData.clientName || 'Rajesh Kumar';
+    const serviceName = customData.serviceName || 'Equity Advisory Pro';
+    const serviceTenure = customData.serviceTenure || '3 months';
+    const grossSales = customData.grossSales || '₹50,000';
+
+    const simulatedSale = {
+      id: testSaleId,
+      date: today.toISOString().split('T')[0],
+      clientName,
+      amount: grossSales,
+      employeeName: currentUser?.name || 'AKSHATA',
+      submittedByUserId: currentUser?.id || 'usr-7',
+      stage: 'Deal Finalized & Active',
+      status: 'E-Signed & Converted',
+      serviceOpted: serviceName,
+      serviceTenure,
+      panNumber: customData.panNumber || 'ABCDE1234F',
+      eSignStatus: 'Completed',
+      eSignDocumentId: docId,
+      eSignedAt: new Date().toISOString()
+    };
+
+    setSales(prev => [simulatedSale, ...prev]);
+
+    const newRecord = {
+      id: 'esign-' + Date.now(),
+      saleId: testSaleId,
+      documentId: docId,
+      clientName,
+      clientPrefix: 'Mr.',
+      panNumber: customData.panNumber || 'ABCDE1234F',
+      phone: '+91 98451 98210',
+      email: 'rajesh.kumar@example.com',
+      serviceName,
+      serviceTenure,
+      grossSales,
+      netSales: '₹42,372.88',
+      gst: '₹7,627.12',
+      date1: date1Str,
+      confirmedAt: new Date().toISOString(),
+      status: 'Confirmed & Sealed',
+      signerOfficer: {
+        name: 'Mr Harshal Parmar',
+        designation: 'Principal Officer',
+        sebiReg: 'INH000002099',
+        entity: 'Research Analyst',
+        eSignStatus: 'Affixed & Verified',
+        signatureMarked: true
+      },
+      clientSigner: {
+        name: clientName,
+        eSignStatus: 'Aadhaar OTP Verified',
+        signatureMarked: true
+      },
+      documentsInterlinked: [
+        'Document 1: Most Important Terms & Conditions (MITC) - Image 1 Ref',
+        'Document 2: Terms and Conditions Agreement (Page 14 of 14) - Image 2 Ref'
+      ]
+    };
+
+    setESignRecords(prev => [newRecord, ...prev]);
+
+    addNotification({
+      title: 'E-Sign Confirmed',
+      message: `Agreement digitally executed & filled in E-Sign Block for '${clientName}'. Service Tenure: ${serviceTenure}. Document: ${docId}`,
+      type: 'success',
+      targetUserId: currentUser?.id
+    });
+
+    return newRecord;
+  };
+
+  const deleteESignRecord = (recordId) => {
+    setESignRecords(prev => prev.filter(r => r.id !== recordId));
   };
 
 
@@ -2587,7 +2746,11 @@ export const CRMProvider = ({ children }) => {
       submitClientInformationReview,
       superAdminApproveSale,
       completeVoiceCallVerification,
-      completeESignProcess
+      completeESignProcess,
+      // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ────────
+      eSignRecords,
+      simulateConfirmESign,
+      deleteESignRecord
     }}>
       {children}
     </CRMContext.Provider>

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
-  const { simulatedRole, sales, leadRequests, hasPermission } = useCRM();
+  const { simulatedRole, sales, leadRequests, eSignRecords = [], hasPermission } = useCRM();
 
   const pendingSalesCount = sales.filter(s => s.status.includes('Pending')).length;
   const pendingRequestsCount = leadRequests?.filter(r => r.status === 'Pending').length || 0;
@@ -50,6 +50,12 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       label: 'Sale Approvals',
       icon: CheckCircle,
       badge: pendingSalesCount > 0 ? pendingSalesCount : null
+    },
+    {
+      id: 'esign-block',
+      label: 'E-Sign Block',
+      icon: FileSignature,
+      badge: eSignRecords.length > 0 ? eSignRecords.length : null
     },
     {
       id: 'lead-reassignment',

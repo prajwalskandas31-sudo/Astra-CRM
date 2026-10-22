@@ -23,6 +23,7 @@ import {
   Check,
   AlertCircle
 } from 'lucide-react';
+import { HarshalParmarESign } from './HarshalParmarESign';
 
 export const LeegalityESignModal = ({
   isOpen,
@@ -60,6 +61,8 @@ export const LeegalityESignModal = ({
   });
 
   const [allowFirstInviteeToFill, setAllowFirstInviteeToFill] = useState(false);
+  // Controls affixing Harshal Parmar's official digital signature in the marked cyan box
+  const [isSignAffixed, setIsSignAffixed] = useState(true);
 
   // Step 2 & 3 state
   const [isSendingInvite, setIsSendingInvite] = useState(false);
@@ -636,31 +639,70 @@ export const LeegalityESignModal = ({
                     <strong>Client Acknowledgment:</strong> "I confirm that I have reviewed, understood, and agreed to these Most Important Terms & Conditions (MITC), specifically acknowledging the service tenure of <strong>{tenure}</strong> for <strong>{serviceName}</strong>."
                   </div>
 
-                  {/* Digital Signature Footer */}
-                  <div style={{
-                    borderTop: '1px dashed #cbd5e1',
-                    paddingTop: '10px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                    fontSize: '0.72rem'
-                  }}>
-                    <div>
-                      <div style={{ color: '#64748b' }}>Authorized Signer (Research Analyst):</div>
-                      <strong style={{ color: '#0f172a' }}>Harshal Parmar (SEBI INH000002099)</strong>
-                      <div style={{ color: '#10b981', fontWeight: 600 }}>✓ Certified Digital Signer</div>
+                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 1 (INTERLINKED) ─── */}
+                  <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
+                    {/* For Harshal Parmar */}
+                    <div style={{ marginBottom: '24px' }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                        For Harshal Parmar
+                      </div>
+
+                      {/* CYAN MARKED BOX FOR HIS E-SIGN (SCREENSHOT 1) */}
+                      <div>
+                        <HarshalParmarESign
+                          date={date1}
+                          isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
+                          showCyanBorder={true}
+                          documentId={documentId}
+                        />
+                      </div>
+
+                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
+                        <div>Signature:</div>
+                        <div>Name: Mr Harshal Parmar</div>
+                        <div>Designation: Principal Officer</div>
+                      </div>
                     </div>
 
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: '#64748b' }}>Client Signature (Second Invitee):</div>
-                      <strong style={{ color: '#0f172a' }}>{clientName}</strong>
-                      {isCompleted ? (
-                        <div style={{ color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px', justifyContent: 'flex-end' }}>
-                          <CheckCircle2 size={13} /> Aadhaar E-Signed ({date1})
-                        </div>
-                      ) : (
-                        <div style={{ color: '#f59e0b', fontWeight: 600 }}>Awaiting Signature</div>
-                      )}
+                    {/* For and on behalf of the Client */}
+                    <div>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                        For and on behalf of the Client
+                      </div>
+
+                      {/* Client Signature Area */}
+                      <div style={{ minHeight: '34px', display: 'flex', alignItems: 'center', margin: '4px 0 6px 0' }}>
+                        {isCompleted ? (
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            backgroundColor: '#f0fdf4',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '4px',
+                            fontSize: '0.74rem',
+                            color: '#166534',
+                            fontWeight: 700
+                          }}>
+                            <CheckCircle2 size={13} color="#16a34a" /> Aadhaar E-Signed by {clientName} ({date1})
+                          </div>
+                        ) : (
+                          <div style={{
+                            fontSize: '0.74rem',
+                            color: '#94a3b8',
+                            fontStyle: 'italic',
+                            padding: '2px 0'
+                          }}>
+                            [Client signature affixed via Aadhaar OTP in Step 3]
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5 }}>
+                        <div>Signature: {isCompleted ? <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified</span> : ''}</div>
+                        <div>Name: {clientName}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -776,33 +818,58 @@ export const LeegalityESignModal = ({
                     </p>
                   </div>
 
-                  {/* Digital E-Sign Stamp / Status */}
-                  <div style={{
-                    marginTop: 'auto',
-                    borderTop: '1px dashed #cbd5e1',
-                    paddingTop: '12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-end',
-                    fontSize: '0.72rem'
-                  }}>
-                    <div>
-                      <div style={{ color: '#64748b' }}>First Invitee (Research Analyst):</div>
-                      <strong style={{ color: '#0f172a' }}>Harshal Parmar (SEBI INH000002099)</strong>
-                      <div style={{ color: '#10b981', fontWeight: 600 }}>✓ Certified Digital Signer</div>
+                  {/* ─── EXACT LEGAL CLAUSES FROM SCREENSHOT 2 (PAGE 14 OF 14) ─── */}
+                  <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
+                    <p style={{ margin: '0 0 10px 0' }}>
+                      rule, regulation, contract, or other instrument to which it is a party or to which any of its property is or may be subject;
+                    </p>
+                    <p style={{ margin: '0 0 10px 0' }}>
+                      iv. The maximum fee that may be charged by the RA is ₹1.51 lakhs per annum per family of the Client;
+                    </p>
+                    <p style={{ margin: '0 0 10px 0' }}>
+                      v. The recommendations provided by the RA do not provide any assurance of returns.
+                    </p>
+                    <p style={{ margin: '0 0 18px 0' }}>
+                      vi. It is not engaged in any additional professional or business activities, on a whole-time basis or in an executive capacity, which may interfere with, influence, or have the potential to interfere with/influence the independence of the research report and/or recommendations contained therein. <strong>**Only for Individual RA**</strong>
+                    </p>
+                  </div>
+
+                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 2 (INTERLINKED) ─── */}
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                      For Harshal Parmar
                     </div>
 
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: '#64748b' }}>Second Invitee (Client):</div>
-                      <strong style={{ color: '#0f172a' }}>{clientName}</strong>
-                      {isCompleted ? (
-                        <div style={{ color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px', justifyContent: 'flex-end' }}>
-                          <CheckCircle2 size={13} /> Aadhaar E-Signed ({date1})
-                        </div>
-                      ) : (
-                        <div style={{ color: '#f59e0b', fontWeight: 600 }}>Awaiting Signature</div>
-                      )}
+                    {/* CYAN MARKED BOX FOR HIS E-SIGN (SCREENSHOT 2) */}
+                    <div>
+                      <HarshalParmarESign
+                        date={date1}
+                        isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
+                        showCyanBorder={true}
+                        documentId={documentId}
+                      />
                     </div>
+
+                    <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
+                      <div>Signature:</div>
+                      <div>Name: Mr Harshal Parmar</div>
+                      <div>Designation: Principal Officer</div>
+                    </div>
+                  </div>
+
+                  {/* EXACT PAGE 14 OF 14 FOOTER FROM SCREENSHOT 2 */}
+                  <div style={{
+                    marginTop: '36px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #f1f5f9',
+                    fontSize: '0.74rem',
+                    color: '#64748b',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span>Page 14 of 14</span>
+                    <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>SEBI INH000002099 Certified</span>
                   </div>
                 </div>
               )}

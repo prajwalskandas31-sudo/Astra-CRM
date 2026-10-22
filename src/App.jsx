@@ -49,6 +49,7 @@ class ErrorBoundary extends React.Component {
 
 import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 import { LeadHistoryBlock } from './components/LeadHistoryBlock';
+import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { LeegalityESignModal } from './components/LeegalityESignModal';
@@ -76,6 +77,7 @@ const AppContent = () => {
       'lead-summary',
       'team-monitoring',
       'sale-approvals',
+      'esign-block',
       'lead-reassignment',
       'system-settings',
       'custom-roles',
@@ -101,6 +103,7 @@ const AppContent = () => {
     'lead-summary': 'Lead Summary & Super Admin Operations (Block 4)',
     'team-monitoring': 'Team Performance & Compliance Monitoring',
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
+    'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'system-settings': 'System Settings & UI Customization',
     'custom-roles': 'Custom Roles Builder (Annexure-I)',
@@ -125,6 +128,8 @@ const AppContent = () => {
         return <TeamMonitoring />;
       case 'sale-approvals':
         return <SaleApprovalWorkflow />;
+      case 'esign-block':
+        return <ESignManagementBlock onOpenLeegalityModal={(sale) => setGlobalESignSale(sale)} />;
       case 'lead-reassignment':
         return <LeadReassignmentView />;
       case 'system-settings':
