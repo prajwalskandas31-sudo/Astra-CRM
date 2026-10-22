@@ -7,6 +7,7 @@ import {
   CheckSquare, 
   Square, 
   ArrowRight, 
+  ArrowLeft,
   CheckCircle2, 
   FileText, 
   Send, 
@@ -21,9 +22,487 @@ import {
   KeyRound,
   FileCheck2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Plus,
+  Sliders,
+  Info,
+  Code,
+  FileSignature,
+  Eye,
+  UserCheck,
+  Shield
 } from 'lucide-react';
 import { HarshalParmarESign } from './HarshalParmarESign';
+
+// ─── AUTHENTIC LEEGALITY LOGO (Geometric Multi-Color Facets) ────────────────
+const LeegalityLogo = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <svg width="26" height="26" viewBox="0 0 40 40" fill="none">
+      <path d="M6 34 L20 6 L20 20 Z" fill="#E11D48" />
+      <path d="M20 6 L34 34 L20 20 Z" fill="#7C3AED" />
+      <path d="M6 34 L34 34 L20 20 Z" fill="#0284C7" />
+      <path d="M12 28 L28 28 L20 14 Z" fill="#06B6D4" opacity="0.8" />
+    </svg>
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+      <span style={{
+        fontSize: '1.4rem',
+        fontWeight: 800,
+        color: '#0f172a',
+        letterSpacing: '-0.5px',
+        fontFamily: "'Inter', sans-serif"
+      }}>
+        leegality
+      </span>
+    </div>
+  </div>
+);
+
+// ─── EXACT LEEGALITY TOGGLE SWITCH COMPONENT ─────────────────────────────────
+const LeegalityToggle = ({ checked, onChange, disabled = false, id }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    id={id}
+    disabled={disabled}
+    onClick={() => !disabled && onChange && onChange(!checked)}
+    style={{
+      position: 'relative',
+      width: '38px',
+      height: '22px',
+      borderRadius: '12px',
+      backgroundColor: checked ? '#2b5c7d' : (disabled ? '#e2e8f0' : '#cbd5e1'),
+      border: disabled ? '1px solid #cbd5e1' : 'none',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'background-color 0.2s ease',
+      padding: 0,
+      outline: 'none',
+      opacity: disabled ? 0.75 : 1,
+      display: 'inline-flex',
+      alignItems: 'center',
+      flexShrink: 0
+    }}
+  >
+    <span
+      style={{
+        display: 'block',
+        width: '18px',
+        height: '18px',
+        borderRadius: '50%',
+        backgroundColor: disabled && !checked ? '#94a3b8' : '#ffffff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+        transform: checked ? 'translateX(18px)' : 'translateX(2px)',
+        transition: 'transform 0.2s ease, background-color 0.2s ease'
+      }}
+    />
+  </button>
+);
+
+// ─── SEBI MITC & CONTRACT DOCUMENT PREVIEW ──────────────────────────────────
+const LeegalityDocumentPreview = ({
+  activeDocTab,
+  setActiveDocTab,
+  tenure,
+  clientInfo,
+  clientName,
+  panNumber,
+  phone,
+  email,
+  serviceName,
+  grossSales,
+  netSales,
+  gst,
+  date1,
+  paymentDate,
+  isSignAffixed,
+  activeStep,
+  isCompleted,
+  documentId
+}) => {
+  return (
+    <div style={{
+      flex: 1,
+      overflowY: 'auto',
+      padding: '20px 24px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      backgroundColor: '#f1f5f9'
+    }}>
+      {/* Document Navigation & Auto-Fill Status Bar */}
+      <div style={{
+        width: '100%',
+        maxWidth: '680px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '14px',
+        background: '#e2e8f0',
+        padding: '4px 6px',
+        borderRadius: '8px',
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)'
+      }}>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          <button
+            type="button"
+            onClick={() => setActiveDocTab('mitc')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: activeDocTab === 'mitc' ? 700 : 500,
+              backgroundColor: activeDocTab === 'mitc' ? '#ffffff' : 'transparent',
+              color: activeDocTab === 'mitc' ? '#0284c7' : '#475569',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              boxShadow: activeDocTab === 'mitc' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <FileText size={13} /> Most Important Terms (MITC)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDocTab('contract')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: activeDocTab === 'contract' ? 700 : 500,
+              backgroundColor: activeDocTab === 'contract' ? '#ffffff' : 'transparent',
+              color: activeDocTab === 'contract' ? '#0284c7' : '#475569',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              boxShadow: activeDocTab === 'contract' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <FileText size={13} /> Contract Agreement (T&C)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveDocTab('both')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: activeDocTab === 'both' ? 700 : 500,
+              backgroundColor: activeDocTab === 'both' ? '#ffffff' : 'transparent',
+              color: activeDocTab === 'both' ? '#0284c7' : '#475569',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              boxShadow: activeDocTab === 'both' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            <FileCheck2 size={13} /> View Both
+          </button>
+        </div>
+
+        {/* Service Tenure Auto-Fill Pill */}
+        <div style={{
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          color: '#0369a1',
+          backgroundColor: '#e0f2fe',
+          border: '1px solid #7dd3fc',
+          padding: '3px 8px',
+          borderRadius: '5px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px'
+        }}>
+          <Sparkles size={11} /> Service Tenure: <strong>{tenure}</strong>
+        </div>
+      </div>
+
+      {/* Virtual A4 Paper Document Preview Container */}
+      <div style={{
+        width: '100%',
+        maxWidth: '680px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '24px'
+      }}>
+        {/* ── DOCUMENT 1: MITC ── */}
+        {(activeDocTab === 'mitc' || activeDocTab === 'both') && (
+          <div style={{
+            backgroundColor: '#ffffff',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+            padding: '36px 34px',
+            borderRadius: '4px',
+            color: '#334155',
+            fontSize: '0.8rem',
+            lineHeight: 1.6,
+            border: '1px solid #e2e8f0',
+            position: 'relative'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+              backgroundColor: '#f0fdf4',
+              color: '#166534',
+              border: '1px solid #bbf7d0',
+              padding: '2px 8px',
+              borderRadius: '4px'
+            }}>
+              SEBI COMPLIANT MITC
+            </div>
+
+            <div style={{ textAlign: 'center', marginBottom: '18px', borderBottom: '2px solid #0284c7', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 4px 0', color: '#0f172a', letterSpacing: '-0.2px' }}>
+                MOST IMPORTANT TERMS & CONDITIONS (MITC)
+              </h2>
+              <p style={{ fontSize: '0.72rem', fontWeight: 600, color: '#0369a1', margin: '0 0 4px 0' }}>
+                SEBI (Research Analyst) Regulations, 2014 Mandatory Disclosure Document
+              </p>
+              <p style={{ fontSize: '0.68rem', color: '#64748b', margin: 0 }}>
+                Research Analyst: <strong>Harshal Parmar</strong> • SEBI Registration No: <strong>INH000002099</strong>
+              </p>
+            </div>
+
+            <p style={{ fontSize: '0.74rem', color: '#475569', textAlign: 'justify', marginBottom: '14px' }}>
+              This document summarizes the <strong>Most Important Terms and Conditions (MITC)</strong> governing the research services provided by the Research Analyst. The Client acknowledges having selected the service parameters during the intake process:
+            </p>
+
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '12px 14px',
+              marginBottom: '16px',
+              fontSize: '0.76rem'
+            }}>
+              <div style={{
+                fontWeight: 700,
+                color: '#0f172a',
+                borderBottom: '1px solid #e2e8f0',
+                paddingBottom: '6px',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <span>Key Commercial & Service Parameters</span>
+                <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600 }}>
+                  Auto-Synced with Client Information Page
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                <div>• <strong>Client Name:</strong> {clientInfo.clientPrefix || 'Mr.'} {clientName}</div>
+                <div>• <strong>PAN Number:</strong> {panNumber}</div>
+                <div>• <strong>Registered Mobile:</strong> {phone}</div>
+                <div>• <strong>Registered Email:</strong> {email}</div>
+                <div>• <strong>Subscribed Service:</strong> {serviceName}</div>
+
+                <div style={{
+                  gridColumn: '1 / -1',
+                  backgroundColor: '#e0f2fe',
+                  border: '1px solid #7dd3fc',
+                  borderRadius: '4px',
+                  padding: '6px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: '2px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <strong style={{ color: '#0369a1' }}>• Service Tenure (Duration):</strong>
+                    <span style={{
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      padding: '1px 8px',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                      fontSize: '0.8rem'
+                    }}>
+                      {tenure}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <Check size={11} /> Auto-Pulled from Client Info Page
+                  </span>
+                </div>
+
+                <div>• <strong>Gross Advisory Fee:</strong> {grossSales}</div>
+                <div>• <strong>Net Fee / GST:</strong> ₹{Number(netSales).toLocaleString('en-IN')} + GST ₹{Number(gst).toLocaleString('en-IN')}</div>
+                <div>• <strong>Date of Execution:</strong> {date1}</div>
+                <div>• <strong>Date of Payment:</strong> {paymentDate}</div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <strong style={{ color: '#0f172a', fontSize: '0.78rem' }}>Essential Terms & Disclosures:</strong>
+              <ol style={{ paddingLeft: '18px', margin: '6px 0 0 0', color: '#475569', fontSize: '0.74rem', lineHeight: 1.5 }}>
+                <li>
+                  <strong>Tenure Duration & Validity:</strong> The research recommendations and analyst advisory services are strictly engaged for the duration of <strong>{tenure}</strong> starting on <strong>{date1}</strong>.
+                </li>
+                <li>
+                  <strong>Nature of Advisory Services:</strong> The Research Analyst provides research reports and opinions on a non-discretionary, advisory basis only under SEBI (Research Analyst) Regulations, 2014.
+                </li>
+                <li>
+                  <strong>Market Risk Disclosure:</strong> Investment in the securities market is subject to market risks. The Client has evaluated their financial risk profile prior to engaging this <strong>{tenure}</strong> service.
+                </li>
+              </ol>
+            </div>
+
+            <div style={{
+              backgroundColor: '#f1f5f9',
+              borderLeft: '3px solid #0284c7',
+              padding: '8px 12px',
+              fontSize: '0.72rem',
+              color: '#334155',
+              marginBottom: '16px'
+            }}>
+              <strong>Client Acknowledgment:</strong> "I confirm that I have reviewed, understood, and agreed to these Most Important Terms & Conditions (MITC), specifically acknowledging the service tenure of <strong>{tenure}</strong> for <strong>{serviceName}</strong>."
+            </div>
+
+            {/* Signature Block (Harshal Parmar in cyan marked box) */}
+            <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                  For Harshal Parmar
+                </div>
+                <div>
+                  <HarshalParmarESign
+                    date={date1}
+                    isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
+                    showCyanBorder={true}
+                    documentId={documentId}
+                  />
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
+                  <div>Signature:</div>
+                  <div>Name: Mr Harshal Parmar</div>
+                  <div>Designation: Principal Officer</div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                  For and on behalf of the Client
+                </div>
+                <div style={{ minHeight: '34px', display: 'flex', alignItems: 'center', margin: '4px 0 6px 0' }}>
+                  {isCompleted ? (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '4px',
+                      fontSize: '0.74rem',
+                      color: '#166534',
+                      fontWeight: 700
+                    }}>
+                      <CheckCircle2 size={13} color="#16a34a" /> Aadhaar E-Signed by {clientName} ({date1})
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                      [Client signature affixed via Aadhaar OTP in Step 3]
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5 }}>
+                  <div>Signature: {isCompleted ? <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified</span> : ''}</div>
+                  <div>Name: {clientName}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── DOCUMENT 2: CONTRACT AGREEMENT ── */}
+        {(activeDocTab === 'contract' || activeDocTab === 'both') && (
+          <div style={{
+            backgroundColor: '#ffffff',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+            padding: '36px 34px',
+            borderRadius: '4px',
+            color: '#334155',
+            fontSize: '0.8rem',
+            lineHeight: 1.6,
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 6px 0', color: '#0f172a', letterSpacing: '-0.2px' }}>
+                TERMS AND CONDITIONS AGREEMENT
+              </h2>
+              <p style={{ fontSize: '0.74rem', fontWeight: 600, color: '#475569', margin: 0 }}>
+                **The client is requested to read the terms and conditions of the research services offered including rights and obligations.**
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
+              This Terms and Conditions Agreement is made on{' '}
+              <span style={{
+                backgroundColor: '#e0f2fe',
+                color: '#0369a1',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: 700,
+                border: '1px solid #7dd3fc'
+              }}>
+                {date1}
+              </span>{' '}
+              and entered into by and between <strong>Harshal Parmar</strong> (SEBI INH000002099) of the <strong>ONE PART</strong> and <strong>{clientName}</strong> (PAN: {panNumber}) of the <strong>SECOND PART</strong> for the explicit tenure of <strong>{tenure}</strong>.
+            </div>
+
+            {/* Signature Block Page 14 */}
+            <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                For Harshal Parmar
+              </div>
+              <div>
+                <HarshalParmarESign
+                  date={date1}
+                  isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
+                  showCyanBorder={true}
+                  documentId={documentId}
+                />
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
+                <div>Signature:</div>
+                <div>Name: Mr Harshal Parmar</div>
+                <div>Designation: Principal Officer</div>
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: '36px',
+              paddingTop: '12px',
+              borderTop: '1px solid #f1f5f9',
+              fontSize: '0.74rem',
+              color: '#64748b',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>Page 14 of 14</span>
+              <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>SEBI INH000002099 Certified</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const LeegalityESignModal = ({
   isOpen,
@@ -41,7 +520,7 @@ export const LeegalityESignModal = ({
   // Document preview switcher: 'mitc' | 'contract' | 'both'
   const [activeDocTab, setActiveDocTab] = useState('mitc');
 
-  // Dynamic Date 1: "This field dynamically records the exact date the process is being performed"
+  // Dynamic Date 1
   const getDynamicDateFormatted = () => {
     const today = new Date();
     const dd = String(today.getDate()).padStart(2, '0');
@@ -53,7 +532,7 @@ export const LeegalityESignModal = ({
   const [date1, setDate1] = useState(getDynamicDateFormatted());
   const [date1Iso, setDate1Iso] = useState(new Date().toISOString().split('T')[0]);
 
-  // Checkbox 1 Options (from template) - dynamically pre-checked & bound to tenure
+  // Checkbox 1 Options (bound to tenure)
   const [checkboxOptions, setCheckboxOptions] = useState({
     option1: true,
     option2: true,
@@ -61,10 +540,20 @@ export const LeegalityESignModal = ({
   });
 
   const [allowFirstInviteeToFill, setAllowFirstInviteeToFill] = useState(false);
-  // Controls affixing Harshal Parmar's official digital signature in the marked cyan box
   const [isSignAffixed, setIsSignAffixed] = useState(true);
 
-  // Step 2 & 3 state
+  // ─── STEP 2 (INVITE) STATE MATCHING LEEGALITY SCREENSHOT ──────────────────
+  const [requestFixedOrder, setRequestFixedOrder] = useState(false);
+  // User Requirement: "in leegality (ekyc portal of which we are using api) this must be disabled"
+  const [iWantToSign, setIWantToSign] = useState(false); // MUST BE DISABLED
+  const [invitees, setInvitees] = useState([]);
+  const [signatureDropdownOpenId, setSignatureDropdownOpenId] = useState(null);
+  const [selectedInviteeForOptions, setSelectedInviteeForOptions] = useState(null);
+  const [showJourneyOptionsModal, setShowJourneyOptionsModal] = useState(false);
+  const [showPayloadModal, setShowPayloadModal] = useState(false);
+  const [previewLegacyInvestEQ, setPreviewLegacyInvestEQ] = useState(false);
+
+  // Step 3 state
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
   const [otpInput, setOtpInput] = useState('');
@@ -72,7 +561,7 @@ export const LeegalityESignModal = ({
   const [isCompleted, setIsCompleted] = useState(false);
   const [documentId, setDocumentId] = useState('');
 
-  // Extract client & sale info with robust fallback to leads array
+  // Extract client & sale info
   const clientInfo = sale?.fullClientInfo || sale?.clientInfo || {};
   const matchingLead = (leads || []).find(l => l.id === sale?.leadId);
   const clientName = clientInfo.clientName || sale?.clientName || 'Client';
@@ -81,7 +570,6 @@ export const LeegalityESignModal = ({
   const email = sale?.email || clientInfo.email || 'client@example.com';
   const serviceName = sale?.serviceOpted || clientInfo.serviceName || 'Equity Advisory';
   
-  // Exact Service Tenure auto-pulled from Client Information Page
   const tenure = sale?.serviceTenure 
     || clientInfo.serviceTenure 
     || matchingLead?.clientInfo?.serviceTenure 
@@ -109,8 +597,20 @@ export const LeegalityESignModal = ({
         option2: true,
         option3: true
       });
+      setRequestFixedOrder(false);
+      setIWantToSign(false); // MUST BE DISABLED
+      setPreviewLegacyInvestEQ(false);
+      setInvitees([
+        {
+          id: 'inv-client-1',
+          name: clientName,
+          contact: phone || email,
+          signatureType: 'Aadhaar E-Sign (OTP)',
+          role: 'Signer'
+        }
+      ]);
     }
-  }, [isOpen]);
+  }, [isOpen, sale]);
 
   if (!isOpen || !sale) return null;
 
@@ -125,25 +625,82 @@ export const LeegalityESignModal = ({
     }
   };
 
-  // Step 1: Create Document
+  // Step 1: Create Document -> Moves to Step 2 (Invite)
   const handleCreateDocument = () => {
     if (!checkboxOptions.option1 || !checkboxOptions.option2 || !checkboxOptions.option3) {
       showToast('Please check all template agreement options to proceed.', 'warning');
       return;
     }
-
     setActiveStep(2);
+    showToast('Document initialized! Review invitees in Leegality Step 2: Invite.', 'info');
+  };
+
+  // Step 2 Invitee Handlers
+  const handleAddInvitee = () => {
+    const newId = 'inv-' + Date.now();
+    setInvitees(prev => [
+      ...prev,
+      {
+        id: newId,
+        name: '',
+        contact: '',
+        signatureType: 'Aadhaar E-Sign (OTP)',
+        role: 'Signer'
+      }
+    ]);
+    showToast('New Invitee added to signing list.', 'info');
+  };
+
+  const handleUpdateInvitee = (id, field, value) => {
+    setInvitees(prev => prev.map(inv => inv.id === id ? { ...inv, [field]: value } : inv));
+  };
+
+  const handleDuplicateInvitee = (id) => {
+    const target = invitees.find(inv => inv.id === id);
+    if (!target) return;
+    const dup = {
+      ...target,
+      id: 'inv-' + Date.now(),
+      name: `${target.name} (Copy)`
+    };
+    setInvitees(prev => [...prev, dup]);
+    showToast('Invitee duplicated.', 'info');
+  };
+
+  const handleMoveInvitee = (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= invitees.length) return;
+    setInvitees(prev => {
+      const copy = [...prev];
+      const temp = copy[index];
+      copy[index] = copy[newIndex];
+      copy[newIndex] = temp;
+      return copy;
+    });
+  };
+
+  const handleDeleteInvitee = (id) => {
+    if (invitees.length <= 1) {
+      showToast('At least one invitee must remain for signing.', 'warning');
+      return;
+    }
+    setInvitees(prev => prev.filter(inv => inv.id !== id));
+    showToast('Invitee removed.', 'info');
+  };
+
+  // Step 2 -> Step 3 (Proceed to Finalize OTP)
+  const handleProceedToOtp = () => {
+    if (invitees.length === 0 || !invitees[0].name.trim() || !invitees[0].contact.trim()) {
+      showToast('Please provide valid invitee name and phone/email.', 'warning');
+      return;
+    }
+    setActiveStep(3);
     setIsSendingInvite(true);
     setTimeout(() => {
       setIsSendingInvite(false);
       setInviteSent(true);
-      showToast('Document created! Leegality invitation link sent via SMS & Email with auto-filled Service Tenure (' + tenure + ').', 'success');
-    }, 1200);
-  };
-
-  // Step 2: Proceed to Finalize (OTP Signing)
-  const handleProceedToOtp = () => {
-    setActiveStep(3);
+      showToast(`Leegality E-Sign package dispatched to ${invitees[0].name} (${invitees[0].contact}).`, 'success');
+    }, 1000);
   };
 
   // Step 3: Complete Aadhaar OTP E-Sign
@@ -163,13 +720,15 @@ export const LeegalityESignModal = ({
         documentId,
         date1: date1,
         signedAt: new Date().toISOString(),
-        signedBy: clientName,
+        signedBy: invitees[0]?.name || clientName,
         pan: panNumber,
         serviceName,
         serviceTenure: tenure,
         grossSales,
         netSales,
-        gst
+        gst,
+        iWantToSignDisabled: true, // Persist compliance flag
+        signers: invitees
       };
 
       completeESignProcess(sale.id, signMetadata);
@@ -179,6 +738,18 @@ export const LeegalityESignModal = ({
         onComplete(signMetadata);
       }
     }, 1500);
+  };
+
+  const cardActionBtnStyle = {
+    padding: '6px 10px',
+    border: 'none',
+    borderRight: '1px solid #e2e8f0',
+    background: 'transparent',
+    color: '#64748b',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   };
 
   return (
@@ -205,12 +776,12 @@ export const LeegalityESignModal = ({
           backgroundColor: '#ffffff',
           color: '#1e293b',
           borderRadius: '10px',
-          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.9), 0 0 40px rgba(14, 116, 144, 0.25)',
+          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.9), 0 0 40px rgba(43, 92, 125, 0.3)',
           overflow: 'hidden',
           fontFamily: "'Inter', sans-serif"
         }}
       >
-        {/* ─── LEEGALITY TOP NAVIGATION BAR (Pixel-Perfect from Screenshot) ─── */}
+        {/* ─── TOP NAVIGATION BAR (Pixel-Perfect from Screenshot) ─── */}
         <div style={{
           padding: '12px 24px',
           backgroundColor: '#ffffff',
@@ -221,43 +792,36 @@ export const LeegalityESignModal = ({
         }}>
           {/* Leegality Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontWeight: 800,
-              fontSize: '1.4rem',
-              color: '#0284c7',
-              letterSpacing: '-0.5px'
-            }}>
-              <span style={{ fontSize: '1.7rem', color: '#0369a1', lineHeight: 0.9 }}>❖</span>
-              <span>leegality</span>
-            </div>
+            <LeegalityLogo />
             <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#64748b', padding: '2px 8px', borderRadius: '4px', fontWeight: 600, marginLeft: '6px' }}>
               API v2.1
             </span>
           </div>
 
           {/* Stepper (1 Create -> 2 Invite -> 3 Finalize) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             {/* Step 1: Create */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '4px',
-              backgroundColor: activeStep === 1 ? '#0284c7' : 'transparent',
-              color: activeStep === 1 ? '#ffffff' : (activeStep > 1 ? '#0284c7' : '#94a3b8'),
-              fontWeight: 600,
-              fontSize: '0.84rem'
-            }}>
+            <div 
+              onClick={() => setActiveStep(1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: activeStep === 1 ? '6px 16px' : '4px 8px',
+                borderRadius: '4px',
+                backgroundColor: activeStep === 1 ? '#2b5c7d' : 'transparent',
+                color: activeStep === 1 ? '#ffffff' : (activeStep > 1 ? '#2b5c7d' : '#94a3b8'),
+                fontWeight: 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer'
+              }}
+            >
               <div style={{
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%',
-                backgroundColor: activeStep === 1 ? '#ffffff' : (activeStep > 1 ? '#0284c7' : '#cbd5e1'),
-                color: activeStep === 1 ? '#0284c7' : '#ffffff',
+                backgroundColor: activeStep === 1 ? '#ffffff' : (activeStep > 1 ? '#2b5c7d' : '#e2e8f0'),
+                color: activeStep === 1 ? '#2b5c7d' : (activeStep > 1 ? '#ffffff' : '#64748b'),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -269,24 +833,28 @@ export const LeegalityESignModal = ({
               <span>Create</span>
             </div>
 
-            {/* Step 2: Invite */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '4px',
-              backgroundColor: activeStep === 2 ? '#0284c7' : 'transparent',
-              color: activeStep === 2 ? '#ffffff' : (activeStep > 2 ? '#0284c7' : '#94a3b8'),
-              fontWeight: 600,
-              fontSize: '0.84rem'
-            }}>
+            {/* Step 2: Invite (Exact Leegality dark slate blue pill #2b5c7d from screenshot) */}
+            <div 
+              onClick={() => setActiveStep(2)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: activeStep === 2 ? '6px 16px' : '4px 8px',
+                borderRadius: '4px',
+                backgroundColor: activeStep === 2 ? '#2b5c7d' : 'transparent',
+                color: activeStep === 2 ? '#ffffff' : (activeStep > 2 ? '#2b5c7d' : '#94a3b8'),
+                fontWeight: 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer'
+              }}
+            >
               <div style={{
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%',
-                backgroundColor: activeStep === 2 ? '#ffffff' : (activeStep > 2 ? '#0284c7' : '#cbd5e1'),
-                color: activeStep === 2 ? '#0284c7' : '#ffffff',
+                backgroundColor: activeStep === 2 ? '#ffffff' : (activeStep > 2 ? '#2b5c7d' : '#e2e8f0'),
+                color: activeStep === 2 ? '#2b5c7d' : (activeStep > 2 ? '#ffffff' : '#64748b'),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -299,23 +867,27 @@ export const LeegalityESignModal = ({
             </div>
 
             {/* Step 3: Finalize */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 16px',
-              borderRadius: '4px',
-              backgroundColor: activeStep === 3 ? '#0284c7' : 'transparent',
-              color: activeStep === 3 ? '#ffffff' : '#94a3b8',
-              fontWeight: 600,
-              fontSize: '0.84rem'
-            }}>
+            <div 
+              onClick={() => setActiveStep(3)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: activeStep === 3 ? '6px 16px' : '4px 8px',
+                borderRadius: '4px',
+                backgroundColor: activeStep === 3 ? '#2b5c7d' : 'transparent',
+                color: activeStep === 3 ? '#ffffff' : '#94a3b8',
+                fontWeight: 600,
+                fontSize: '0.84rem',
+                cursor: 'pointer'
+              }}
+            >
               <div style={{
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%',
-                backgroundColor: activeStep === 3 ? '#ffffff' : '#cbd5e1',
-                color: activeStep === 3 ? '#0284c7' : '#ffffff',
+                backgroundColor: activeStep === 3 ? '#ffffff' : '#e2e8f0',
+                color: activeStep === 3 ? '#2b5c7d' : '#64748b',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -330,32 +902,33 @@ export const LeegalityESignModal = ({
 
           {/* Right Action Icons & Close */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Top Right Tabs: Upload | Templates */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', fontWeight: 500 }}>
-              <span 
-                onClick={() => setActiveTab('Upload')}
-                style={{ 
-                  color: activeTab === 'Upload' ? '#0284c7' : '#64748b', 
-                  cursor: 'pointer',
-                  paddingBottom: '4px',
-                  borderBottom: activeTab === 'Upload' ? '2px solid #0284c7' : 'none'
-                }}
-              >
-                Upload
-              </span>
-              <span 
-                onClick={() => setActiveTab('Templates')}
-                style={{ 
-                  color: activeTab === 'Templates' ? '#0284c7' : '#64748b', 
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  paddingBottom: '4px',
-                  borderBottom: activeTab === 'Templates' ? '2px solid #0284c7' : 'none'
-                }}
-              >
-                Templates
-              </span>
-            </div>
+            {activeStep === 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.85rem', fontWeight: 500 }}>
+                <span 
+                  onClick={() => setActiveTab('Upload')}
+                  style={{ 
+                    color: activeTab === 'Upload' ? '#2b5c7d' : '#64748b', 
+                    cursor: 'pointer',
+                    paddingBottom: '4px',
+                    borderBottom: activeTab === 'Upload' ? '2px solid #2b5c7d' : 'none'
+                  }}
+                >
+                  Upload
+                </span>
+                <span 
+                  onClick={() => setActiveTab('Templates')}
+                  style={{ 
+                    color: activeTab === 'Templates' ? '#2b5c7d' : '#64748b', 
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    paddingBottom: '4px',
+                    borderBottom: activeTab === 'Templates' ? '2px solid #2b5c7d' : 'none'
+                  }}
+                >
+                  Templates
+                </span>
+              </div>
+            )}
 
             <button 
               onClick={onClose} 
@@ -375,972 +948,285 @@ export const LeegalityESignModal = ({
           </div>
         </div>
 
-        {/* ─── MAIN WORKSPACE (SPLIT: DOCUMENT PREVIEW VS FORM FIELDS) ─── */}
-        <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
-          {/* LEFT COLUMN: DOCUMENT PREVIEW WITH MITC & CONTRACT TOGGLES */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '20px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            backgroundColor: '#f1f5f9'
-          }}>
-            {/* Document Navigation & Auto-Fill Status Bar */}
+        {/* ─── STEP 1: CREATE VIEW (SPLIT: PREVIEW VS FORM FIELDS) ─── */}
+        {activeStep === 1 && (
+          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
+            <LeegalityDocumentPreview
+              activeDocTab={activeDocTab}
+              setActiveDocTab={setActiveDocTab}
+              tenure={tenure}
+              clientInfo={clientInfo}
+              clientName={clientName}
+              panNumber={panNumber}
+              phone={phone}
+              email={email}
+              serviceName={serviceName}
+              grossSales={grossSales}
+              netSales={netSales}
+              gst={gst}
+              date1={date1}
+              paymentDate={paymentDate}
+              isSignAffixed={isSignAffixed}
+              activeStep={activeStep}
+              isCompleted={isCompleted}
+              documentId={documentId}
+            />
+
+            {/* RIGHT COLUMN: TEMPLATE FORM FIELDS */}
             <div style={{
-              width: '100%',
-              maxWidth: '680px',
+              width: '380px',
+              backgroundColor: '#ffffff',
+              borderLeft: '1px solid #e2e8f0',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '14px',
-              background: '#e2e8f0',
-              padding: '4px 6px',
-              borderRadius: '8px',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)'
+              flexDirection: 'column'
             }}>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveDocTab('mitc')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.76rem',
-                    fontWeight: activeDocTab === 'mitc' ? 700 : 500,
-                    backgroundColor: activeDocTab === 'mitc' ? '#ffffff' : 'transparent',
-                    color: activeDocTab === 'mitc' ? '#0284c7' : '#475569',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    boxShadow: activeDocTab === 'mitc' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <FileText size={13} /> Most Important Terms (MITC)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveDocTab('contract')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.76rem',
-                    fontWeight: activeDocTab === 'contract' ? 700 : 500,
-                    backgroundColor: activeDocTab === 'contract' ? '#ffffff' : 'transparent',
-                    color: activeDocTab === 'contract' ? '#0284c7' : '#475569',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    boxShadow: activeDocTab === 'contract' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <FileText size={13} /> Contract Agreement (T&C)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveDocTab('both')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '0.76rem',
-                    fontWeight: activeDocTab === 'both' ? 700 : 500,
-                    backgroundColor: activeDocTab === 'both' ? '#ffffff' : 'transparent',
-                    color: activeDocTab === 'both' ? '#0284c7' : '#475569',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    boxShadow: activeDocTab === 'both' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <FileCheck2 size={13} /> View Both
-                </button>
-              </div>
+              <div style={{ flex: 1, padding: '22px 20px', overflowY: 'auto' }}>
+                <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 16px 0' }}>
+                  Template Form Fields
+                </h3>
 
-              {/* Service Tenure Auto-Fill Pill */}
-              <div style={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                color: '#0369a1',
-                backgroundColor: '#e0f2fe',
-                border: '1px solid #7dd3fc',
-                padding: '3px 8px',
-                borderRadius: '5px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <Sparkles size={11} /> Service Tenure: <strong>{tenure}</strong>
-              </div>
-            </div>
-
-            {/* Virtual A4 Paper Document Preview Container */}
-            <div style={{
-              width: '100%',
-              maxWidth: '680px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px'
-            }}>
-
-              {/* ───────────────────────────────────────────────────────────── */}
-              {/* DOCUMENT 1: MOST IMPORTANT TERMS & CONDITIONS (MITC)           */}
-              {/* ───────────────────────────────────────────────────────────── */}
-              {(activeDocTab === 'mitc' || activeDocTab === 'both') && (
-                <div style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  padding: '36px 34px',
-                  borderRadius: '4px',
-                  color: '#334155',
-                  fontSize: '0.8rem',
-                  lineHeight: 1.6,
-                  border: '1px solid #e2e8f0',
-                  position: 'relative'
-                }}>
-                  {/* Watermark / Badge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '16px',
-                    right: '16px',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.5px',
-                    backgroundColor: '#f0fdf4',
-                    color: '#166534',
-                    border: '1px solid #bbf7d0',
-                    padding: '2px 8px',
-                    borderRadius: '4px'
-                  }}>
-                    SEBI COMPLIANT MITC
+                {/* Date 1 Field */}
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Date 1
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={date1}
+                      onChange={(e) => setDate1(e.target.value)}
+                      placeholder="dd/mm/yyyy"
+                      style={{
+                        width: '100%',
+                        padding: '8px 36px 8px 12px',
+                        fontSize: '0.84rem',
+                        color: '#0f172a',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #0284c7',
+                        borderRadius: '4px',
+                        fontWeight: 500
+                      }}
+                    />
+                    <input
+                      type="date"
+                      value={date1Iso}
+                      onChange={handleDateIsoChange}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        opacity: 0,
+                        width: '24px',
+                        height: '24px',
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <Calendar 
+                      size={16} 
+                      color="#0284c7" 
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} 
+                    />
                   </div>
+                  <span style={{ fontSize: '0.72rem', color: '#0284c7', marginTop: '4px', display: 'block', fontWeight: 500 }}>
+                    ⚡ Dynamically records execution date: <strong>{date1}</strong>
+                  </span>
+                </div>
 
-                  {/* MITC Header */}
-                  <div style={{ textAlign: 'center', marginBottom: '18px', borderBottom: '2px solid #0284c7', paddingBottom: '12px' }}>
-                    <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 4px 0', color: '#0f172a', letterSpacing: '-0.2px' }}>
-                      MOST IMPORTANT TERMS & CONDITIONS (MITC)
-                    </h2>
-                    <p style={{ fontSize: '0.72rem', fontWeight: 600, color: '#0369a1', margin: '0 0 4px 0' }}>
-                      SEBI (Research Analyst) Regulations, 2014 Mandatory Disclosure Document
-                    </p>
-                    <p style={{ fontSize: '0.68rem', color: '#64748b', margin: 0 }}>
-                      Research Analyst: <strong>Harshal Parmar</strong> • SEBI Registration No: <strong>INH000002099</strong>
-                    </p>
-                  </div>
-
-                  {/* Preamble Notice */}
-                  <p style={{ fontSize: '0.74rem', color: '#475569', textAlign: 'justify', marginBottom: '14px' }}>
-                    This document summarizes the <strong>Most Important Terms and Conditions (MITC)</strong> governing the research services provided by the Research Analyst. The Client acknowledges having selected the service parameters during the intake process:
-                  </p>
-
-                  {/* Highlighted Schedule Table with Exact Service Tenure */}
+                {/* Service Tenure Auto-Fill */}
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>Service Tenure (Auto-Filled)</span>
+                    <span style={{ fontSize: '0.68rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      ✓ Client Info Synced
+                    </span>
+                  </label>
                   <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
                     backgroundColor: '#f8fafc',
                     border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    padding: '12px 14px',
-                    marginBottom: '16px',
-                    fontSize: '0.76rem'
+                    borderRadius: '4px',
+                    fontSize: '0.84rem'
                   }}>
-                    <div style={{
-                      fontWeight: 700,
-                      color: '#0f172a',
-                      borderBottom: '1px solid #e2e8f0',
-                      paddingBottom: '6px',
-                      marginBottom: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span>Key Commercial & Service Parameters</span>
-                      <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600 }}>
-                        Auto-Synced with Client Information Page
-                      </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <ClockIcon />
+                      <strong style={{ color: '#0f172a' }}>{tenure}</strong>
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
-                      <div>• <strong>Client Name:</strong> {clientInfo.clientPrefix || 'Mr.'} {clientName}</div>
-                      <div>• <strong>PAN Number:</strong> {panNumber}</div>
-                      <div>• <strong>Registered Mobile:</strong> {phone}</div>
-                      <div>• <strong>Registered Email:</strong> {email}</div>
-                      <div>• <strong>Subscribed Service:</strong> {serviceName}</div>
-
-                      {/* SERVICE TENURE - HIGH VISIBILITY ROW */}
-                      <div style={{
-                        gridColumn: '1 / -1',
-                        backgroundColor: '#e0f2fe',
-                        border: '1px solid #7dd3fc',
-                        borderRadius: '4px',
-                        padding: '6px 10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginTop: '2px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <strong style={{ color: '#0369a1' }}>• Service Tenure (Duration):</strong>
-                          <span style={{
-                            backgroundColor: '#0284c7',
-                            color: '#ffffff',
-                            padding: '1px 8px',
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            fontSize: '0.8rem'
-                          }}>
-                            {tenure}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.68rem', color: '#0284c7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <Check size={11} /> Auto-Pulled from Client Info Page
-                        </span>
-                      </div>
-
-                      <div>• <strong>Gross Advisory Fee:</strong> {grossSales}</div>
-                      <div>• <strong>Net Fee / GST:</strong> ₹{Number(netSales).toLocaleString('en-IN')} + GST ₹{Number(gst).toLocaleString('en-IN')}</div>
-                      <div>• <strong>Date of Execution:</strong> {date1}</div>
-                      <div>• <strong>Date of Payment:</strong> {paymentDate}</div>
-                    </div>
-                  </div>
-
-                  {/* Standard MITC Regulatory Points */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.78rem' }}>Essential Terms & Disclosures:</strong>
-                    <ol style={{ paddingLeft: '18px', margin: '6px 0 0 0', color: '#475569', fontSize: '0.74rem', lineHeight: 1.5 }}>
-                      <li>
-                        <strong>Tenure Duration & Validity:</strong> The research recommendations and analyst advisory services are strictly engaged for the duration of <strong>{tenure}</strong> starting on <strong>{date1}</strong>. The service shall automatically terminate at the conclusion of the <strong>{tenure}</strong> period without automatic rollover unless renewed by written mutual agreement.
-                      </li>
-                      <li>
-                        <strong>Nature of Advisory Services:</strong> The Research Analyst provides research reports and opinions on a non-discretionary, advisory basis only under SEBI (Research Analyst) Regulations, 2014. The RA does not execute trades, manage funds, or offer guaranteed returns.
-                      </li>
-                      <li>
-                        <strong>Market Risk Disclosure:</strong> Investment in the securities market is subject to market risks. The Client has evaluated their financial risk profile prior to engaging this <strong>{tenure}</strong> service.
-                      </li>
-                      <li>
-                        <strong>Grievance Redressal / SCORES:</strong> In case of unresolved queries, the Client may register a complaint on the SEBI SCORES portal at <code>https://scores.sebi.gov.in</code> or SMART ODR portal at <code>https://smartodr.in</code>.
-                      </li>
-                    </ol>
-                  </div>
-
-                  {/* Client Declaration */}
-                  <div style={{
-                    backgroundColor: '#f1f5f9',
-                    borderLeft: '3px solid #0284c7',
-                    padding: '8px 12px',
-                    fontSize: '0.72rem',
-                    color: '#334155',
-                    marginBottom: '16px'
-                  }}>
-                    <strong>Client Acknowledgment:</strong> "I confirm that I have reviewed, understood, and agreed to these Most Important Terms & Conditions (MITC), specifically acknowledging the service tenure of <strong>{tenure}</strong> for <strong>{serviceName}</strong>."
-                  </div>
-
-                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 1 (INTERLINKED) ─── */}
-                  <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
-                    {/* For Harshal Parmar */}
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                        For Harshal Parmar
-                      </div>
-
-                      {/* CYAN MARKED BOX FOR HIS E-SIGN (SCREENSHOT 1) */}
-                      <div>
-                        <HarshalParmarESign
-                          date={date1}
-                          isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
-                          showCyanBorder={true}
-                          documentId={documentId}
-                        />
-                      </div>
-
-                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
-                        <div>Signature:</div>
-                        <div>Name: Mr Harshal Parmar</div>
-                        <div>Designation: Principal Officer</div>
-                      </div>
-                    </div>
-
-                    {/* For and on behalf of the Client */}
-                    <div>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                        For and on behalf of the Client
-                      </div>
-
-                      {/* Client Signature Area */}
-                      <div style={{ minHeight: '34px', display: 'flex', alignItems: 'center', margin: '4px 0 6px 0' }}>
-                        {isCompleted ? (
-                          <div style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '4px 10px',
-                            backgroundColor: '#f0fdf4',
-                            border: '1px solid #bbf7d0',
-                            borderRadius: '4px',
-                            fontSize: '0.74rem',
-                            color: '#166534',
-                            fontWeight: 700
-                          }}>
-                            <CheckCircle2 size={13} color="#16a34a" /> Aadhaar E-Signed by {clientName} ({date1})
-                          </div>
-                        ) : (
-                          <div style={{
-                            fontSize: '0.74rem',
-                            color: '#94a3b8',
-                            fontStyle: 'italic',
-                            padding: '2px 0'
-                          }}>
-                            [Client signature affixed via Aadhaar OTP in Step 3]
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5 }}>
-                        <div>Signature: {isCompleted ? <span style={{ color: '#10b981', fontWeight: 600 }}>✓ Verified</span> : ''}</div>
-                        <div>Name: {clientName}</div>
-                      </div>
-                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 600 }}>
+                      Auto-Filled
+                    </span>
                   </div>
                 </div>
-              )}
 
-              {/* ───────────────────────────────────────────────────────────── */}
-              {/* DOCUMENT 2: TERMS AND CONDITIONS AGREEMENT (CONTRACT)          */}
-              {/* ───────────────────────────────────────────────────────────── */}
-              {(activeDocTab === 'contract' || activeDocTab === 'both') && (
+                {/* Checkbox 1 (Bound to Tenure) */}
                 <div style={{
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  padding: '36px 34px',
-                  borderRadius: '4px',
-                  color: '#334155',
-                  fontSize: '0.8rem',
-                  lineHeight: 1.6,
-                  border: '1px solid #e2e8f0'
+                  marginBottom: '22px',
+                  border: '1.5px dashed #0284c7',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  backgroundColor: 'rgba(2, 132, 199, 0.03)'
                 }}>
-                  {/* Document Header */}
-                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 6px 0', color: '#0f172a', letterSpacing: '-0.2px' }}>
-                      TERMS AND CONDITIONS AGREEMENT
-                    </h2>
-                    <p style={{ fontSize: '0.74rem', fontWeight: 600, color: '#475569', margin: 0 }}>
-                      **The client is requested to read the terms and conditions of the research services offered including rights and obligations.**
-                    </p>
-                  </div>
-
-                  {/* Dynamic Date Agreement Preamble */}
-                  <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
-                    This Terms and Conditions Agreement (hereinafter referred to as <strong>"Agreement"</strong>) is made on{' '}
-                    <span style={{
-                      backgroundColor: '#e0f2fe',
-                      color: '#0369a1',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      fontWeight: 700,
-                      border: '1px solid #7dd3fc'
-                    }}>
-                      {date1}
-                    </span>{' '}
-                    and entered into
-                  </div>
-
-                  {/* By and Between */}
-                  <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
-                    <strong>By and between:</strong>
-                    <p style={{ margin: '4px 0 0 0', color: '#475569' }}>
-                      <strong>Harshal Parmar</strong> (hereinafter referred to as <strong>"Research Analyst / RA"</strong>), having its registered office at Shop No. 5, Pramukh Darshan Complex, Chharwada Road, Vapi, Valsad, Gujarat - 396191 and duly registered under SEBI (Research Analyst) Regulations, 2014 under Registration Number <strong>INH000002099</strong> (which expression shall, unless repugnant to the context or meaning thereof, be deemed to mean and include its successors and assigns) of the <strong>ONE PART</strong>.
-                    </p>
-                  </div>
-
-                  {/* AND Client Details */}
-                  <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
-                    <strong>AND</strong>
-                    <p style={{ margin: '4px 0 0 0' }}>
-                      Client or User (<strong>"You"</strong>, <strong>"Your"</strong>, or <strong>"Client"</strong>):
-                    </p>
-                    <div style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '4px',
-                      padding: '8px 12px',
-                      margin: '6px 0',
-                      fontSize: '0.75rem',
-                      lineHeight: 1.4
-                    }}>
-                      <div>• <strong>Name:</strong> {clientInfo.clientPrefix || ''} {clientName}</div>
-                      <div>• <strong>PAN:</strong> {panNumber} | <strong>Email:</strong> {email}</div>
-                      <div>• <strong>Phone:</strong> {phone} | <strong>State:</strong> {clientInfo.clientState || 'Maharashtra'}</div>
-                      <div style={{ marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span>• <strong>Service:</strong> {serviceName}</span>
-                        <span style={{
-                          backgroundColor: '#e0f2fe',
-                          color: '#0284c7',
-                          padding: '1px 6px',
-                          borderRadius: '3px',
-                          fontWeight: 700,
-                          border: '1px solid #bae6fd'
-                        }}>
-                          Service Tenure: {tenure}
-                        </span>
-                        <span>• <strong>Fee Consideration:</strong> {grossSales}</span>
-                      </div>
-                    </div>
-                    <p style={{ margin: '4px 0 0 0', color: '#475569' }}>
-                      • The individual or entity subscribing to or availing research services.<br />
-                      • Must meet the eligibility requirements set forth herein and under Indian law of the <strong>SECOND PART</strong>.
-                    </p>
-                    <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', color: '#64748b' }}>
-                      The Research Analyst and the Client are hereinafter collectively referred to as "Parties" and individually as "Party".
-                    </p>
-                  </div>
-
-                  {/* Recitals / WHEREAS */}
-                  <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
-                    <strong>WHEREAS</strong>
-                    <ol style={{ paddingLeft: '18px', margin: '4px 0 0 0', color: '#475569' }}>
-                      <li>The Research Analyst is authorized to provide research analyst services in accordance with SEBI (Research Analyst) Regulations, 2014.</li>
-                      <li>The Client has expressed an interest in availing the aforementioned services.</li>
-                      <li>These Terms & Conditions ("T&C") Agreement govern the Client's, from time to time, use or subscription of our research services ("Services"), including any Digital Platforms, or communications.</li>
-                    </ol>
-                  </div>
-
-                  {/* Clause 3: Scope of Services & Exact Service Tenure */}
-                  <div style={{ marginBottom: '14px', textAlign: 'justify' }}>
-                    <strong>3. SCOPE OF SERVICES & SERVICE TENURE</strong>
-                    <p style={{ margin: '4px 0 0 0', color: '#475569' }}>
-                      (a) The Research Analyst shall provide research recommendations and analyst reports under the <strong>{serviceName}</strong> package to the Client for the explicit duration of <strong>{tenure}</strong> (<strong>"Service Tenure"</strong>) selected during the Client Information intake process.<br />
-                      (b) The tenure starts effective on the date of execution (<strong>{date1}</strong>) and remains valid strictly for the agreed <strong>{tenure}</strong> period.<br />
-                      (c) All research alerts and advisory publications will be disseminated strictly in accordance with SEBI (Research Analyst) Regulations, 2014.
-                    </p>
-                  </div>
-
-                  {/* ─── EXACT LEGAL CLAUSES FROM SCREENSHOT 2 (PAGE 14 OF 14) ─── */}
-                  <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1', fontSize: '0.78rem', color: '#334155', lineHeight: 1.6 }}>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      rule, regulation, contract, or other instrument to which it is a party or to which any of its property is or may be subject;
-                    </p>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      iv. The maximum fee that may be charged by the RA is ₹1.51 lakhs per annum per family of the Client;
-                    </p>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      v. The recommendations provided by the RA do not provide any assurance of returns.
-                    </p>
-                    <p style={{ margin: '0 0 18px 0' }}>
-                      vi. It is not engaged in any additional professional or business activities, on a whole-time basis or in an executive capacity, which may interfere with, influence, or have the potential to interfere with/influence the independence of the research report and/or recommendations contained therein. <strong>**Only for Individual RA**</strong>
-                    </p>
-                  </div>
-
-                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 2 (INTERLINKED) ─── */}
-                  <div style={{ marginTop: '16px' }}>
-                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                      For Harshal Parmar
-                    </div>
-
-                    {/* CYAN MARKED BOX FOR HIS E-SIGN (SCREENSHOT 2) */}
-                    <div>
-                      <HarshalParmarESign
-                        date={date1}
-                        isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
-                        showCyanBorder={true}
-                        documentId={documentId}
-                      />
-                    </div>
-
-                    <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
-                      <div>Signature:</div>
-                      <div>Name: Mr Harshal Parmar</div>
-                      <div>Designation: Principal Officer</div>
-                    </div>
-                  </div>
-
-                  {/* EXACT PAGE 14 OF 14 FOOTER FROM SCREENSHOT 2 */}
-                  <div style={{
-                    marginTop: '36px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #f1f5f9',
-                    fontSize: '0.74rem',
-                    color: '#64748b',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <span>Page 14 of 14</span>
-                    <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>SEBI INH000002099 Certified</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: TEMPLATE FORM FIELDS (Pixel-Perfect from Screenshot) */}
-          <div style={{
-            width: '380px',
-            backgroundColor: '#ffffff',
-            borderLeft: '1px solid #e2e8f0',
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{ flex: 1, padding: '22px 20px', overflowY: 'auto' }}>
-              {activeStep === 1 && (
-                <>
-                  <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 16px 0' }}>
-                    Template Form Fields
-                  </h3>
-
-                  {/* ─── FIELD: Date 1 (Matching Screenshot) ─── */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px' }}>
-                      Date 1
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                      Checkbox 1
                     </label>
-
-                    {/* Input with calendar icon matching screenshot */}
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type="text"
-                        value={date1}
-                        onChange={(e) => setDate1(e.target.value)}
-                        placeholder="dd/mm/yyyy"
-                        style={{
-                          width: '100%',
-                          padding: '8px 36px 8px 12px',
-                          fontSize: '0.84rem',
-                          color: '#0f172a',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #0284c7',
-                          borderRadius: '4px',
-                          boxShadow: '0 0 0 2px rgba(2, 132, 199, 0.15)',
-                          fontWeight: 500
-                        }}
-                      />
-                      {/* Hidden native date picker to allow picking */}
-                      <input
-                        type="date"
-                        value={date1Iso}
-                        onChange={handleDateIsoChange}
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          opacity: 0,
-                          width: '24px',
-                          height: '24px',
-                          cursor: 'pointer'
-                        }}
-                      />
-                      <Calendar 
-                        size={16} 
-                        color="#0284c7" 
-                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} 
-                      />
-                    </div>
-
-                    <span style={{ fontSize: '0.72rem', color: '#0284c7', marginTop: '4px', display: 'block', fontWeight: 500 }}>
-                      ⚡ Dynamically records the exact execution date: <strong>{date1}</strong>
+                    <span style={{ fontSize: '0.68rem', backgroundColor: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: '3px', fontWeight: 700 }}>
+                      Tenure Bound
                     </span>
                   </div>
 
-                  {/* ─── SERVICE TENURE AUTO-FILL INDICATOR FIELD ─── */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span>Service Tenure (Auto-Filled)</span>
-                      <span style={{ fontSize: '0.68rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                        ✓ Client Info Synced
-                      </span>
-                    </label>
-
-                    <div style={{
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '4px',
-                      fontSize: '0.84rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <ClockIcon />
-                        <strong style={{ color: '#0f172a' }}>{tenure}</strong>
-                      </div>
-                      <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 600 }}>
-                        Auto-Filled
-                      </span>
-                    </div>
-
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                      Pulled from Client Information Page & injected into MITC and contract.
-                    </span>
-                  </div>
-
-                  {/* ─── FIELD: Checkbox 1 (Circled in Cyan in Screenshot) ─── */}
-                  <div style={{
-                    marginBottom: '22px',
-                    border: '1.5px dashed #0284c7',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    backgroundColor: 'rgba(2, 132, 199, 0.03)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                        Checkbox 1
-                      </label>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        backgroundColor: '#dcfce7',
-                        color: '#166534',
-                        padding: '1px 6px',
-                        borderRadius: '3px',
-                        fontWeight: 700
-                      }}>
-                        Tenure Bound
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {/* Option 1: Bound to Exact Service Tenure (Circled in Screenshot) */}
-                      <label style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        fontSize: '0.8rem',
-                        color: '#1e293b',
-                        cursor: 'pointer',
-                        padding: '6px 8px',
-                        backgroundColor: checkboxOptions.option1 ? '#f0fdf4' : '#ffffff',
-                        border: checkboxOptions.option1 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                        borderRadius: '4px'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={checkboxOptions.option1}
-                          onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option1: e.target.checked })}
-                          style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 600 }}>
-                            Option 1: Service Tenure: <strong style={{ color: '#0284c7' }}>{tenure}</strong>
-                          </div>
-                          <span style={{ fontSize: '0.69rem', color: '#16a34a', display: 'block', marginTop: '1px' }}>
-                            ✓ Exact Service Tenure selected on Client Information Page
-                          </span>
-                        </div>
-                      </label>
-
-                      {/* Option 2: Service Name & Fee */}
-                      <label style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        fontSize: '0.8rem',
-                        color: '#1e293b',
-                        cursor: 'pointer',
-                        padding: '6px 8px',
-                        backgroundColor: checkboxOptions.option2 ? '#f8fafc' : '#ffffff',
-                        border: checkboxOptions.option2 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
-                        borderRadius: '4px'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={checkboxOptions.option2}
-                          onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option2: e.target.checked })}
-                          style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 500 }}>
-                            Option 2: Service Plan ({serviceName})
-                          </div>
-                          <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
-                            Fee: {grossSales} • RA Scope Confirmed
-                          </span>
-                        </div>
-                      </label>
-
-                      {/* Option 3: MITC & Regulatory Compliance */}
-                      <label style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: '8px',
-                        fontSize: '0.8rem',
-                        color: '#1e293b',
-                        cursor: 'pointer',
-                        padding: '6px 8px',
-                        backgroundColor: checkboxOptions.option3 ? '#f8fafc' : '#ffffff',
-                        border: checkboxOptions.option3 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
-                        borderRadius: '4px'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={checkboxOptions.option3}
-                          onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option3: e.target.checked })}
-                          style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 500 }}>
-                            Option 3: MITC & Leegality E-Sign Consent
-                          </div>
-                          <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
-                            SEBI (Research Analyst) Regulations, 2014 Terms
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-
-                    <div style={{
-                      fontSize: '0.68rem',
-                      color: '#0284c7',
-                      marginTop: '8px',
-                      padding: '4px 8px',
-                      backgroundColor: '#eff6ff',
-                      borderRadius: '4px',
-                      lineHeight: 1.3
-                    }}>
-                      ⚡ <strong>Auto-Fill Active:</strong> Checkbox 1 Option 1 is bound to <strong>"{tenure}"</strong> chosen on Client Information Page.
-                    </div>
-                  </div>
-
-                  {/* Invitee Metadata Box */}
-                  <div style={{
-                    padding: '12px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '6px',
-                    fontSize: '0.74rem',
-                    color: '#64748b',
-                    lineHeight: 1.4
-                  }}>
-                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: '4px' }}>Invitee Target:</strong>
-                    <div>• Name: {clientName}</div>
-                    <div>• Mobile: {phone}</div>
-                    <div>• Email: {email}</div>
-                    <div>• Service: {serviceName}</div>
-                    <div>• Service Tenure: <strong style={{ color: '#0284c7' }}>{tenure}</strong></div>
-                  </div>
-                </>
-              )}
-
-              {/* STEP 2: INVITE SCREEN */}
-              {activeStep === 2 && (
-                <div>
-                  <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 12px 0' }}>
-                    Leegality API Dispatch
-                  </h3>
-
-                  <div style={{
-                    padding: '14px',
-                    backgroundColor: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '6px',
-                    marginBottom: '16px',
-                    fontSize: '0.78rem',
-                    color: '#166534'
-                  }}>
-                    <strong>Document Created!</strong> Reference: <code>{documentId}</code>
-                    <br /><br />
-                    An encrypted digital e-sign package containing the <strong>MITC</strong> and <strong>Contract Agreement</strong> for <strong>{tenure}</strong> tenure has been dispatched via Leegality API to:
-                    <div style={{ marginTop: '6px', fontWeight: 600 }}>
-                      📱 SMS: {phone}<br />
-                      ✉️ Email: {email}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', marginBottom: '16px' }}>
-                    The client can either click their SMS/Email link or you can proceed to the Finalize step to simulate Aadhaar OTP authentication directly.
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleProceedToOtp}
-                    style={{
-                      width: '100%',
-                      padding: '10px 14px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontWeight: 600,
-                      fontSize: '0.84rem',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      fontSize: '0.8rem',
+                      color: '#1e293b',
                       cursor: 'pointer',
+                      padding: '6px 8px',
+                      backgroundColor: checkboxOptions.option1 ? '#f0fdf4' : '#ffffff',
+                      border: checkboxOptions.option1 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                      borderRadius: '4px'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={checkboxOptions.option1}
+                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option1: e.target.checked })}
+                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>
+                          Option 1: Service Tenure: <strong style={{ color: '#0284c7' }}>{tenure}</strong>
+                        </div>
+                        <span style={{ fontSize: '0.69rem', color: '#16a34a', display: 'block', marginTop: '1px' }}>
+                          ✓ Exact Service Tenure selected on Client Information Page
+                        </span>
+                      </div>
+                    </label>
+
+                    <label style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    Proceed to Client Finalize Step <ArrowRight size={14} />
-                  </button>
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      fontSize: '0.8rem',
+                      color: '#1e293b',
+                      cursor: 'pointer',
+                      padding: '6px 8px',
+                      backgroundColor: checkboxOptions.option2 ? '#f8fafc' : '#ffffff',
+                      border: checkboxOptions.option2 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
+                      borderRadius: '4px'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={checkboxOptions.option2}
+                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option2: e.target.checked })}
+                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 500 }}>
+                          Option 2: Service Plan ({serviceName})
+                        </div>
+                        <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
+                          Fee: {grossSales} • RA Scope Confirmed
+                        </span>
+                      </div>
+                    </label>
+
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      fontSize: '0.8rem',
+                      color: '#1e293b',
+                      cursor: 'pointer',
+                      padding: '6px 8px',
+                      backgroundColor: checkboxOptions.option3 ? '#f8fafc' : '#ffffff',
+                      border: checkboxOptions.option3 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
+                      borderRadius: '4px'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={checkboxOptions.option3}
+                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option3: e.target.checked })}
+                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 500 }}>
+                          Option 3: MITC & Leegality E-Sign Consent
+                        </div>
+                        <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
+                          SEBI (Research Analyst) Regulations, 2014 Terms
+                        </span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-              )}
 
-              {/* STEP 3: FINALIZE / AADHAAR OTP E-SIGN */}
-              {activeStep === 3 && (
-                <div>
-                  <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: '0 0 12px 0' }}>
-                    Finalize Digital E-Sign
-                  </h3>
-
-                  {!isCompleted ? (
-                    <form onSubmit={handleFinalizeSigning}>
-                      <div style={{
-                        padding: '12px',
-                        backgroundColor: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '6px',
-                        marginBottom: '16px',
-                        fontSize: '0.76rem',
-                        color: '#475569'
-                      }}>
-                        <strong>Aadhaar e-Sign Service (ESP)</strong>
-                        <p style={{ margin: '4px 0 0 0' }}>
-                          A 6-digit one-time password has been sent to client mobile linked with UIDAI for executing the <strong>{tenure}</strong> agreement.
-                        </p>
-                      </div>
-
-                      <div style={{ marginBottom: '16px' }}>
-                        <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px' }}>
-                          Enter Aadhaar OTP (Demo: 123456) *
-                        </label>
-                        <input
-                          type="text"
-                          value={otpInput}
-                          onChange={(e) => setOtpInput(e.target.value)}
-                          placeholder="123456"
-                          maxLength={6}
-                          autoFocus
-                          style={{
-                            width: '100%',
-                            padding: '10px 12px',
-                            fontSize: '1rem',
-                            letterSpacing: '4px',
-                            textAlign: 'center',
-                            border: '1px solid #0284c7',
-                            borderRadius: '4px'
-                          }}
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isVerifyingOtp}
-                        style={{
-                          width: '100%',
-                          padding: '10px 14px',
-                          backgroundColor: '#10b981',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontWeight: 600,
-                          fontSize: '0.84rem',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        {isVerifyingOtp ? 'Verifying OTP & Affixing Signature...' : 'Confirm & Affix Digital Signature'}
-                      </button>
-                    </form>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                      <div style={{
-                        width: '46px',
-                        height: '46px',
-                        borderRadius: '50%',
-                        backgroundColor: '#dcfce7',
-                        color: '#16a34a',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 12px auto'
-                      }}>
-                        <CheckCircle2 size={26} />
-                      </div>
-                      <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#166534', fontWeight: 700 }}>
-                        Agreement E-Signed!
-                      </h4>
-                      <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '0 0 16px 0' }}>
-                        MITC and Contract document sealed with Leegality cryptographic audit certificate for <strong>{tenure}</strong> tenure.
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        style={{
-                          width: '100%',
-                          padding: '8px 14px',
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontWeight: 600,
-                          fontSize: '0.82rem',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Return to CRM Dashboard
-                      </button>
-                    </div>
-                  )}
+                {/* Invitee Metadata Box */}
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '0.74rem',
+                  color: '#64748b',
+                  lineHeight: 1.4
+                }}>
+                  <strong style={{ color: '#0f172a', display: 'block', marginBottom: '4px' }}>Invitee Target:</strong>
+                  <div>• Name: {clientName}</div>
+                  <div>• Mobile: {phone}</div>
+                  <div>• Email: {email}</div>
+                  <div>• Service Tenure: <strong style={{ color: '#0284c7' }}>{tenure}</strong></div>
                 </div>
-              )}
-            </div>
-
-            {/* ─── BOTTOM CONTROLS (Pixel-Perfect from Screenshot) ─── */}
-            <div style={{
-              padding: '14px 18px',
-              borderTop: '1px solid #e2e8f0',
-              backgroundColor: '#ffffff',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px'
-            }}>
-              {/* "Allow first invitee to fill" Toggle (Matching Screenshot) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="checkbox"
-                  id="allowFirstInvitee"
-                  checked={allowFirstInviteeToFill}
-                  onChange={(e) => setAllowFirstInviteeToFill(e.target.checked)}
-                  style={{ width: '16px', height: '16px', accentColor: '#0284c7', cursor: 'pointer' }}
-                />
-                <label htmlFor="allowFirstInvitee" style={{ fontSize: '0.76rem', color: '#64748b', cursor: 'pointer' }}>
-                  Allow first invitee to fill
-                </label>
               </div>
 
-              {/* Action Buttons: Back & Create Document */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeStep > 1) setActiveStep(prev => prev - 1);
-                    else onClose();
-                  }}
-                  style={{
-                    padding: '7px 16px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: '#64748b',
-                    fontSize: '0.84rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Back
-                </button>
+              {/* Bottom Controls */}
+              <div style={{
+                padding: '14px 18px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    id="allowFirstInvitee"
+                    checked={allowFirstInviteeToFill}
+                    onChange={(e) => setAllowFirstInviteeToFill(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#2b5c7d', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="allowFirstInvitee" style={{ fontSize: '0.76rem', color: '#64748b', cursor: 'pointer' }}>
+                    Allow first invitee to fill
+                  </label>
+                </div>
 
-                {activeStep === 1 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    style={{
+                      padding: '7px 16px',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.84rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
                   <button
                     type="button"
                     onClick={handleCreateDocument}
                     style={{
                       padding: '7px 18px',
-                      backgroundColor: '#0284c7',
+                      backgroundColor: '#2b5c7d',
                       color: '#ffffff',
                       border: 'none',
                       borderRadius: '4px',
@@ -1350,33 +1236,946 @@ export const LeegalityESignModal = ({
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)'
+                      boxShadow: '0 2px 8px rgba(43, 92, 125, 0.35)'
                     }}
                   >
-                    Create Document
+                    Create Document <ArrowRight size={14} />
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    style={{
-                      padding: '7px 18px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      fontSize: '0.84rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Done
-                  </button>
-                )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ─── STEP 2: DEDICATED FULL-WIDTH INVITE SCREEN (EXACT FROM SCREENSHOT) ─── */}
+        {activeStep === 2 && (
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#ffffff',
+            overflowY: 'auto'
+          }}>
+            {/* Centered Content Container */}
+            <div style={{
+              width: '100%',
+              maxWidth: '820px',
+              margin: '0 auto',
+              padding: '36px 32px 20px 32px',
+              flex: 1
+            }}>
+              {/* ─── TWO SWITCHES AT TOP (MATCHING SCREENSHOT) ─── */}
+              <div style={{ marginBottom: '26px' }}>
+                {/* Switch 1: Request invitees to sign in fixed order */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
+                  <LeegalityToggle
+                    id="toggle-fixed-order"
+                    checked={requestFixedOrder}
+                    onChange={(checked) => setRequestFixedOrder(checked)}
+                  />
+                  <label 
+                    htmlFor="toggle-fixed-order" 
+                    style={{ fontSize: '0.88rem', color: '#1e293b', fontWeight: 500, cursor: 'pointer' }}
+                  >
+                    Request invitees to sign in fixed order
+                  </label>
+                </div>
+
+                {/* Switch 2: I want to sign this document (CIRCLED IN CYAN - MUST BE DISABLED) */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '14px',
+                  padding: '12px 14px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px'
+                }}>
+                  <LeegalityToggle
+                    id="toggle-self-sign"
+                    checked={previewLegacyInvestEQ}
+                    disabled={true} // Strictly disabled per requirement
+                    onChange={() => {}}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <label 
+                        htmlFor="toggle-self-sign" 
+                        style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600, cursor: 'not-allowed' }}
+                      >
+                        I want to sign this document
+                      </label>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        backgroundColor: '#fee2e2',
+                        color: '#b91c1c',
+                        border: '1px solid #fca5a5',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <Lock size={11} /> Must be disabled (API Policy)
+                      </span>
+                    </div>
+
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45 }}>
+                      In Leegality (eKYC API portal), this toggle <strong>must be disabled</strong>. Disabling this removes <code>InvestEQ (8494953754)</code> from signers so only the client signs, since Harshal Parmar's digital signature is already pre-affixed on the documents.
+                    </p>
+
+                    {/* Interactive Comparison Preview Button */}
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Preview Modes:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewLegacyInvestEQ(false);
+                          setInvitees([
+                            {
+                              id: 'inv-client-1',
+                              name: clientName,
+                              contact: phone || email,
+                              signatureType: 'Aadhaar E-Sign (OTP)',
+                              role: 'Signer'
+                            }
+                          ]);
+                          showToast('Switched to API Mode: InvestEQ disabled, client is sole signer.', 'success');
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '0.7rem',
+                          borderRadius: '4px',
+                          border: !previewLegacyInvestEQ ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                          backgroundColor: !previewLegacyInvestEQ ? '#e0f2fe' : '#ffffff',
+                          color: !previewLegacyInvestEQ ? '#0284c7' : '#64748b',
+                          fontWeight: !previewLegacyInvestEQ ? 700 : 500,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✓ API Mode: Client Only (Active)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewLegacyInvestEQ(true);
+                          setInvitees([
+                            {
+                              id: 'inv-investeq',
+                              name: 'InvestEQ',
+                              contact: '8494953754',
+                              signatureType: 'Aadhaar E-Sign (OTP)',
+                              role: 'Signer'
+                            }
+                          ]);
+                          showToast('Showing screenshot state: self-sign enabled adds InvestEQ.', 'warning');
+                        }}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '0.7rem',
+                          borderRadius: '4px',
+                          border: previewLegacyInvestEQ ? '1px solid #ef4444' : '1px solid #cbd5e1',
+                          backgroundColor: previewLegacyInvestEQ ? '#fee2e2' : '#ffffff',
+                          color: previewLegacyInvestEQ ? '#dc2626' : '#64748b',
+                          fontWeight: previewLegacyInvestEQ ? 700 : 500,
+                          cursor: 'pointer'
+                        }}
+                        title="Simulate what happened in the screenshot when self-sign was turned ON"
+                      >
+                        Screenshot Mode: InvestEQ (Self-Sign ON)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── SECTION TITLE: Invitees (Signers & Reviewers) ─── */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '14px'
+              }}>
+                <h3 style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  margin: 0
+                }}>
+                  Invitees (Signers & Reviewers)
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPayloadModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0284c7',
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Code size={13} /> View Leegality API JSON Payload
+                </button>
+              </div>
+
+              {/* ─── INVITEE CARDS (MATCHING SCREENSHOT) ─── */}
+              {invitees.map((inv, idx) => (
+                <div
+                  key={inv.id}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
+                    padding: '18px 22px',
+                    marginBottom: '18px',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Top Right Card Action Icons Group (Duplicate, Up, Down, Delete) */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '4px',
+                      backgroundColor: '#f8fafc',
+                      overflow: 'hidden'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateInvitee(inv.id)}
+                        title="Duplicate Invitee"
+                        style={cardActionBtnStyle}
+                      >
+                        <Copy size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveInvitee(idx, -1)}
+                        disabled={idx === 0}
+                        title="Move Up"
+                        style={{ ...cardActionBtnStyle, opacity: idx === 0 ? 0.35 : 1 }}
+                      >
+                        <ChevronUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveInvitee(idx, 1)}
+                        disabled={idx === invitees.length - 1}
+                        title="Move Down"
+                        style={{ ...cardActionBtnStyle, opacity: idx === invitees.length - 1 ? 0.35 : 1 }}
+                      >
+                        <ChevronDown size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInvitee(inv.id)}
+                        title="Delete Invitee"
+                        style={{ ...cardActionBtnStyle, borderRight: 'none', color: '#ef4444' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Form Inputs (Name & Email/Phone Number) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={inv.name}
+                        onChange={(e) => handleUpdateInvitee(inv.id, 'name', e.target.value)}
+                        placeholder="e.g. Vikramaditya Rao"
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          fontSize: '0.86rem',
+                          backgroundColor: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          color: '#0f172a',
+                          fontWeight: 500
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+                        Email / Phone number
+                      </label>
+                      <input
+                        type="text"
+                        value={inv.contact}
+                        onChange={(e) => handleUpdateInvitee(inv.id, 'contact', e.target.value)}
+                        placeholder="e.g. 9845198210 or email@domain.com"
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          fontSize: '0.86rem',
+                          backgroundColor: '#f1f5f9',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '4px',
+                          color: '#0f172a',
+                          fontWeight: 500
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Row: Signature type and Invitee level options */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: '18px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #f1f5f9',
+                    position: 'relative'
+                  }}>
+                    {/* Left: Signature Type Dropdown */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSignatureDropdownOpenId(signatureDropdownOpenId === inv.id ? null : inv.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '0.82rem',
+                          color: '#334155',
+                          fontWeight: 500,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        <span>Signature type: <strong>{inv.signatureType || 'Aadhaar E-Sign (OTP)'}</strong></span>
+                        <ChevronDown size={14} color="#64748b" />
+                      </button>
+
+                      {signatureDropdownOpenId === inv.id && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '28px',
+                          left: 0,
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                          zIndex: 30,
+                          minWidth: '220px',
+                          padding: '6px 0'
+                        }}>
+                          {[
+                            'Aadhaar E-Sign (OTP)',
+                            'Aadhaar Biometric (IRIS/Fingerprint)',
+                            'Virtual Electronic Sign',
+                            'DSC Token (Class 3 Paperless)'
+                          ].map(st => (
+                            <div
+                              key={st}
+                              onClick={() => {
+                                handleUpdateInvitee(inv.id, 'signatureType', st);
+                                setSignatureDropdownOpenId(null);
+                              }}
+                              style={{
+                                padding: '8px 14px',
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                color: inv.signatureType === st ? '#0284c7' : '#334155',
+                                fontWeight: inv.signatureType === st ? 700 : 500,
+                                backgroundColor: inv.signatureType === st ? '#f0f9ff' : 'transparent',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <span>{st}</span>
+                              {inv.signatureType === st && <Check size={13} color="#0284c7" />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Invitee Level Options Link */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInviteeForOptions(inv)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        color: '#0284c7',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      Invitee level options
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Centered "+ Add Invitee" Button matching screenshot */}
+              <div style={{ textAlign: 'center', marginTop: '20px', marginBottom: '32px' }}>
+                <button
+                  type="button"
+                  onClick={handleAddInvitee}
+                  style={{
+                    padding: '8px 22px',
+                    backgroundColor: '#2b5c7d', // Exact Leegality dark slate blue
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(43, 92, 125, 0.25)'
+                  }}
+                >
+                  <Plus size={16} /> Add Invitee
+                </button>
+              </div>
+            </div>
+
+            {/* ─── BOTTOM FOOTER BAR (MATCHING SCREENSHOT) ─── */}
+            <div style={{
+              padding: '16px 36px',
+              borderTop: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 'auto'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowJourneyOptionsModal(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#0284c7',
+                  fontSize: '0.84rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                Signing journey options
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep(1)}
+                  style={{
+                    padding: '8px 24px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    color: '#475569',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProceedToOtp}
+                  style={{
+                    padding: '8px 28px',
+                    backgroundColor: '#2b5c7d', // Exact Leegality dark slate blue
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(43, 92, 125, 0.3)'
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── STEP 3: FINALIZE VIEW (DOCUMENT PREVIEW + AADHAAR OTP E-SIGN) ─── */}
+        {activeStep === 3 && (
+          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden', backgroundColor: '#f8fafc' }}>
+            <LeegalityDocumentPreview
+              activeDocTab={activeDocTab}
+              setActiveDocTab={setActiveDocTab}
+              tenure={tenure}
+              clientInfo={clientInfo}
+              clientName={invitees[0]?.name || clientName}
+              panNumber={panNumber}
+              phone={invitees[0]?.contact || phone}
+              email={email}
+              serviceName={serviceName}
+              grossSales={grossSales}
+              netSales={netSales}
+              gst={gst}
+              date1={date1}
+              paymentDate={paymentDate}
+              isSignAffixed={true}
+              activeStep={activeStep}
+              isCompleted={isCompleted}
+              documentId={documentId}
+            />
+
+            {/* RIGHT COLUMN: STEP 3 FINALIZE SIGNING */}
+            <div style={{
+              width: '380px',
+              backgroundColor: '#ffffff',
+              borderLeft: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{ flex: 1, padding: '24px 22px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <ShieldCheck size={20} color="#2b5c7d" />
+                  <h3 style={{ fontSize: '0.96rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    Finalize Digital E-Sign
+                  </h3>
+                </div>
+
+                {!isCompleted ? (
+                  <form onSubmit={handleFinalizeSigning}>
+                    <div style={{
+                      padding: '14px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      marginBottom: '16px',
+                      fontSize: '0.76rem',
+                      color: '#475569',
+                      lineHeight: 1.5
+                    }}>
+                      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+                        Leegality Aadhaar ESP Gateway (Live)
+                      </div>
+                      An authenticated Aadhaar OTP e-sign request for <strong>{tenure}</strong> tenure has been dispatched to:
+                      <div style={{ marginTop: '6px', fontWeight: 600, color: '#0f172a' }}>
+                        • Signer: {invitees[0]?.name || clientName}<br />
+                        • Phone: {invitees[0]?.contact || phone}
+                      </div>
+                      <div style={{ marginTop: '6px', fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>
+                        ✓ Harshal Parmar signature pre-stamped
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                        Enter Aadhaar OTP (Demo: 123456) *
+                      </label>
+                      <input
+                        type="text"
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value)}
+                        placeholder="123456"
+                        maxLength={6}
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '1.05rem',
+                          letterSpacing: '4px',
+                          textAlign: 'center',
+                          border: '1px solid #2b5c7d',
+                          borderRadius: '4px',
+                          fontWeight: 700,
+                          backgroundColor: '#f8fafc'
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isVerifyingOtp}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        fontSize: '0.84rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {isVerifyingOtp ? 'Verifying OTP & Affixing Signature...' : 'Confirm & Affix Digital Signature'}
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                    <div style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '50%',
+                      backgroundColor: '#dcfce7',
+                      color: '#166534',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 12px auto'
+                    }}>
+                      <CheckCircle2 size={26} />
+                    </div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: '#166534', fontWeight: 700 }}>
+                      Agreement E-Signed!
+                    </h4>
+                    <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '0 0 16px 0', lineHeight: 1.5 }}>
+                      MITC and Contract document sealed with Leegality cryptographic audit certificate for <strong>{tenure}</strong> tenure. Auto-synced to Dedicated E-Sign Block.
+                    </p>
+
+                    <div style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      fontSize: '0.74rem',
+                      color: '#475569',
+                      textAlign: 'left',
+                      marginBottom: '16px',
+                      lineHeight: 1.5
+                    }}>
+                      <div>• <strong>Document ID:</strong> <code>{documentId}</code></div>
+                      <div>• <strong>Signer:</strong> {invitees[0]?.name || clientName}</div>
+                      <div>• <strong>Service Tenure:</strong> {tenure}</div>
+                      <div>• <strong>Creator Self-Sign:</strong> Disabled (InvestEQ omitted)</div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      style={{
+                        width: '100%',
+                        padding: '9px 14px',
+                        backgroundColor: '#2b5c7d',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        fontSize: '0.84rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Return to CRM Dashboard
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Back Button */}
+              <div style={{
+                padding: '14px 18px',
+                borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep(2)}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Back to Invitees
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    color: '#475569',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL: INVITEE LEVEL OPTIONS ─── */}
+        {selectedInviteeForOptions && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1600,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '20px 24px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              fontFamily: "'Inter', sans-serif"
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+                  Invitee Level Options • {selectedInviteeForOptions.name || 'Invitee'}
+                </h4>
+                <button
+                  onClick={() => setSelectedInviteeForOptions(null)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>• <strong>Authentication Mode:</strong> Aadhaar OTP (Mobile UIDAI ESP)</div>
+                <div>• <strong>Link Expiry Duration:</strong> 15 Days from dispatch</div>
+                <div>• <strong>Automated Reminders:</strong> Daily SMS & Email (9:00 AM IST)</div>
+                <div>• <strong>Capture GPS Location:</strong> Enabled (Audit Certificate Compliance)</div>
+                <div>• <strong>Face / Liveness Check:</strong> Optional for SEBI RA T&C</div>
+                <div>• <strong>Access Passcode:</strong> Not required (direct encrypted bearer token)</div>
+              </div>
+
+              <div style={{ marginTop: '20px', textAlign: 'right' }}>
+                <button
+                  onClick={() => setSelectedInviteeForOptions(null)}
+                  style={{
+                    padding: '7px 16px',
+                    backgroundColor: '#2b5c7d',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save & Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL: SIGNING JOURNEY OPTIONS ─── */}
+        {showJourneyOptionsModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1600,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '480px',
+              width: '100%',
+              padding: '20px 24px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              fontFamily: "'Inter', sans-serif"
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#0f172a' }}>
+                  Signing Journey Options
+                </h4>
+                <button
+                  onClick={() => setShowJourneyOptionsModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>• <strong>Signing Flow:</strong> Remote Electronic Dispatch via SMS & Email</div>
+                <div>• <strong>In-Person Signing Mode:</strong> Disabled (Self-service remote Aadhaar ESP)</div>
+                <div>• <strong>Completion Redirect URL:</strong> <code>http://localhost:3000/Astra-CRM/</code></div>
+                <div>• <strong>Audit Trail Webhook:</strong> Real-time callback to Astra Dedicated E-Sign Block</div>
+                <div>• <strong>Self-Sign Exemption:</strong> "I want to sign this document" disabled for InvestEQ</div>
+              </div>
+
+              <div style={{ marginTop: '20px', textAlign: 'right' }}>
+                <button
+                  onClick={() => setShowJourneyOptionsModal(false)}
+                  style={{
+                    padding: '7px 16px',
+                    backgroundColor: '#2b5c7d',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Confirm & Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── MODAL: LEEGALITY API v2.1 PAYLOAD PREVIEW ─── */}
+        {showPayloadModal && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1600,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            <div style={{
+              backgroundColor: '#0f172a',
+              color: '#f8fafc',
+              borderRadius: '8px',
+              maxWidth: '620px',
+              width: '100%',
+              padding: '20px 24px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              fontFamily: "'Inter', sans-serif"
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Code size={18} color="#38bdf8" />
+                  <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700, color: '#ffffff' }}>
+                    Leegality API v2.1 Dispatch Payload
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setShowPayloadModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '0 0 10px 0' }}>
+                Endpoint: <code>POST https://api.leegality.com/v2.1/document/create</code>
+              </p>
+
+              <pre style={{
+                backgroundColor: 'rgba(0,0,0,0.4)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '6px',
+                padding: '12px 14px',
+                fontSize: '0.76rem',
+                color: '#38bdf8',
+                overflowX: 'auto',
+                lineHeight: 1.5,
+                maxHeight: '340px'
+              }}>
+{JSON.stringify({
+  profileId: "LEEG_ASTRA_PORTAL_01",
+  document: {
+    name: "SEBI_MITC_and_Service_Agreement.pdf",
+    fields: {
+      "Date 1": date1,
+      "Service Tenure": tenure,
+      "Checkbox 1": "Agreed (Tenure Bound)"
+    }
+  },
+  // CRITICAL: User requirement fulfilled
+  iWantToSign: false, // <-- DISABLED: Sender InvestEQ is omitted
+  requestFixedOrder: requestFixedOrder,
+  invitees: invitees.map(inv => ({
+    name: inv.name,
+    contact: inv.contact,
+    signatureType: inv.signatureType,
+    role: "Client / Signer"
+  })),
+  preAffixedSignatory: {
+    name: "Mr Harshal Parmar",
+    designation: "Principal Officer",
+    sebiRegNo: "INH000002099",
+    dscAffixed: true
+  }
+}, null, 2)}
+              </pre>
+
+              <div style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '4px',
+                fontSize: '0.72rem',
+                color: '#fca5a5'
+              }}>
+                <strong>Verification:</strong> <code>iWantToSign: false</code> guarantees the portal account holder (InvestEQ / 8494953754) is not added as an invitee. Only the client signs.
+              </div>
+
+              <div style={{ marginTop: '16px', textAlign: 'right' }}>
+                <button
+                  onClick={() => setShowPayloadModal(false)}
+                  style={{
+                    padding: '6px 16px',
+                    backgroundColor: '#0284c7',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close Payload
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

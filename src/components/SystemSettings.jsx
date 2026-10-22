@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, Tag, Lock, Unlock, KeyRound, Eye, EyeOff, X, ExternalLink } from 'lucide-react';
+import { Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, Tag, Lock, Unlock, KeyRound, Eye, EyeOff, X, ExternalLink, FileSignature } from 'lucide-react';
 import Demo from './ui/demo';
 
 export const SystemSettings = () => {
@@ -870,6 +870,79 @@ export const SystemSettings = () => {
           <div>• <strong>Bot Name:</strong> {voiceAgentSettings.botName || 'Astra AI Compliance Voice Bot'}</div>
           <div>• <strong>Telephony VoIP Provider:</strong> {voiceAgentSettings.provider || 'Leegality Voice API Integration'}</div>
           <div>• <strong>Voice Verification Questions:</strong> 4 Compliance Checks (Identity, Service/Tenure, Banking Payment, and Leegality E-Sign Consent).</div>
+        </div>
+      </div>
+
+      {/* ── Leegality E-Sign Gateway & API Integration Settings ────── */}
+      <div className="directory-card" style={{ padding: '20px 24px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(2, 132, 199, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0284c7',
+              flexShrink: 0
+            }}>
+              <FileSignature size={20} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Leegality E-Sign Gateway & eKYC API Integration
+                </h4>
+                <span style={{
+                  fontSize: '0.68rem',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                }}>
+                  API v2.1 Live
+                </span>
+                <span style={{
+                  fontSize: '0.68rem',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.3)'
+                }}>
+                  Self-Sign Disabled
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Manages digital contract execution for SEBI RA compliance. Harshal Parmar's official digital signature is pre-affixed; creator self-sign is disabled via API so the portal account owner (InvestEQ) is never added as an invitee.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: '12px',
+          padding: '12px 14px',
+          backgroundColor: 'var(--bg-input)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-sm)',
+          fontSize: '0.78rem',
+          color: 'var(--text-muted)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '8px 16px'
+        }}>
+          <div>• <strong>Gateway Endpoint:</strong> <code>https://api.leegality.com/v2.1/document/create</code></div>
+          <div>• <strong>Authorized Signatory:</strong> Mr. Harshal Parmar (SEBI INH000002099)</div>
+          <div>• <strong>"I want to sign this document" Toggle:</strong> <strong style={{ color: '#ef4444' }}>Disabled (Locked OFF)</strong></div>
+          <div>• <strong>Fixed Signing Order:</strong> Disabled (Independent client dispatch)</div>
+          <div>• <strong>Primary Signer:</strong> Recipient / Client (Aadhaar OTP ESP)</div>
+          <div>• <strong>Registry Sync:</strong> Dedicated E-Sign Block (Automatic upon Aadhaar OTP)</div>
         </div>
       </div>
 
