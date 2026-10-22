@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
@@ -612,41 +612,48 @@ export const LeegalityESignModal = ({
   const gst = clientInfo.gst || sale?.gst || (rawGrossNum - parseFloat(netSales)).toFixed(2);
   const paymentDate = clientInfo.paymentDate || sale?.date || date1;
 
+  const modalInitializedRef = useRef(null);
+
   useEffect(() => {
     if (isOpen) {
-      setActiveStep(1);
-      const dynamicDate = getDynamicDateFormatted();
-      setDate1(dynamicDate);
-      setDate1Iso(new Date().toISOString().split('T')[0]);
-      setInviteSent(false);
-      setIsCompleted(false);
-      setOtpInput('');
-      setDocumentId('LEEG-' + Date.now().toString().slice(-8));
-      setActiveDocTab('mitc');
-      setCheckboxOptions({
-        option1: true,
-        option2: true,
-        option3: true
-      });
-      setRequestFixedOrder(false);
-      setIWantToSign(false); // MUST BE DISABLED
-      setPreviewLegacyInvestEQ(false);
+      if (modalInitializedRef.current !== sale?.id) {
+        modalInitializedRef.current = sale?.id;
+        setActiveStep(1);
+        const dynamicDate = getDynamicDateFormatted();
+        setDate1(dynamicDate);
+        setDate1Iso(new Date().toISOString().split('T')[0]);
+        setInviteSent(false);
+        setIsCompleted(false);
+        setOtpInput('');
+        setDocumentId('LEEG-' + Date.now().toString().slice(-8));
+        setActiveDocTab('mitc');
+        setCheckboxOptions({
+          option1: true,
+          option2: true,
+          option3: true
+        });
+        setRequestFixedOrder(false);
+        setIWantToSign(false); // MUST BE DISABLED
+        setPreviewLegacyInvestEQ(false);
 
-      // Pre-fill Name, Phone number, and Email strictly from the Client Information Page
-      setInvitees([
-        {
-          id: 'inv-client-1',
-          name: clientName,
-          phone: phone,
-          email: email,
-          contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
-          enterBoth: true, // "once disabled, 'enter both' must be selected"
-          signatureType: 'Aadhaar E-Sign (OTP)',
-          role: 'Signer'
-        }
-      ]);
+        // Pre-fill Name, Phone number, and Email strictly from the Client Information Page
+        setInvitees([
+          {
+            id: 'inv-client-1',
+            name: clientName,
+            phone: phone,
+            email: email,
+            contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+            enterBoth: true, // "once disabled, 'enter both' must be selected"
+            signatureType: 'Aadhaar E-Sign (OTP)',
+            role: 'Signer'
+          }
+        ]);
+      }
+    } else {
+      modalInitializedRef.current = null;
     }
-  }, [isOpen, sale, clientName, phone, email]);
+  }, [isOpen, sale?.id, clientName, phone, email]);
 
   if (!isOpen || !sale) return null;
 
@@ -1597,6 +1604,7 @@ export const LeegalityESignModal = ({
                             type="text"
                             value={inv.name}
                             onChange={(e) => handleUpdateInvitee(inv.id, 'name', e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleProceedToOtp(); }}
                             placeholder="Name"
                             style={{
                               width: '100%',
@@ -1621,6 +1629,7 @@ export const LeegalityESignModal = ({
                               type="email"
                               value={inv.email}
                               onChange={(e) => handleUpdateInvitee(inv.id, 'email', e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleProceedToOtp(); }}
                               placeholder="Email"
                               style={{
                                 width: '100%',
@@ -1665,6 +1674,7 @@ export const LeegalityESignModal = ({
                               type="text"
                               value={inv.phone}
                               onChange={(e) => handleUpdateInvitee(inv.id, 'phone', e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleProceedToOtp(); }}
                               placeholder="Phone number"
                               style={{
                                 width: '100%',
@@ -1692,6 +1702,7 @@ export const LeegalityESignModal = ({
                             type="text"
                             value={inv.name}
                             onChange={(e) => handleUpdateInvitee(inv.id, 'name', e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleProceedToOtp(); }}
                             placeholder="Name"
                             style={{
                               width: '100%',
@@ -1714,6 +1725,7 @@ export const LeegalityESignModal = ({
                             type="text"
                             value={inv.contact || inv.phone || inv.email}
                             onChange={(e) => handleUpdateInvitee(inv.id, 'contact', e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleProceedToOtp(); }}
                             placeholder="Email or Phone number"
                             style={{
                               width: '100%',
@@ -1950,8 +1962,8 @@ export const LeegalityESignModal = ({
               clientInfo={clientInfo}
               clientName={invitees[0]?.name || clientName}
               panNumber={panNumber}
-              phone={invitees[0]?.contact || phone}
-              email={email}
+              phone={invitees[0]?.phone || invitees[0]?.contact || phone}
+              email={invitees[0]?.email || email}
               serviceName={serviceName}
               grossSales={grossSales}
               netSales={netSales}
@@ -1998,7 +2010,8 @@ export const LeegalityESignModal = ({
                       An authenticated Aadhaar OTP e-sign request for <strong>{tenure}</strong> tenure has been dispatched to:
                       <div style={{ marginTop: '6px', fontWeight: 600, color: '#0f172a' }}>
                         • Signer: {invitees[0]?.name || clientName}<br />
-                        • Phone: {invitees[0]?.contact || phone}
+                        • Phone: {invitees[0]?.phone || invitees[0]?.contact || phone}<br />
+                        • Email: {invitees[0]?.email || email}
                       </div>
                       <div style={{ marginTop: '6px', fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>
                         ✓ Harshal Parmar signature pre-stamped
