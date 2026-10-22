@@ -940,6 +940,7 @@ export const SystemSettings = () => {
           <div>• <strong>Gateway Endpoint:</strong> <code>https://api.leegality.com/v2.1/document/create</code></div>
           <div>• <strong>Authorized Signatory:</strong> Mr. Harshal Parmar (SEBI INH000002099)</div>
           <div>• <strong>"I want to sign this document" Toggle:</strong> <strong style={{ color: '#ef4444' }}>Disabled (Locked OFF)</strong></div>
+          <div>• <strong>Two-Factor Delivery Policy:</strong> <strong style={{ color: '#10b981' }}>"Enter both" Selected (Phone & Email Active)</strong></div>
           <div>• <strong>Fixed Signing Order:</strong> Disabled (Independent client dispatch)</div>
           <div>• <strong>Primary Signer:</strong> Recipient / Client (Aadhaar OTP ESP)</div>
           <div>• <strong>Registry Sync:</strong> Dedicated E-Sign Block (Automatic upon Aadhaar OTP)</div>
