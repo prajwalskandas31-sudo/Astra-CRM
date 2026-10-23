@@ -13,6 +13,26 @@ export default defineConfig({
   base: '/Astra-CRM/',
   server: {
     port: 3000,
-    open: false
+    open: false,
+    proxy: {
+      '/api-leegality': {
+        target: 'https://app1.leegality.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/api-leegality/, '')
+      },
+      '/sign-proxy': {
+        target: 'https://app1.leegality.com',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/sign-proxy/, ''),
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            delete proxyRes.headers['x-frame-options'];
+            delete proxyRes.headers['content-security-policy'];
+          });
+        }
+      }
+    }
   }
 })

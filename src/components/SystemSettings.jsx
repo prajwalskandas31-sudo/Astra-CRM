@@ -53,7 +53,7 @@ export const SystemSettings = () => {
   const [newWhitelistedIP, setNewWhitelistedIP] = useState('');
   const [isTestingLeegalityHandshake, setIsTestingLeegalityHandshake] = useState(false);
   const [handshakeResult, setHandshakeResult] = useState(null);
-  const [tokenInput, setTokenInput] = useState(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM');
+  const [tokenInput, setTokenInput] = useState(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM');
   const [saltInput, setSaltInput] = useState(leegalityConfig?.privateSalt || 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG');
 
   useEffect(() => {

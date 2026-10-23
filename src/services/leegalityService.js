@@ -1,26 +1,26 @@
 /**
- * Leegality API v2.1 Service Integration
+ * Leegality API v3.0 Service Integration
  * 
  * Authenticated with:
- * - Legacy Auth Token: JsAEa0QGumZ0PaNII2cildpFZad1RbxM
+ * - Legacy Auth Token: JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM
  * - Private Salt: hFBCLusGymhRFGNsdEUUISXtJynqRAhG
- * - Endpoint: POST https://api.leegality.com/api/v2.1/sign/request
+ * - Endpoint: POST https://app1.leegality.com/api/v3.0/sign/request
  */
 
 const STORAGE_KEY = 'astra_leegality_api_config';
 const AUDIT_STORAGE_KEY = 'astra_leegality_audit_log';
 
 export const DEFAULT_LEEGALITY_CONFIG = {
-  legacyAuthToken: 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM',
+  legacyAuthToken: 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM',
   privateSalt: 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG',
-  whitelistedIPs: ['103.21.244.0', '192.168.1.100'],
-  creditsLeft: 40,
+  whitelistedIPs: ['49.37.240.108'],
+  creditsLeft: 39,
   initialCredits: 40,
   status: 'Active', // 'Active' | 'Disabled'
-  profileId: 'LEEG_ASTRA_PORTAL_01',
+  profileId: 'LzfDhWc',
   environment: 'Live Production',
-  baseUrl: 'https://api.leegality.com/api/v2.1',
-  signRequestEndpoint: 'https://api.leegality.com/api/v2.1/sign/request'
+  baseUrl: 'https://app1.leegality.com/api/v3.0',
+  signRequestEndpoint: '/api-leegality/api/v3.0/sign/request'
 };
 
 /**
@@ -30,7 +30,18 @@ export const getLeegalityConfig = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_LEEGALITY_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      if (!parsed.profileId || parsed.profileId === 'LEEG_ASTRA_PORTAL_01' || parsed.profileId === 'hm6uV8X') {
+        parsed.profileId = DEFAULT_LEEGALITY_CONFIG.profileId;
+      }
+      if (!parsed.legacyAuthToken || parsed.legacyAuthToken === 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM') {
+        parsed.legacyAuthToken = DEFAULT_LEEGALITY_CONFIG.legacyAuthToken;
+      }
+      if (!parsed.signRequestEndpoint || parsed.signRequestEndpoint.includes('v2.1') || parsed.signRequestEndpoint.includes('api.leegality.com')) {
+        parsed.signRequestEndpoint = DEFAULT_LEEGALITY_CONFIG.signRequestEndpoint;
+        parsed.baseUrl = DEFAULT_LEEGALITY_CONFIG.baseUrl;
+      }
+      return { ...DEFAULT_LEEGALITY_CONFIG, ...parsed };
     }
   } catch (err) {
     console.warn('Error reading Leegality config from localStorage:', err);
@@ -107,7 +118,7 @@ export const maskToken = (token, leadChars = 6, tailChars = 4) => {
 };
 
 /**
- * Build standard Leegality v2.1 sign request payload
+ * Build standard Leegality v3.0 sign request payload
  */
 export const buildSignRequestPayload = ({
   sale,
@@ -116,56 +127,41 @@ export const buildSignRequestPayload = ({
   date1 = new Date().toLocaleDateString('en-GB'),
   config = getLeegalityConfig()
 }) => {
-  const primary = invitees[0] || {};
+  const primary = (invitees && invitees[0]) || {};
   const phoneVal = (primary.phone || (primary.contact && !primary.contact.includes('@') ? primary.contact : '') || sale?.phone1 || '').trim();
   const emailVal = (primary.email || (primary.contact && primary.contact.includes('@') ? primary.contact : '') || sale?.email || '').trim();
+  const clientNameVal = (primary.name || sale?.clientName || 'Client').trim();
 
   return {
     profileId: config.profileId || DEFAULT_LEEGALITY_CONFIG.profileId,
     irn: sale?.id || `SALE-${Date.now()}`,
-    document: {
-      name: `SEBI_MITC_Agreement_${(primary.name || sale?.clientName || 'Client').replace(/\s+/g, '_')}.pdf`,
-      fields: {
-        'Date 1': date1,
-        'Service Tenure': tenure,
-        'Checkbox 1': 'Agreed (Tenure Bound)'
-      }
+    file: {
+      name: `SEBI_MITC_Agreement_${clientNameVal.replace(/\s+/g, '_')}.pdf`,
+      fields: [
+        { name: 'Date', value: date1 },
+        { name: 'Date 1', value: date1 },
+        { name: 'Service Tenure', value: tenure },
+        { name: 'Client Name', value: clientNameVal },
+        { name: 'Phone', value: phoneVal },
+        { name: 'Email', value: emailVal },
+        { name: 'Checkbox 1', value: 'Agreed' }
+      ]
     },
-    // User mandate: "I want to sign this document" MUST be disabled in Leegality API
-    iWantToSign: false,
-    requestFixedOrder: false,
-    invitees: invitees.map((inv, idx) => {
+    invitees: (invitees && invitees.length > 0 ? invitees : [{ name: clientNameVal, email: emailVal, phone: phoneVal }]).map((inv, idx) => {
       const p = (inv.phone || (inv.contact && !inv.contact.includes('@') ? inv.contact : '') || phoneVal).trim();
       const e = (inv.email || (inv.contact && inv.contact.includes('@') ? inv.contact : '') || emailVal).trim();
       return {
-        name: inv.name || sale?.clientName || `Invitee ${idx + 1}`,
+        name: inv.name || clientNameVal || `Invitee ${idx + 1}`,
         email: e,
-        phone: p,
-        enterBoth: !!inv.enterBoth,
-        activeNotification: inv.enterBoth ? ['SMS', 'EMAIL'] : (e ? ['EMAIL'] : ['SMS']),
-        signatureType: inv.signatureType || 'Aadhaar E-Sign (OTP)',
-        role: 'Client / Signer',
-        authMode: 'UIDAI_OTP'
+        phone: p
       };
-    }),
-    preAffixedSignatory: {
-      name: 'Mr Harshal Parmar',
-      designation: 'Principal Officer',
-      sebiRegNo: 'INH000002099',
-      entity: 'Research Analyst',
-      dscAffixed: true,
-      stampedDate: date1
-    },
-    webhook: {
-      url: 'https://crm.astrainvestment.com/api/v1/webhooks/leegality',
-      eventTypes: ['DOCUMENT_SIGNED', 'DOCUMENT_REJECTED', 'INVITATION_DELIVERED']
-    }
+    })
   };
 };
 
 /**
- * Execute Leegality v2.1 E-Sign Dispatch API Call
- * Authenticated via X-Auth-Token: JsAEa0QGumZ0PaNII2cildpFZad1RbxM
+ * Execute Leegality v3.0 E-Sign Dispatch API Call
+ * Authenticated via X-Auth-Token: JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM
  */
 export const dispatchLeegalitySignRequest = async ({
   sale,
@@ -180,49 +176,68 @@ export const dispatchLeegalitySignRequest = async ({
   }
 
   const payload = buildSignRequestPayload({ sale, invitees, tenure, date1, config });
-  const docId = 'LEEG-' + Date.now().toString().slice(-8);
 
-  // Compute HMAC signature using Private Salt (hFBCLusGymhRFGNsdEUUISXtJynqRAhG)
-  const webhookMac = await computeHmacSha1(docId, config.privateSalt);
+  // Priority endpoint candidates: Vite dev proxy first (avoids browser CORS), then direct production endpoint
+  const endpointCandidates = [
+    '/api-leegality/api/v3.0/sign/request',
+    config.signRequestEndpoint,
+    'https://app1.leegality.com/api/v3.0/sign/request'
+  ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
+
+  let remoteData = null;
+  let lastErrorMessage = '';
+
+  for (const ep of endpointCandidates) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(ep, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': config.legacyAuthToken
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      const resJson = await response.json();
+      if (resJson && resJson.status === 1) {
+        remoteData = resJson;
+        break;
+      } else if (resJson && resJson.messages && resJson.messages.length > 0) {
+        lastErrorMessage = resJson.messages.map(m => m.message).join(' | ');
+      }
+    } catch (err) {
+      lastErrorMessage = err.message;
+    }
+  }
+
+  if (!remoteData || !remoteData.data) {
+    throw new Error(lastErrorMessage ? `Leegality Gateway: ${lastErrorMessage}` : 'Failed to reach Leegality API. Please check your network and whitelisted IP.');
+  }
+
+  const realData = remoteData.data;
+  const docId = realData.documentId;
+  const primaryInvitee = realData.invitees?.[0] || {};
+  const signUrl = primaryInvitee.signUrl || '';
+  // Map signUrl through proxy for iframe embedding to bypass X-Frame-Options SAMEORIGIN
+  const embeddedIframeUrl = signUrl ? signUrl.replace('https://app1.leegality.com', '/sign-proxy') : '';
 
   // Deduct 1 credit from account balance
   const remainingCredits = deductCredit();
 
-  // Try real network dispatch to Leegality endpoint with X-Auth-Token header
-  let networkSucceeded = false;
-  let remoteData = null;
+  // Compute HMAC signature using Private Salt
+  const webhookMac = await computeHmacSha1(docId, config.privateSalt);
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-    const response = await fetch(config.signRequestEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Auth-Token': config.legacyAuthToken
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      remoteData = await response.json();
-      networkSucceeded = true;
-    }
-  } catch (err) {
-    // Expected in frontend-only sandboxes due to enterprise CORS preflights
-    // Seamlessly fallback to authentic simulated response with exact signature & token telemetry
-    networkSucceeded = false;
-  }
-
-  // Generate authentic Leegality v2.1 response structure
   const result = {
     status: 1,
     responseCode: 200,
-    message: 'Document created and invitation dispatched successfully via Leegality API v2.1',
-    networkDispatched: networkSucceeded,
+    message: remoteData.messages?.[0]?.message || 'Document created and invitation dispatched successfully via Leegality API v3.0',
+    networkDispatched: true,
+    isRealLeegality: true,
     data: {
       documentId: docId,
       irn: payload.irn,
@@ -234,14 +249,11 @@ export const dispatchLeegalitySignRequest = async ({
       webhookMac,
       creditsRemaining: remainingCredits,
       signedByPreAffixed: 'Mr Harshal Parmar (SEBI INH000002099)',
-      signUrl: `https://app.leegality.com/sign/${docId.toLowerCase()}`,
-      invitees: payload.invitees.map(inv => ({
+      signUrl: signUrl,
+      embeddedIframeUrl: embeddedIframeUrl || signUrl,
+      invitees: realData.invitees || payload.invitees.map(inv => ({
         ...inv,
-        status: 'Invitation Sent',
-        deliveryStatus: {
-          sms: inv.phone ? 'Delivered via Gateway' : 'N/A',
-          email: inv.email ? 'Sent via Leegality Mailer' : 'N/A'
-        }
+        status: 'Invitation Sent'
       })),
       timestamp: new Date().toISOString()
     }
@@ -258,6 +270,8 @@ export const dispatchLeegalitySignRequest = async ({
       authToken: maskToken(config.legacyAuthToken),
       mac: webhookMac,
       tenure,
+      signUrl,
+      verifiedReal: true,
       timestamp: new Date().toISOString()
     });
     localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(existingLog.slice(0, 50)));
@@ -267,6 +281,8 @@ export const dispatchLeegalitySignRequest = async ({
 
   return result;
 };
+
+
 
 /**
  * Retrieve recent Leegality API dispatch audit records

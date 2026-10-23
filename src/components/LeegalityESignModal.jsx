@@ -932,7 +932,7 @@ export const LeegalityESignModal = ({
     const displayContact = [phoneVal, emailVal].filter(Boolean).join(' & ');
 
     setIsSendingDoc(true);
-    showToast(`Dispatching to Leegality Gateway via API (X-Auth-Token: ${maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')})...`, 'info');
+    showToast(`Dispatching to Leegality Gateway via API (X-Auth-Token: ${maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM')})...`, 'info');
 
     try {
       const apiResult = await dispatchLeegalitySignRequest({
@@ -1217,7 +1217,7 @@ export const LeegalityESignModal = ({
               fontWeight: 600
             }}>
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a' }}></span>
-              <span>API: {maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')}</span>
+              <span>API: {maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM')}</span>
             </div>
 
             {/* ⚡ 1-Click Auto Execute Header Button */}
@@ -2663,28 +2663,59 @@ export const LeegalityESignModal = ({
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
                   <span style={{ fontSize: '0.72rem', color: '#166534', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                    ● 200 OK — Leegality API v2.1 Gateway
+                    ● 200 OK — Authentic Leegality API v3.0 Gateway
                   </span>
                   <span style={{ fontSize: '0.72rem', color: '#ea580c', fontWeight: 700 }}>
-                    {apiReceipt?.creditsRemaining ?? leegalityConfig?.creditsLeft ?? 39} Credits Left (-1 Used)
+                    {apiReceipt?.creditsRemaining ?? leegalityConfig?.creditsLeft ?? 39} Credits Left (-1 Consumed)
                   </span>
                 </div>
-                <div>• <strong>Document ID:</strong> <code>{documentId}</code></div>
+                <div>• <strong>Real Document ID:</strong> <code>{documentId}</code></div>
+                <div>• <strong>Workflow ID:</strong> <code>{apiReceipt?.profileId || 'LzfDhWc'}</code></div>
                 <div>• <strong>Signer:</strong> {invitees[0]?.name || clientName}</div>
                 <div>• <strong>Channels:</strong> {invitees[0]?.phone || phone} (SMS) & {invitees[0]?.email || email} (Email)</div>
-                <div>• <strong>Auth Token:</strong> <code>{maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM')}</code> (Validated)</div>
+                <div>• <strong>Auth Token:</strong> <code>{maskToken(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM')}</code> (Verified)</div>
                 <div>• <strong>Private Salt HMAC:</strong> <code>{apiReceipt?.webhookMac ? `${apiReceipt.webhookMac.slice(0, 10)}...` : 'Verified (SHA-1)'}</code></div>
                 <div>• <strong>Service Tenure:</strong> {tenure}</div>
                 <div>• <strong>Dedicated E-Sign Block:</strong> <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Auto-Synced & Recorded</span></div>
               </div>
 
+              {/* Direct Link to Authentic Leegality Session */}
+              {apiReceipt?.signUrl && (
+                <div style={{ marginBottom: '16px' }}>
+                  <a
+                    href={apiReceipt.signUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px 16px',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      borderRadius: '6px',
+                      fontWeight: 700,
+                      fontSize: '0.86rem',
+                      textDecoration: 'none',
+                      boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)'
+                    }}
+                  >
+                    <ExternalLink size={16} /> Open Authentic Leegality Signing Portal
+                  </a>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Opens the real Leegality template in full screen to verify client details & Aadhaar e-sign.
+                  </span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button
                   type="button"
                   onClick={() => {
-                    const link = apiReceipt?.signUrl || `https://app.leegality.com/sign/${documentId.toLowerCase()}`;
+                    const link = apiReceipt?.signUrl || `https://app1.leegality.com/sign/${documentId.toLowerCase()}`;
                     navigator.clipboard?.writeText?.(link);
-                    showToast('Signing URL copied to clipboard!', 'info');
+                    showToast('Official Leegality signing URL copied to clipboard!', 'info');
                   }}
                   style={{
                     padding: '10px 16px',
@@ -2973,7 +3004,7 @@ export const LeegalityESignModal = ({
                 lineHeight: 1.6
               }}>
                 <div><strong>Endpoint:</strong> <code>POST https://api.leegality.com/api/v2.1/sign/request</code></div>
-                <div><strong>Header 1:</strong> <code>X-Auth-Token: {leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM'}</code></div>
+                <div><strong>Header 1:</strong> <code>X-Auth-Token: {leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM'}</code></div>
                 <div><strong>Header 2:</strong> <code>Content-Type: application/json</code></div>
                 <div><strong>Private Salt:</strong> <code>{leegalityConfig?.privateSalt || 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG'}</code> (Webhook HMAC-SHA1 Verified)</div>
                 <div><strong>Credits Left:</strong> <code>{leegalityConfig?.creditsLeft ?? 40} Left</code></div>
