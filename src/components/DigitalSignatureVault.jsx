@@ -98,6 +98,11 @@ export const DigitalSignatureVault = ({
   const [ocrProgress, setOcrProgress] = useState({ stage: 'idle', percent: 0, message: '' });
   const [ocrData, setOcrData] = useState(null);
   const [showRawOcr, setShowRawOcr] = useState(false);
+  const [ocrSensitivity, setOcrSensitivity] = useState(0);
+  const [ocrUpscale, setOcrUpscale] = useState(true);
+  const [ocrAutoCrop, setOcrAutoCrop] = useState(true);
+  const [showOcrTuningPanel, setShowOcrTuningPanel] = useState(false);
+  const [showBinarizedPreview, setShowBinarizedPreview] = useState(false);
   const [stagedDetails, setStagedDetails] = useState({
     signerName: '',
     designation: '',
@@ -309,7 +314,8 @@ export const DigitalSignatureVault = ({
       const extracted = await extractDetailsFromSignatureImage(
         file,
         processed.dataUrl,
-        (p) => setOcrProgress(p)
+        (p) => setOcrProgress(p),
+        { sensitivity: ocrSensitivity, upscale: ocrUpscale, autoCrop: ocrAutoCrop, multiPass: true }
       );
       setIsOcrScanning(false);
       setOcrData(extracted);
@@ -349,7 +355,8 @@ export const DigitalSignatureVault = ({
       const extracted = await extractDetailsFromSignatureImage(
         stagedFile,
         stagedPreviewData?.dataUrl,
-        (p) => setOcrProgress(p)
+        (p) => setOcrProgress(p),
+        { sensitivity: ocrSensitivity, upscale: ocrUpscale, autoCrop: ocrAutoCrop, multiPass: true }
       );
       setOcrData(extracted);
       setStagedDetails(prev => ({
@@ -362,6 +369,45 @@ export const DigitalSignatureVault = ({
       showToast(`OCR re-analyzed: ${extracted.tags.join(' • ')}`, 'success');
     } catch (err) {
       showToast('OCR analysis encountered an issue', 'error');
+    } finally {
+      setIsOcrScanning(false);
+    }
+  };
+
+  const handleApplyTuningAndRescan = async (tuningOverrides = {}) => {
+    if (!stagedFile && !stagedPreviewData) {
+      showToast('Please select or upload a signature file first to run OCR.', 'info');
+      return;
+    }
+    const currentSensitivity = tuningOverrides.sensitivity !== undefined ? tuningOverrides.sensitivity : ocrSensitivity;
+    const currentUpscale = tuningOverrides.upscale !== undefined ? tuningOverrides.upscale : ocrUpscale;
+    const currentAutoCrop = tuningOverrides.autoCrop !== undefined ? tuningOverrides.autoCrop : ocrAutoCrop;
+
+    setIsOcrScanning(true);
+    setOcrProgress({ stage: 'init', percent: 15, message: 'Re-processing image with adjusted sensitivity...' });
+    try {
+      const extracted = await extractDetailsFromSignatureImage(
+        stagedFile,
+        stagedPreviewData?.dataUrl,
+        (p) => setOcrProgress(p),
+        {
+          sensitivity: currentSensitivity,
+          upscale: currentUpscale,
+          autoCrop: currentAutoCrop,
+          multiPass: true
+        }
+      );
+      setOcrData(extracted);
+      setStagedDetails(prev => ({
+        ...prev,
+        signerName: extracted.detectedName || prev.signerName,
+        designation: extracted.detectedDesignation || prev.designation,
+        entity: extracted.detectedEntity || prev.entity,
+        sebiReg: extracted.detectedRegId || prev.sebiReg
+      }));
+      showToast(`Re-scanned with T=${extracted.threshold}: ${extracted.tags.slice(0, 3).join(' • ')}`, 'success');
+    } catch (err) {
+      showToast('Re-scan error', 'error');
     } finally {
       setIsOcrScanning(false);
     }
@@ -2162,6 +2208,27 @@ export const DigitalSignatureVault = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <button
                     type="button"
+                    onClick={() => setShowOcrTuningPanel(!showOcrTuningPanel)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: showOcrTuningPanel ? 'rgba(234, 179, 8, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                      border: showOcrTuningPanel ? '1px solid rgba(234, 179, 8, 0.5)' : '1px solid rgba(255, 255, 255, 0.15)',
+                      color: showOcrTuningPanel ? '#facc15' : '#cbd5e1',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                    title="Adjust ink threshold, shadow removal, and resolution upscaling"
+                  >
+                    <Sliders size={13} /> {showOcrTuningPanel ? 'Hide Tuning' : '🎛️ Tune Accuracy'}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleLoadSampleStamp}
                     disabled={isOcrScanning}
                     style={{
@@ -2205,6 +2272,129 @@ export const DigitalSignatureVault = ({
                   </button>
                 </div>
               </div>
+
+              {/* 🎛️ OCR Tuning & Shadow Removal Controls */}
+              {showOcrTuningPanel && (
+                <div style={{
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(234, 179, 8, 0.3)',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#facc15', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Sliders size={14} /> OCR Computer Vision Preprocessing & Accuracy Tuning
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                      Optimizes faint scans & camera photos
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                    {/* Ink Sensitivity / Otsu Threshold Slider */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '4px' }}>
+                        <span>Ink Sensitivity / Darkness:</span>
+                        <span style={{ color: '#facc15', fontWeight: 700 }}>
+                          {ocrSensitivity > 0 ? `+${ocrSensitivity}` : ocrSensitivity === 0 ? 'Balanced (Otsu)' : ocrSensitivity}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="-40"
+                        max="40"
+                        step="5"
+                        value={ocrSensitivity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          setOcrSensitivity(val);
+                        }}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#64748b' }}>
+                        <span>Light / Faint Ink</span>
+                        <span>Dark / High Contrast</span>
+                      </div>
+                    </div>
+
+                    {/* Toggles */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#cbd5e1', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={ocrUpscale}
+                          onChange={(e) => setOcrUpscale(e.target.checked)}
+                        />
+                        <span><strong>2x Super-Sampling:</strong> Upscale small text fonts for neural OCR</span>
+                      </label>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#cbd5e1', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={ocrAutoCrop}
+                          onChange={(e) => setOcrAutoCrop(e.target.checked)}
+                        />
+                        <span><strong>Auto-Crop Margins:</strong> Remove empty background borders</span>
+                      </label>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#cbd5e1', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={showBinarizedPreview}
+                          onChange={(e) => setShowBinarizedPreview(e.target.checked)}
+                        />
+                        <span><strong>Show OCR Canvas View:</strong> Inspect black & white pixel output</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleApplyTuningAndRescan()}
+                      disabled={isOcrScanning || (!stagedFile && !stagedPreviewData)}
+                      style={{
+                        padding: '6px 14px',
+                        backgroundColor: '#eab308',
+                        color: '#000000',
+                        fontWeight: 700,
+                        fontSize: '0.74rem',
+                        borderRadius: '5px',
+                        border: 'none',
+                        cursor: (isOcrScanning || (!stagedFile && !stagedPreviewData)) ? 'not-allowed' : 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <RefreshCw size={12} className={isOcrScanning ? 'animate-spin' : ''} />
+                      {isOcrScanning ? 'Applying...' : 'Apply Tuning & Re-Scan'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Binarized OCR Canvas Preview when enabled */}
+              {showBinarizedPreview && ocrData?.ocrOptimizedDataUrl && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '6px',
+                  backgroundColor: '#ffffff',
+                  border: '2px solid #eab308',
+                  marginBottom: '14px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '0.7rem', color: '#854d0e', fontWeight: 700, marginBottom: '6px' }}>
+                    HIGH-CONTRAST BINARIZED CANVAS (SENT TO TESSERACT OCR):
+                  </div>
+                  <img
+                    src={ocrData.ocrOptimizedDataUrl}
+                    alt="Binarized OCR scan preview"
+                    style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              )}
 
               {/* Explanatory Helper Banner if no file is chosen yet */}
               {!stagedFile && !stagedPreviewData && (
@@ -2351,6 +2541,7 @@ export const DigitalSignatureVault = ({
                   )}
                 </div>
               )}
+
 
               {/* Quick Presets Inside Upload Modal */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
