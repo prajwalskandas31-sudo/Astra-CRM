@@ -12,6 +12,7 @@ import {
   setVaultSessionUnlocked,
   processSignatureFile,
   generateDemoSignaturePNG,
+  generateSampleStampPNG,
   extractDetailsFromSignatureImage,
   DEFAULT_OFFICER_SIGNATURE,
   SIGNATORY_PRESETS
@@ -94,7 +95,9 @@ export const DigitalSignatureVault = ({
 
   // OCR & Extracted Details State
   const [isOcrScanning, setIsOcrScanning] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState({ stage: 'idle', percent: 0, message: '' });
   const [ocrData, setOcrData] = useState(null);
+  const [showRawOcr, setShowRawOcr] = useState(false);
   const [stagedDetails, setStagedDetails] = useState({
     signerName: '',
     designation: '',
@@ -300,9 +303,14 @@ export const DigitalSignatureVault = ({
       });
       setStagedPreviewData(processed);
 
-      // Trigger automatic smart OCR detection
+      // Trigger automatic smart OCR detection with real progress tracking
       setIsOcrScanning(true);
-      const extracted = await extractDetailsFromSignatureImage(file, processed.dataUrl);
+      setOcrProgress({ stage: 'init', percent: 15, message: 'Initializing Tesseract OCR engine...' });
+      const extracted = await extractDetailsFromSignatureImage(
+        file,
+        processed.dataUrl,
+        (p) => setOcrProgress(p)
+      );
       setIsOcrScanning(false);
       setOcrData(extracted);
 
@@ -314,7 +322,12 @@ export const DigitalSignatureVault = ({
           entity: extracted.detectedEntity || prev.entity,
           sebiReg: extracted.detectedRegId || prev.sebiReg
         }));
-        showToast(`OCR Scan complete: Detected '${extracted.detectedName}' (${extracted.detectedDesignation}). Details auto-filled!`, 'success');
+
+        if (extracted.hasPrintedText) {
+          showToast(`OCR Scan complete: Detected '${extracted.detectedName}' from image text!`, 'success');
+        } else {
+          showToast(`Signature loaded. Stylized cursive detected (no machine typeface). Review or edit details below!`, 'info');
+        }
       }
     } catch (err) {
       showToast(err.message || 'Error processing signature file', 'error');
@@ -331,8 +344,13 @@ export const DigitalSignatureVault = ({
       return;
     }
     setIsOcrScanning(true);
+    setOcrProgress({ stage: 'init', percent: 20, message: 'Re-analyzing image pixels with OCR engine...' });
     try {
-      const extracted = await extractDetailsFromSignatureImage(stagedFile, stagedPreviewData?.dataUrl);
+      const extracted = await extractDetailsFromSignatureImage(
+        stagedFile,
+        stagedPreviewData?.dataUrl,
+        (p) => setOcrProgress(p)
+      );
       setOcrData(extracted);
       setStagedDetails(prev => ({
         ...prev,
@@ -345,6 +363,47 @@ export const DigitalSignatureVault = ({
     } catch (err) {
       showToast('OCR analysis encountered an issue', 'error');
     } finally {
+      setIsOcrScanning(false);
+    }
+  };
+
+  const handleLoadSampleStamp = async () => {
+    setIsProcessingImage(true);
+    setUpdateError('');
+    try {
+      const stamp = generateSampleStampPNG(
+        stagedDetails.signerName || 'Srinivas R',
+        stagedDetails.designation || 'Managing Director & Authorized Signatory',
+        stagedDetails.entity || 'Astra CRM Enterprise',
+        stagedDetails.sebiReg || 'EMP-001'
+      );
+      setStagedFile({ name: stamp.fileName, size: 32000, type: 'image/png' });
+      setStagedPreviewData(stamp);
+
+      setIsOcrScanning(true);
+      setOcrProgress({ stage: 'init', percent: 20, message: 'Scanning official stamp with OCR engine...' });
+
+      const extracted = await extractDetailsFromSignatureImage(
+        { name: stamp.fileName },
+        stamp.dataUrl,
+        (p) => setOcrProgress(p)
+      );
+
+      setOcrData(extracted);
+      if (extracted.success) {
+        setStagedDetails(prev => ({
+          ...prev,
+          signerName: extracted.detectedName || prev.signerName,
+          designation: extracted.detectedDesignation || prev.designation,
+          entity: extracted.detectedEntity || prev.entity,
+          sebiReg: extracted.detectedRegId || prev.sebiReg
+        }));
+        showToast(`OCR Success: Read '${extracted.detectedName}' from stamp pixels!`, 'success');
+      }
+    } catch (err) {
+      showToast('Error testing sample stamp OCR', 'error');
+    } finally {
+      setIsProcessingImage(false);
       setIsOcrScanning(false);
     }
   };
@@ -2076,7 +2135,7 @@ export const DigitalSignatureVault = ({
               padding: '16px',
               marginBottom: '18px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '28px',
@@ -2092,83 +2151,173 @@ export const DigitalSignatureVault = ({
                   </div>
                   <div>
                     <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ffffff' }}>
-                      Signatory Identity & Details
+                      Signatory Identity & OCR Extraction
                     </div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)' }}>
-                      Auto-detected via OCR from image & fully editable
+                      Auto-detected via Optical Character Recognition from image pixels & fully editable
                     </div>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleRunManualOcr}
-                  disabled={isOcrScanning || (!stagedFile && !stagedPreviewData)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '5px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(6, 182, 212, 0.12)',
-                    border: '1px solid rgba(6, 182, 212, 0.35)',
-                    color: '#22d3ee',
-                    fontSize: '0.74rem',
-                    fontWeight: 600,
-                    cursor: (isOcrScanning || (!stagedFile && !stagedPreviewData)) ? 'not-allowed' : 'pointer',
-                    opacity: (!stagedFile && !stagedPreviewData) ? 0.6 : 1
-                  }}
-                >
-                  <Cpu size={13} /> {isOcrScanning ? 'Scanning OCR...' : '⚡ Run OCR Scan'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleStamp}
+                    disabled={isOcrScanning}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#38bdf8',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      cursor: isOcrScanning ? 'not-allowed' : 'pointer'
+                    }}
+                    title="Generate a sample corporate rubber seal and test OCR text recognition"
+                  >
+                    <Sparkles size={13} /> Test Sample Stamp
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRunManualOcr}
+                    disabled={isOcrScanning || (!stagedFile && !stagedPreviewData)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(6, 182, 212, 0.12)',
+                      border: '1px solid rgba(6, 182, 212, 0.35)',
+                      color: '#22d3ee',
+                      fontSize: '0.74rem',
+                      fontWeight: 600,
+                      cursor: (isOcrScanning || (!stagedFile && !stagedPreviewData)) ? 'not-allowed' : 'pointer',
+                      opacity: (!stagedFile && !stagedPreviewData) ? 0.6 : 1
+                    }}
+                  >
+                    <Cpu size={13} /> {isOcrScanning ? 'Scanning OCR...' : '⚡ Run OCR Scan'}
+                  </button>
+                </div>
               </div>
 
-              {/* OCR Scanning Progress Animation Bar */}
-              {isOcrScanning && (
+              {/* Explanatory Helper Banner if no file is chosen yet */}
+              {!stagedFile && !stagedPreviewData && (
                 <div style={{
                   padding: '10px 14px',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                  border: '1px solid rgba(6, 182, 212, 0.3)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
                   marginBottom: '14px',
+                  fontSize: '0.74rem',
+                  color: 'var(--text-muted, #94a3b8)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px'
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  flexWrap: 'wrap'
                 }}>
-                  <div className="animate-spin" style={{ color: '#06b6d4' }}>
-                    <RefreshCw size={15} />
+                  <span>
+                    💡 <strong>To run OCR:</strong> Drag & drop or select an image file above. The OCR engine automatically analyzes the image pixels for printed text, seals, or employee IDs.
+                  </span>
+                </div>
+              )}
+
+              {/* OCR Scanning Progress Bar */}
+              {isOcrScanning && (
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                  border: '1px solid rgba(6, 182, 212, 0.35)',
+                  marginBottom: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: '#22d3ee', fontWeight: 600 }}>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>{ocrProgress.message || 'Scanning image pixels with Tesseract OCR...'}</span>
+                    </div>
+                    <span style={{ fontSize: '0.74rem', color: '#67e8f9', fontWeight: 700 }}>
+                      {ocrProgress.percent || 25}%
+                    </span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#22d3ee' }}>
-                    Analyzing uploaded signature image contours & optical character marks...
+                  <div style={{ width: '100%', height: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${ocrProgress.percent || 25}%`,
+                      height: '100%',
+                      backgroundColor: '#06b6d4',
+                      transition: 'width 0.3s ease'
+                    }} />
                   </div>
                 </div>
               )}
 
-              {/* OCR Extracted Notice Badge */}
-              {ocrData && (
+              {/* OCR Extracted Notice Badge & Raw Text Preview */}
+              {ocrData && !isOcrScanning && (
                 <div style={{
-                  padding: '10px 14px',
+                  padding: '12px 14px',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  backgroundColor: ocrData.hasPrintedText ? 'rgba(16, 185, 129, 0.1)' : 'rgba(56, 189, 248, 0.08)',
+                  border: ocrData.hasPrintedText ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(56, 189, 248, 0.25)',
                   marginBottom: '14px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 700, color: '#34d399' }}>
-                      <CheckCircle2 size={14} /> OCR Analysis Complete ({ocrData.confidence}% Confidence)
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      color: ocrData.hasPrintedText ? '#34d399' : '#38bdf8'
+                    }}>
+                      {ocrData.hasPrintedText ? (
+                        <>
+                          <CheckCircle2 size={14} /> OCR Read Success ({ocrData.confidence}% Confidence)
+                        </>
+                      ) : (
+                        <>
+                          <Info size={14} /> Handwritten Cursive Signature Detected
+                        </>
+                      )}
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                      You can modify any detected field below
-                    </span>
+
+                    {ocrData.rawText && (
+                      <button
+                        type="button"
+                        onClick={() => setShowRawOcr(!showRawOcr)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#93c5fd',
+                          fontSize: '0.7rem',
+                          textDecoration: 'underline',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {showRawOcr ? 'Hide Raw OCR Text' : 'View Raw OCR Text'}
+                      </button>
+                    )}
                   </div>
+
+                  {!ocrData.hasPrintedText && (
+                    <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '8px', lineHeight: 1.4 }}>
+                      Pure handwritten signatures contain ink loops rather than machine typeface. You can easily adjust or verify your name, title, and registration ID directly in the editable inputs below!
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {ocrData.tags.map((tag, idx) => (
                       <span
                         key={idx}
                         style={{
                           fontSize: '0.68rem',
-                          backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                          color: '#a7f3d0',
+                          backgroundColor: ocrData.hasPrintedText ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.15)',
+                          color: ocrData.hasPrintedText ? '#a7f3d0' : '#bae6fd',
                           padding: '2px 8px',
                           borderRadius: '4px',
                           fontWeight: 500
@@ -2178,6 +2327,28 @@ export const DigitalSignatureVault = ({
                       </span>
                     ))}
                   </div>
+
+                  {/* Expandable Raw OCR Text Box */}
+                  {showRawOcr && ocrData.rawText && (
+                    <div style={{
+                      marginTop: '10px',
+                      padding: '8px 10px',
+                      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.72rem',
+                      color: '#e2e8f0',
+                      whiteSpace: 'pre-wrap',
+                      maxHeight: '120px',
+                      overflowY: 'auto'
+                    }}>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 600 }}>
+                        RAW PIXEL TEXT EXTRACTED BY TESSERACT OCR:
+                      </div>
+                      {ocrData.rawText}
+                    </div>
+                  )}
                 </div>
               )}
 
