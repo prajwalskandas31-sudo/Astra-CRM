@@ -41,6 +41,7 @@ import {
   PenTool
 } from 'lucide-react';
 import { HarshalParmarESign } from './HarshalParmarESign';
+import { getPrimarySignatory } from '../services/digitalSignatureService';
 import { 
   dispatchLeegalitySignRequest, 
   maskToken, 
@@ -133,6 +134,7 @@ const LeegalityDocumentPreview = ({
   isCompleted,
   documentId
 }) => {
+  const primarySig = getPrimarySignatory();
   return (
     <div style={{
       flex: 1,
@@ -281,7 +283,7 @@ const LeegalityDocumentPreview = ({
                 SEBI (Research Analyst) Regulations, 2014 Mandatory Disclosure Document
               </p>
               <p style={{ fontSize: '0.68rem', color: '#64748b', margin: 0 }}>
-                Research Analyst: <strong>Harshal Parmar</strong> • SEBI Registration No: <strong>INH000002099</strong>
+                Research Analyst: <strong>{primarySig?.signerName || 'Authorized Signatory'}</strong> • Registration No: <strong>{primarySig?.sebiReg || 'EMP-001'}</strong>
               </p>
             </div>
 
@@ -386,7 +388,7 @@ const LeegalityDocumentPreview = ({
             <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                  For Harshal Parmar
+                  For {primarySig?.signerName || 'Authorized Signatory'}
                 </div>
                 <div>
                   <HarshalParmarESign
@@ -394,12 +396,15 @@ const LeegalityDocumentPreview = ({
                     isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
                     showCyanBorder={true}
                     documentId={documentId}
+                    signerName={primarySig?.signerName}
+                    designation={primarySig?.designation}
+                    sebiReg={primarySig?.sebiReg}
                   />
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                   <div>Signature:</div>
-                  <div>Name: Mr Harshal Parmar</div>
-                  <div>Designation: Principal Officer</div>
+                  <div>Name: {primarySig?.signerName || 'Authorized Signatory'}</div>
+                  <div>Designation: {primarySig?.designation || 'Principal Officer'}</div>
                 </div>
               </div>
 
@@ -471,13 +476,13 @@ const LeegalityDocumentPreview = ({
               }}>
                 {date1}
               </span>{' '}
-              and entered into by and between <strong>Harshal Parmar</strong> (SEBI INH000002099) of the <strong>ONE PART</strong> and <strong>{clientName}</strong> (PAN: {panNumber}) of the <strong>SECOND PART</strong> for the explicit tenure of <strong>{tenure}</strong>.
+              and entered into by and between <strong>{primarySig?.signerName || 'Authorized Signatory'}</strong> ({primarySig?.sebiReg || 'EMP-001'}) of the <strong>ONE PART</strong> and <strong>{clientName}</strong> (PAN: {panNumber}) of the <strong>SECOND PART</strong> for the explicit tenure of <strong>{tenure}</strong>.
             </div>
 
             {/* Signature Block Page 14 */}
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
               <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                For Harshal Parmar
+                For {primarySig?.signerName || 'Authorized Signatory'}
               </div>
               <div>
                 <HarshalParmarESign
@@ -485,12 +490,15 @@ const LeegalityDocumentPreview = ({
                   isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
                   showCyanBorder={true}
                   documentId={documentId}
+                  signerName={primarySig?.signerName}
+                  designation={primarySig?.designation}
+                  sebiReg={primarySig?.sebiReg}
                 />
               </div>
               <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                 <div>Signature:</div>
-                <div>Name: Mr Harshal Parmar</div>
-                <div>Designation: Principal Officer</div>
+                <div>Name: {primarySig?.signerName || 'Authorized Signatory'}</div>
+                <div>Designation: {primarySig?.designation || 'Principal Officer'}</div>
               </div>
             </div>
 
@@ -524,6 +532,7 @@ export const LeegalityESignModal = ({
   const { currentUser, leads, completeESignProcess, leegalityConfig, updateLeegalityConfig } = useCRM();
   const { showToast } = useToast();
   const [apiReceipt, setApiReceipt] = useState(null);
+  const primarySig = getPrimarySignatory();
 
   // Stepper: 1: Create, 2: Invite, 3: Finalize
   const [activeStep, setActiveStep] = useState(1);
@@ -1326,7 +1335,7 @@ export const LeegalityESignModal = ({
                   <span><strong>Step 2:</strong> Auto-reading Client Info (<strong>{clientName}</strong> • <strong>{phone}</strong> • <strong>{email}</strong>) with 'Enter both' active & 'I want to sign' disabled...</span>
                 )}
                 {autoProgressPhase === 3 && (
-                  <span><strong>Step 3:</strong> Affixing Harshal Parmar DSC E-Sign, Client Aadhaar E-Signature & live timestamps...</span>
+                  <span><strong>Step 3:</strong> Affixing {primarySig?.signerName || 'authorized'} DSC E-Sign, Client Aadhaar E-Signature & live timestamps...</span>
                 )}
                 {autoProgressPhase === 4 && (
                   <span><strong>Step 4:</strong> Dispatched via Leegality API v2.1! 1 Credit consumed • Saved to Dedicated E-Sign Block.</span>
@@ -1773,7 +1782,7 @@ export const LeegalityESignModal = ({
                     </div>
 
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45 }}>
-                      In Leegality (eKYC API portal), this toggle <strong>must be disabled</strong>. Disabling this removes <code>InvestEQ (8494953754)</code> from signers so only the client signs, since Harshal Parmar's digital signature is already pre-affixed on the documents.
+                      In Leegality (eKYC API portal), this toggle <strong>must be disabled</strong>. Disabling this removes <code>InvestEQ (8494953754)</code> from signers so only the client signs, since {primarySig?.signerName || 'authorized signatory'}'s digital signature is already pre-affixed on the documents.
                     </p>
 
                     {/* Interactive Comparison Preview Button */}
@@ -2472,19 +2481,19 @@ export const LeegalityESignModal = ({
                 {/* Points 7 through 11 matching screenshot */}
                 <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.65, textAlign: 'justify' }}>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    7. Harshal Parmar or its associates are not affiliated with any other intermediaries or have received any brokerage or commission from any third party.
+                    7. {primarySig?.signerName || 'The Research Analyst'} or its associates are not affiliated with any other intermediaries or have received any brokerage or commission from any third party.
                   </p>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    8. Harshal Parmar or its associates have not received any compensation from the Company covered by Research Analyst during the past twelve months.
+                    8. {primarySig?.signerName || 'The Research Analyst'} or its associates have not received any compensation from the Company covered by Research Analyst during the past twelve months.
                   </p>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    9. Harshal Parmar or its associates have not managed or co-managed public offering of securities of the Company during the past twelve months.
+                    9. {primarySig?.signerName || 'The Research Analyst'} or its associates have not managed or co-managed public offering of securities of the Company during the past twelve months.
                   </p>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    10. Harshal Parmar or its associates has not served as an officer, director or employee of the Company and has not been engaged in the market making activity of the Company.
+                    10. {primarySig?.signerName || 'The Research Analyst'} or its associates has not served as an officer, director or employee of the Company and has not been engaged in the market making activity of the Company.
                   </p>
                   <p style={{ margin: '0 0 12px 0' }}>
-                    11. Harshal Parmar have ensured that the facts mentioned in the research report are taken from the reliable source and information. However, the investors are advised to independently evaluate the market conditions/ risks involved before making the investment decision.
+                    11. {primarySig?.signerName || 'The Research Analyst'} have ensured that the facts mentioned in the research report are taken from the reliable source and information. However, the investors are advised to independently evaluate the market conditions/ risks involved before making the investment decision.
                   </p>
                 </div>
 
@@ -2500,13 +2509,13 @@ export const LeegalityESignModal = ({
                 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>
-                      Signer 1 (SEBI Research Analyst):
+                      Signer 1 (Authorized Signatory):
                     </div>
                     <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0f172a' }}>
-                      Mr Harshal Parmar
+                      {primarySig?.signerName || 'Authorized Signatory'}
                     </div>
                     <div style={{ fontSize: '0.74rem', color: '#10b981', fontWeight: 600, marginTop: '3px' }}>
-                      ✓ Digitally Pre-Stamped (SEBI INH000002099)
+                      ✓ Digitally Pre-Stamped ({primarySig?.sebiReg || 'EMP-001'})
                     </div>
                   </div>
 
@@ -3046,9 +3055,9 @@ export const LeegalityESignModal = ({
     role: "Client / Signer"
   })),
   preAffixedSignatory: {
-    name: "Mr Harshal Parmar",
-    designation: "Principal Officer",
-    sebiRegNo: "INH000002099",
+    name: primarySig?.signerName || "Authorized Signatory",
+    designation: primarySig?.designation || "Principal Officer",
+    sebiRegNo: primarySig?.sebiReg || "EMP-001",
     dscAffixed: true
   }
 }, null, 2)}

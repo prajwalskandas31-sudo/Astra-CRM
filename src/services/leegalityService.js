@@ -7,6 +7,8 @@
  * - Endpoint: POST https://app1.leegality.com/api/v3.0/sign/request
  */
 
+import { getPrimarySignatory } from './digitalSignatureService';
+
 const STORAGE_KEY = 'astra_leegality_api_config';
 const AUDIT_STORAGE_KEY = 'astra_leegality_audit_log';
 
@@ -248,7 +250,10 @@ export const dispatchLeegalitySignRequest = async ({
       privateSaltMasked: maskToken(config.privateSalt),
       webhookMac,
       creditsRemaining: remainingCredits,
-      signedByPreAffixed: 'Mr Harshal Parmar (SEBI INH000002099)',
+      signedByPreAffixed: (() => {
+        const sig = getPrimarySignatory();
+        return `${sig?.signerName || 'Authorized Signatory'} (${sig?.sebiReg || 'EMP-001'})`;
+      })(),
       signUrl: signUrl,
       embeddedIframeUrl: embeddedIframeUrl || signUrl,
       invitees: realData.invitees || payload.invitees.map(inv => ({

@@ -10,6 +10,7 @@ import {
   Building2, CheckCircle2
 } from 'lucide-react';
 import { computeHmacSha1, maskToken } from '../services/leegalityService';
+import { DigitalSignatureVault } from './DigitalSignatureVault';
 
 export const SystemSettings = () => {
   const { 
@@ -1130,9 +1131,14 @@ export const SystemSettings = () => {
             </div>
           </div>
 
-          {/* Right Main API Panel */}
-          <div style={{ flex: 1, padding: '24px 32px', backgroundColor: '#ffffff' }}>
-            {/* Panel Header */}
+          {/* Right Main Panel: Subtab Routing */}
+          {leegalityActiveSubTab === 'eSignature' ? (
+            <div style={{ flex: 1, padding: '24px 28px', backgroundColor: 'var(--bg-surface)' }}>
+              <DigitalSignatureVault embedded={true} initialSignerKey="master_officer" />
+            </div>
+          ) : (
+            <div style={{ flex: 1, padding: '24px 32px', backgroundColor: '#ffffff' }}>
+              {/* Panel Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
@@ -1570,7 +1576,7 @@ export const SystemSettings = () => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Check size={14} color="#16a34a" />
-                    <span><strong>Step 1:</strong> Pre-affixed Signatory Mr Harshal Parmar</span>
+                    <span><strong>Step 1:</strong> Pre-affixed Authorized Signatory & Digital Stamp</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Check size={14} color="#16a34a" />
@@ -1588,6 +1594,7 @@ export const SystemSettings = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 

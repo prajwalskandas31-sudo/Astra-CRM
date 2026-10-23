@@ -6,6 +6,7 @@ import {
   dispatchLeegalitySignRequest,
   DEFAULT_LEEGALITY_CONFIG 
 } from '../services/leegalityService';
+import { getPrimarySignatory } from '../services/digitalSignatureService';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -540,7 +541,7 @@ export const CRM_FEATURES = [
     id: 'esign-block',
     name: 'Dedicated E-Sign Block (Leegality SEBI Master)',
     category: 'Sales & Approvals',
-    description: 'Centralized E-Sign block in the CRM filled after confirmation, storing executed agreements with Harshal Parmar official e-sign.',
+    description: 'Centralized E-Sign block in the CRM filled after confirmation, storing executed agreements with authorized digital signatures and password-protected vault.',
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
   },
   {
@@ -2521,14 +2522,17 @@ export const CRMProvider = ({ children }) => {
       date1: date1Val,
       confirmedAt: eSignDetails.signedAt || new Date().toISOString(),
       status: 'Confirmed & Sealed',
-      signerOfficer: {
-        name: 'Mr Harshal Parmar',
-        designation: 'Principal Officer',
-        sebiReg: 'INH000002099',
-        entity: 'Research Analyst',
-        eSignStatus: 'Affixed & Verified',
-        signatureMarked: true
-      },
+      signerOfficer: (() => {
+        const sig = getPrimarySignatory();
+        return {
+          name: sig?.signerName || 'Authorized Signatory',
+          designation: sig?.designation || 'Principal Officer',
+          sebiReg: sig?.sebiReg || 'EMP-001',
+          entity: sig?.entity || 'Astra CRM Enterprise',
+          eSignStatus: 'Affixed & Verified',
+          signatureMarked: true
+        };
+      })(),
       clientSigner: {
         name: clientName,
         eSignStatus: 'Aadhaar OTP Verified',
@@ -2564,7 +2568,7 @@ export const CRMProvider = ({ children }) => {
   // 2. Stamps today's execution date into Date 1
   // 3. Auto-reads Name, Phone number, and Email from Client Information Page
   // 4. Disables "I want to sign this document" and activates "Enter both"
-  // 5. Affixes official Harshal Parmar E-Sign, Client E-Signature & live timestamps
+  // 5. Affixes official digital signature, Client E-Signature & live timestamps
   // 6. Dispatches via Leegality API v2.1 & saves executed agreement into Dedicated E-Sign Block
   const executeOneClickLeegalityESign = async (saleId) => {
     const targetSale = sales.find(s => s.id === saleId);
@@ -2696,14 +2700,17 @@ export const CRMProvider = ({ children }) => {
       date1: date1Str,
       confirmedAt: new Date().toISOString(),
       status: 'Confirmed & Sealed',
-      signerOfficer: {
-        name: 'Mr Harshal Parmar',
-        designation: 'Principal Officer',
-        sebiReg: 'INH000002099',
-        entity: 'Research Analyst',
-        eSignStatus: 'Affixed & Verified',
-        signatureMarked: true
-      },
+      signerOfficer: (() => {
+        const sig = getPrimarySignatory();
+        return {
+          name: sig?.signerName || 'Authorized Signatory',
+          designation: sig?.designation || 'Principal Officer',
+          sebiReg: sig?.sebiReg || 'EMP-001',
+          entity: sig?.entity || 'Astra CRM Enterprise',
+          eSignStatus: 'Affixed & Verified',
+          signatureMarked: true
+        };
+      })(),
       clientSigner: {
         name: clientName,
         eSignStatus: 'Aadhaar OTP Verified',

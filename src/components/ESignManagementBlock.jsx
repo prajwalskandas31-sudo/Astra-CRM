@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { HarshalParmarESign } from './HarshalParmarESign';
+import { DigitalSignatureVault } from './DigitalSignatureVault';
+import { getPrimarySignatory } from '../services/digitalSignatureService';
 import {
   FileSignature,
   ShieldCheck,
@@ -25,7 +27,10 @@ import {
   ArrowRight,
   Send,
   AlertCircle,
-  Zap
+  Zap,
+  Lock,
+  Unlock,
+  KeyRound
 } from 'lucide-react';
 
 export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
@@ -41,10 +46,21 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
 
   const { showToast } = useToast();
 
+  const [activeBlockTab, setActiveBlockTab] = useState('registry'); // 'registry' | 'vault'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecordForInspection, setSelectedRecordForInspection] = useState(null);
   const [activeInspectorTab, setActiveInspectorTab] = useState('both'); // 'doc1' | 'doc2' | 'both'
   const [isSimulating, setIsSimulating] = useState(false);
+  const [primarySignatory, setPrimarySignatory] = useState(() => getPrimarySignatory());
+
+  // Listen to signature/signatory profile updates in real time
+  useEffect(() => {
+    const handleSigUpdate = () => {
+      setPrimarySignatory(getPrimarySignatory());
+    };
+    window.addEventListener('astra:digital_signature_updated', handleSigUpdate);
+    return () => window.removeEventListener('astra:digital_signature_updated', handleSigUpdate);
+  }, []);
 
   // Filter records
   const filteredRecords = eSignRecords.filter(r => {
@@ -81,7 +97,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
   };
 
   const handleDownloadPdf = (rec) => {
-    showToast(`Downloading certified E-Signed agreement (${rec.documentId}) with Harshal Parmar signature...`, 'info');
+    showToast(`Downloading certified E-Signed agreement (${rec.documentId}) with ${primarySignatory?.signerName || 'authorized'} signature...`, 'info');
     setTimeout(() => {
       showToast(`Signed Agreement PDF downloaded successfully! Certified by Leegality.`, 'success');
     }, 1200);
@@ -204,10 +220,10 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               Authorized Signatory
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary, #ffffff)' }}>
-              Mr. Harshal Parmar
+              {primarySignatory?.signerName || 'Authorized Signatory'}
             </div>
             <div style={{ fontSize: '0.72rem', color: '#22d3ee' }}>
-              Principal Officer (Research Analyst)
+              {primarySignatory?.designation || 'Principal Officer'}
             </div>
           </div>
 
@@ -218,13 +234,13 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             borderRadius: '8px'
           }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '4px' }}>
-              SEBI Registration
+              Registration ID / Entity
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary, #ffffff)' }}>
-              INH000002099
+              {primarySignatory?.sebiReg || 'EMP-001'}
             </div>
             <div style={{ fontSize: '0.72rem', color: '#10b981' }}>
-              ✓ Fully Verified & Compliant
+              ✓ {primarySignatory?.entity || 'Astra CRM Enterprise'}
             </div>
           </div>
 
@@ -248,9 +264,76 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
         </div>
       </div>
 
-      {/* ─── AUTHORIZED SIGNER PROFILE & SEAL CARD ─── */}
+      {/* ─── E-SIGN BLOCK SUB-NAVIGATION TABS ─── */}
       <div style={{
-        backgroundColor: 'var(--bg-card, #1e293b)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '22px',
+        flexWrap: 'wrap'
+      }}>
+        <button
+          type="button"
+          onClick={() => setActiveBlockTab('registry')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: activeBlockTab === 'registry' ? '1.5px solid #06b6d4' : '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: activeBlockTab === 'registry' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+            color: activeBlockTab === 'registry' ? '#22d3ee' : 'var(--text-muted, #94a3b8)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <FileText size={16} />
+          <span>Confirmed E-Sign Documents Registry ({eSignRecords.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveBlockTab('vault')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: activeBlockTab === 'vault' ? '1.5px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: activeBlockTab === 'vault' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+            color: activeBlockTab === 'vault' ? '#10b981' : 'var(--text-muted, #94a3b8)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Lock size={15} />
+          <span>Digital Signature Storage Block</span>
+          <span style={{
+            fontSize: '0.68rem',
+            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+            color: '#f87171',
+            padding: '1px 6px',
+            borderRadius: '4px',
+            fontWeight: 700
+          }}>
+            Password Protected
+          </span>
+        </button>
+      </div>
+
+      {activeBlockTab === 'vault' ? (
+        <DigitalSignatureVault initialSignerKey="master_officer" />
+      ) : (
+        <>
+          {/* ─── AUTHORIZED SIGNER PROFILE & SEAL CARD ─── */}
+          <div style={{
+            backgroundColor: 'var(--bg-card, #1e293b)',
         border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
         borderRadius: '10px',
         padding: '20px 24px',
@@ -290,10 +373,10 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
         }}>
           {/* Signer Details */}
           <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary, #cbd5e1)', lineHeight: 1.6 }}>
-            <div>• <strong>Signer Name:</strong> Mr. Harshal Parmar</div>
-            <div>• <strong>Designation:</strong> Principal Officer</div>
-            <div>• <strong>Registered Entity:</strong> Research Analyst (SEBI INH000002099)</div>
-            <div>• <strong>Registered Office:</strong> Shop No. 5, Pramukh Darshan Complex, Chharwada Road, Vapi, Valsad, Gujarat - 396191</div>
+            <div>• <strong>Signer Name:</strong> {primarySignatory?.signerName || 'Authorized Signatory'}</div>
+            <div>• <strong>Designation:</strong> {primarySignatory?.designation || 'Principal Officer'}</div>
+            <div>• <strong>Registered Entity:</strong> {primarySignatory?.entity || 'Astra CRM Enterprise'} ({primarySignatory?.sebiReg || 'EMP-001'})</div>
+            <div>• <strong>Registered Office:</strong> {primarySignatory?.officeAddress || 'Corporate Headquarters, Bengaluru, Karnataka'}</div>
             <div>• <strong>Execution Mode:</strong> Interlinked Two-Document E-Sign (MITC + 14-page Agreement)</div>
           </div>
 
@@ -311,10 +394,37 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '8px', fontWeight: 600 }}>
               Official Digital E-Sign Stamp (Affixed Upon Confirmation):
             </span>
-            <HarshalParmarESign date={new Date().toLocaleDateString('en-GB')} isConfirmed={true} showCyanBorder={true} />
+            <HarshalParmarESign
+              date={new Date().toLocaleDateString('en-GB')}
+              isConfirmed={true}
+              showCyanBorder={true}
+              signerName={primarySignatory?.signerName}
+              designation={primarySignatory?.designation}
+              sebiReg={primarySignatory?.sebiReg}
+            />
             <span style={{ fontSize: '0.68rem', color: '#06b6d4', marginTop: '6px' }}>
-              ✓ Automatically stamped into cyan-marked places above "Signature: / Name: Mr Harshal Parmar"
+              ✓ Automatically stamped into cyan-marked places above "Signature: / Name: {primarySignatory?.signerName || 'Authorized Signatory'}"
             </span>
+            <button
+              type="button"
+              onClick={() => setActiveBlockTab('vault')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '10px',
+                padding: '6px 14px',
+                backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                border: '1px solid rgba(6, 182, 212, 0.4)',
+                borderRadius: '6px',
+                color: '#22d3ee',
+                fontSize: '0.74rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <Lock size={12} /> Manage / Upload Custom Signature (Password Protected)
+            </button>
           </div>
         </div>
       </div>
@@ -407,7 +517,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                     cursor: 'pointer',
                     boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
                   }}
-                  title="Executes template document access, auto-reads client info, sets date, affixes Harshal Parmar signature & timestamps, and dispatches via Leegality API in 1 click"
+                  title={`Executes template document access, auto-reads client info, sets date, affixes ${primarySignatory?.signerName || 'authorized'} signature & timestamps, and dispatches via Leegality API in 1 click`}
                 >
                   <Zap size={14} /> ⚡ 1-Click Auto Execute Leegality ({pendingESignSales[0].clientName})
                 </button>
@@ -451,7 +561,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               Dedicated E-Sign Block is Ready
             </h4>
             <p style={{ margin: '0 auto 20px auto', fontSize: '0.82rem', color: 'var(--text-muted, #94a3b8)', maxWidth: '520px', lineHeight: 1.5 }}>
-              This block will automatically be filled as soon as a client's sale confirmation is executed. Click the simulation button below to preview how confirmed agreements and Harshal Parmar's E-Sign are filed here.
+              This block will automatically be filled as soon as a client's sale confirmation is executed. Click the simulation button below to preview how confirmed agreements and {primarySignatory?.signerName || 'authorized'} E-Sign are filed here.
             </p>
             <button
               onClick={handleSimulateConfirmation}
@@ -477,7 +587,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                   <th>Client Name</th>
                   <th>Service & Tenure</th>
                   <th>Fee Amount</th>
-                  <th>Harshal Parmar E-Sign</th>
+                  <th>{primarySignatory?.signerName ? `${primarySignatory.signerName} E-Sign` : 'Authorized E-Sign'}</th>
                   <th>Client Signature</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -615,6 +725,8 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
           </div>
         )}
       </div>
+    </>
+  )}
 
       {/* ─── INTERLINKED DOCUMENT INSPECTOR MODAL ─── */}
       {selectedRecordForInspection && (
@@ -763,7 +875,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                   CYAN BOX LOCATION
                 </span>
                 <span>
-                  <strong>Note: Both images are interlinked.</strong> Harshal Parmar's digital E-Sign appears in the marked places above "Signature: / Name: Mr Harshal Parmar".
+                  <strong>Note: Both documents are interlinked.</strong> {primarySignatory?.signerName || 'Authorized Signatory'}'s digital E-Sign appears in the marked places above "Signature: / Name: {primarySignatory?.signerName || 'Authorized Signatory'}".
                 </span>
               </div>
               <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>
@@ -813,26 +925,29 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
 
                   {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 1 ─── */}
                   <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
-                    {/* For Harshal Parmar */}
+                    {/* Authorized Signatory Block */}
                     <div style={{ marginBottom: '28px' }}>
                       <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
-                        For Harshal Parmar
+                        For {primarySignatory?.signerName || 'Authorized Signatory'}
                       </div>
 
-                      {/* CYAN MARKED BOX WHERE HIS E-SIGN APPEARS */}
+                      {/* CYAN MARKED BOX WHERE E-SIGN APPEARS */}
                       <div>
                         <HarshalParmarESign
                           date={selectedRecordForInspection.date1}
                           isConfirmed={true}
                           showCyanBorder={true}
                           documentId={selectedRecordForInspection.documentId}
+                          signerName={primarySignatory?.signerName}
+                          designation={primarySignatory?.designation}
+                          sebiReg={primarySignatory?.sebiReg}
                         />
                       </div>
 
                       <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                         <div>Signature:</div>
-                        <div>Name: Mr Harshal Parmar</div>
-                        <div>Designation: Principal Officer</div>
+                        <div>Name: {primarySignatory?.signerName || 'Authorized Signatory'}</div>
+                        <div>Designation: {primarySignatory?.designation || 'Principal Officer'}</div>
                       </div>
                     </div>
 
@@ -913,23 +1028,26 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                   {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 2 ─── */}
                   <div style={{ marginTop: 'auto' }}>
                     <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
-                      For Harshal Parmar
+                      For {primarySignatory?.signerName || 'Authorized Signatory'}
                     </div>
 
-                    {/* CYAN MARKED BOX WHERE HIS E-SIGN APPEARS */}
+                    {/* CYAN MARKED BOX WHERE E-SIGN APPEARS */}
                     <div>
                       <HarshalParmarESign
                         date={selectedRecordForInspection.date1}
                         isConfirmed={true}
                         showCyanBorder={true}
                         documentId={selectedRecordForInspection.documentId}
+                        signerName={primarySignatory?.signerName}
+                        designation={primarySignatory?.designation}
+                        sebiReg={primarySignatory?.sebiReg}
                       />
                     </div>
 
                     <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                       <div>Signature:</div>
-                      <div>Name: Mr Harshal Parmar</div>
-                      <div>Designation: Principal Officer</div>
+                      <div>Name: {primarySignatory?.signerName || 'Authorized Signatory'}</div>
+                      <div>Designation: {primarySignatory?.designation || 'Principal Officer'}</div>
                     </div>
                   </div>
 
