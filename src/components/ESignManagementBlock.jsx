@@ -288,7 +288,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             </div>
             <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
               <span>● Token: {leegalityConfig?.legacyAuthToken ? `${leegalityConfig.legacyAuthToken.slice(0, 6)}...` : 'JsAEa0...'}</span>
-              <span>• {leegalityConfig?.creditsLeft ?? 10} Credits Left</span>
+              <span>• {leegalityConfig?.creditsLeft ?? 50} Credits Left</span>
             </div>
           </div>
         </div>

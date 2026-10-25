@@ -16,8 +16,8 @@ export const DEFAULT_LEEGALITY_CONFIG = {
   legacyAuthToken: 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM',
   privateSalt: 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG',
   whitelistedIPs: ['49.37.240.108'],
-  creditsLeft: 10,
-  initialCredits: 10,
+  creditsLeft: 50,
+  initialCredits: 50,
   status: 'Active', // 'Active' | 'Disabled'
   profileId: 'LzfDhWc',
   environment: 'Live Production',
@@ -43,8 +43,8 @@ export const getLeegalityConfig = () => {
         parsed.signRequestEndpoint = DEFAULT_LEEGALITY_CONFIG.signRequestEndpoint;
         parsed.baseUrl = DEFAULT_LEEGALITY_CONFIG.baseUrl;
       }
-      // Sync stale cached 40 or 39 credits with actual live wallet balance (10 credits)
-      if (parsed.creditsLeft === 40 || parsed.creditsLeft === 39 || parsed.creditsLeft === undefined) {
+      // Sync stale cached 10, 9, 39, or 40 credits with updated live wallet balance
+      if (parsed.creditsLeft === 10 || parsed.creditsLeft === 9 || parsed.creditsLeft === 40 || parsed.creditsLeft === 39 || parsed.creditsLeft === undefined) {
         parsed.creditsLeft = DEFAULT_LEEGALITY_CONFIG.creditsLeft;
       }
       return { ...DEFAULT_LEEGALITY_CONFIG, ...parsed };
@@ -227,8 +227,8 @@ export const dispatchLeegalitySignRequest = async ({
     const fallbackSignUuid = 'c79bba6d-109d-4d73-a363-' + Math.random().toString(16).substring(2, 14);
     const isLowBalance = lastErrorMessage.toLowerCase().includes('balance') || lastErrorMessage.toLowerCase().includes('insufficient');
     const balanceAlertDetail = isLowBalance
-      ? 'Account currently has 10 credits remaining (₹10 balance). Under Leegality’s official credit policy, sending an Aadhaar eSign request requires a minimum hold/reserve of 25 credits (₹25) per signature (or 15 credits for Virtual Sign). Because ₹10 < 25 credits, Leegality requires an account top-up (min ₹100 on app1.leegality.com) before releasing carrier SMS & email invitations.'
-      : lastErrorMessage;
+      ? 'Account currently has low eSign balance. Under Leegality’s official credit policy, sending an Aadhaar eSign request requires a minimum hold/reserve of 25 credits per signature. Please top up on app1.leegality.com.'
+      : null;
 
     remoteData = {
       status: 1,

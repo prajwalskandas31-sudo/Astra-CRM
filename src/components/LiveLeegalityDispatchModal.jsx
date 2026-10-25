@@ -18,6 +18,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  AlertTriangle,
   Lock
 } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export const LiveLeegalityDispatchModal = ({
   dispatchResult,
   onFinalized = null
 }) => {
-  const { completeESignProcess } = useCRM();
+  const { completeESignProcess, leegalityConfig } = useCRM();
   const { showToast } = useToast();
 
   const [copiedLink, setCopiedLink] = useState(false);
@@ -48,7 +49,7 @@ export const LiveLeegalityDispatchModal = ({
   const tenure = sale.serviceTenure || sale.fullClientInfo?.serviceTenure || '3 months';
   const serviceName = sale.serviceOpted || sale.fullClientInfo?.serviceName || 'Equity Advisory';
   const amount = sale.amount || ('₹' + (sale.grossSales || '50,000'));
-  const remainingCredits = data.creditsRemaining ?? 9;
+  const remainingCredits = data.creditsRemaining ?? (leegalityConfig?.creditsLeft ? Math.max(0, leegalityConfig.creditsLeft - 1) : 49);
 
   const handleCopyLink = () => {
     if (signUrl) {

@@ -947,7 +947,7 @@ export const SystemSettings = () => {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="3" strokeDasharray="42 20" strokeLinecap="round" />
               </svg>
-              <span>{leegalityConfig?.creditsLeft ?? 10} eSign credits Left</span>
+              <span>{leegalityConfig?.creditsLeft ?? 50} eSign credits Left</span>
             </div>
 
             {/* Sub-icons */}
@@ -1341,6 +1341,42 @@ export const SystemSettings = () => {
                       {copiedSalt ? <CheckCheck size={16} /> : <Copy size={16} />}
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Field: Active eSign Credits */}
+              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
+                    Active eSign Credits
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+                    Remaining credit balance in your Leegality account wallet.
+                  </div>
+                </div>
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    value={leegalityConfig?.creditsLeft ?? 50}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      updateLeegalityConfig({ creditsLeft: isNaN(val) ? 0 : val });
+                    }}
+                    style={{
+                      width: '120px',
+                      padding: '8px 12px',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '0.86rem',
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      color: '#0f172a',
+                      fontWeight: 600
+                    }}
+                  />
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>credits available</span>
                 </div>
               </div>
 
