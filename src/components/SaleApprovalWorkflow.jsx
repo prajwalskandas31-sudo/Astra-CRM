@@ -20,6 +20,7 @@ import {
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
 import { LeegalityESignModal } from './LeegalityESignModal';
+import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 
 export const SaleApprovalWorkflow = () => {
   const { 
@@ -29,7 +30,8 @@ export const SaleApprovalWorkflow = () => {
     rejectSale, 
     users, 
     hasPermission,
-    voiceAgentSettings
+    voiceAgentSettings,
+    triggerEKycAndESign
   } = useCRM();
   const { showToast } = useToast();
 
@@ -38,6 +40,8 @@ export const SaleApprovalWorkflow = () => {
   const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
   const [selectedESignSale, setSelectedESignSale] = useState(null);
   const [isAutoRunMode, setIsAutoRunMode] = useState(false);
+  const [liveDispatchData, setLiveDispatchData] = useState(null); // { sale, result }
+  const [isDispatchingDirect, setIsDispatchingDirect] = useState(false);
 
   const [newSale, setNewSale] = useState({
     clientName: '',
@@ -64,8 +68,27 @@ export const SaleApprovalWorkflow = () => {
     showToast(`Sale for '${name}' rejected.`, 'info');
   };
 
-  const pendingSales = sales.filter(s => s.status.includes('Pending') || s.status.includes('Voice Call Pending'));
-  const processedSales = sales.filter(s => !s.status.includes('Pending') && !s.status.includes('Voice Call Pending'));
+  const handleDirectTriggerEKycAndESign = async (targetSale) => {
+    setIsDispatchingDirect(true);
+    showToast(`Dispatching live Leegality e-KYC & E-Sign package for '${targetSale.clientName}' (Workflow LzfDhWc)...`, 'info');
+    try {
+      const res = await triggerEKycAndESign(targetSale.id);
+      setIsDispatchingDirect(false);
+      setLiveDispatchData({ sale: targetSale, result: res.apiResult });
+      showToast(`Leegality API Gateway: Invitations dispatched successfully! (Doc ID: ${res.apiResult.data.documentId})`, 'success');
+    } catch (err) {
+      setIsDispatchingDirect(false);
+      showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
+    }
+  };
+
+  const pendingSales = sales.filter(s => 
+    s.status.includes('Pending') || 
+    s.status.includes('Voice Call Pending') ||
+    s.status.includes('Dispatched') ||
+    s.stage?.includes('Awaiting Client E-Sign')
+  );
+  const processedSales = sales.filter(s => !pendingSales.some(p => p.id === s.id));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -173,9 +196,29 @@ export const SaleApprovalWorkflow = () => {
                       <td>
                         {hasPermission('sale-approvals') ? (
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {/* Open Review Email Modal */}
+                            {/* Direct provision to trigger e-KYC & E-Sign process */}
                             <button
                               className="btn-primary"
+                              style={{
+                                padding: '3px 10px',
+                                fontSize: '0.74rem',
+                                gap: '5px',
+                                fontWeight: 700,
+                                background: 'linear-gradient(135deg, #0ea5e9 0%, #10b981 100%)',
+                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                                border: 'none',
+                                color: '#ffffff'
+                              }}
+                              onClick={() => handleDirectTriggerEKycAndESign(s)}
+                              disabled={isDispatchingDirect}
+                              title="Directly trigger real Leegality e-KYC & E-Sign dispatch (Workflow LzfDhWc)"
+                            >
+                              <Sparkles size={12} /> Trigger e-KYC & E-Sign
+                            </button>
+
+                            {/* Open Review Email Modal */}
+                            <button
+                              className="btn-secondary"
                               style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
                               onClick={() => setSelectedReviewSale(s)}
                               title="Inspect Approval Email and decide Voice Call / Skip options"
@@ -383,7 +426,8 @@ export const SaleApprovalWorkflow = () => {
         sale={selectedReviewSale}
         onClose={() => setSelectedReviewSale(null)}
         onExecuteVoiceCall={(sale) => setSelectedVoiceSale(sale)}
-        onSkipVoiceCall={(sale) => setSelectedESignSale(sale)}
+        onSkipVoiceCall={(sale) => handleDirectTriggerEKycAndESign(sale)}
+        onTriggerEKycAndESign={(sale) => handleDirectTriggerEKycAndESign(sale)}
       />
 
       {/* Automated Voice Agent Verification Modal */}
@@ -391,10 +435,19 @@ export const SaleApprovalWorkflow = () => {
         isOpen={!!selectedVoiceSale}
         sale={selectedVoiceSale}
         onClose={() => setSelectedVoiceSale(null)}
-        onProceedToESign={(sale) => setSelectedESignSale(sale)}
+        onProceedToESign={(sale) => handleDirectTriggerEKycAndESign(sale)}
       />
 
-      {/* Leegality E-Sign Execution Modal */}
+      {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal (Replaces simulation) */}
+      <LiveLeegalityDispatchModal
+        isOpen={!!liveDispatchData}
+        sale={liveDispatchData?.sale}
+        dispatchResult={liveDispatchData?.result}
+        onClose={() => setLiveDispatchData(null)}
+        onFinalized={() => setLiveDispatchData(null)}
+      />
+
+      {/* Leegality Agreement Inspector Modal for Completed Deals */}
       <LeegalityESignModal
         isOpen={!!selectedESignSale}
         sale={selectedESignSale}

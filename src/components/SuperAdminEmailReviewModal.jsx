@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   ArrowRight,
   ExternalLink,
-  Bot
+  Bot,
+  Sparkles
 } from 'lucide-react';
 
 export const SuperAdminEmailReviewModal = ({
@@ -26,7 +27,8 @@ export const SuperAdminEmailReviewModal = ({
   onClose,
   sale = null,
   onExecuteVoiceCall = null,
-  onSkipVoiceCall = null
+  onSkipVoiceCall = null,
+  onTriggerEKycAndESign = null
 }) => {
   const { 
     currentUser, 
@@ -60,8 +62,24 @@ export const SuperAdminEmailReviewModal = ({
       return;
     }
     superAdminApproveSale(sale.id, { executeVoiceCall: false });
-    showToast('Super admin has approved the sale. Voice call skipped — proceeding directly to E-Sign.', 'info');
+    showToast('Super admin has approved the sale. Voice call skipped — triggering real Leegality e-KYC & E-Sign.', 'info');
     if (onSkipVoiceCall) {
+      onSkipVoiceCall(sale);
+    } else if (onTriggerEKycAndESign) {
+      onTriggerEKycAndESign(sale);
+    }
+    onClose();
+  };
+
+  const handleDirectTriggerEKyc = () => {
+    if (!isSuperAdmin) {
+      showToast('Only Super Admin has authority to trigger e-KYC and E-Sign.', 'error');
+      return;
+    }
+    showToast('Triggering real Leegality e-KYC & E-Sign (Workflow LzfDhWc)...', 'info');
+    if (onTriggerEKycAndESign) {
+      onTriggerEKycAndESign(sale);
+    } else if (onSkipVoiceCall) {
       onSkipVoiceCall(sale);
     }
     onClose();
@@ -440,6 +458,28 @@ export const SuperAdminEmailReviewModal = ({
 
             {voiceAgentEnabled ? (
               <>
+                {/* Trigger e-KYC & E-Sign Provision */}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleDirectTriggerEKyc}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    background: 'linear-gradient(135deg, #0ea5e9 0%, #10b981 100%)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    border: 'none',
+                    color: '#ffffff'
+                  }}
+                  title="Directly trigger real Leegality e-KYC and E-Sign (Workflow LzfDhWc)"
+                >
+                  <Sparkles size={14} /> Trigger e-KYC & E-Sign
+                </button>
+
                 {/* Option 2: Skip Voice Call (Proceed directly to E-Sign) */}
                 <button
                   type="button"
@@ -455,7 +495,7 @@ export const SuperAdminEmailReviewModal = ({
                     borderColor: 'rgba(59, 130, 246, 0.4)',
                     color: '#60a5fa'
                   }}
-                  title="Only Super Admin has authority to skip voice agent call"
+                  title="Skip voice call and execute real Leegality e-KYC & E-Sign process (Workflow LzfDhWc)"
                 >
                   <FastForward size={14} /> Skip Voice Call (Proceed to E-Sign)
                 </button>
@@ -480,23 +520,42 @@ export const SuperAdminEmailReviewModal = ({
                 </button>
               </>
             ) : (
-              /* Direct Approve when Voice Agent is Disabled */
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleApproveSkipVoiceCall}
-                style={{
-                  padding: '8px 20px',
-                  fontSize: '0.84rem',
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <CheckCircle2 size={14} /> Approve Sale & Move to E-Sign
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleDirectTriggerEKyc}
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    background: 'linear-gradient(135deg, #0ea5e9 0%, #10b981 100%)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: 'none',
+                    color: '#ffffff'
+                  }}
+                >
+                  <Sparkles size={14} /> Trigger e-KYC & E-Sign
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleApproveSkipVoiceCall}
+                  style={{
+                    padding: '8px 20px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  Approve Sale
+                </button>
+              </>
             )}
           </div>
         </div>

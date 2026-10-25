@@ -2435,6 +2435,82 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
+  // ─── Direct e-KYC & E-Sign Trigger via Real Leegality Gateway (Workflow LzfDhWc) ───
+  const triggerEKycAndESign = async (saleId) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) throw new Error(`Sale with ID '${saleId}' not found`);
+
+    const matchingLead = (leads || []).find(l => 
+      (sale?.leadId && l.id === sale.leadId) ||
+      (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
+      (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
+    );
+
+    const clientInfo = sale?.fullClientInfo || sale?.clientInfo || matchingLead?.clientInfo || {};
+    const clientName = clientInfo.clientName 
+      || (clientInfo.clientPrefix && clientInfo.clientName ? `${clientInfo.clientPrefix} ${clientInfo.clientName}` : '')
+      || clientInfo.fullName 
+      || sale?.clientName 
+      || 'Client';
+    const phone = (clientInfo.phone1 || clientInfo.phone || sale?.phone1 || matchingLead?.phone || '').trim();
+    const email = (clientInfo.email || sale?.email || matchingLead?.email || '').trim();
+    const tenure = clientInfo.serviceTenure || sale?.serviceTenure || '3 months';
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const date1 = `${dd}/${mm}/${yyyy}`;
+
+    const invitees = [{
+      name: clientName,
+      phone,
+      email
+    }];
+
+    // Dispatch via real Leegality API (Workflow ID: LzfDhWc)
+    const apiResult = await dispatchLeegalitySignRequest({
+      sale,
+      invitees,
+      tenure,
+      date1
+    });
+
+    const docId = apiResult.data.documentId;
+    const signUrl = apiResult.data.signUrl;
+
+    // Update sale state
+    setSales(prev => prev.map(s => s.id === saleId ? {
+      ...s,
+      status: 'e-KYC & E-Sign Dispatched',
+      stage: 'Awaiting Client E-Sign',
+      eSignStatus: 'Dispatched',
+      eSignDocumentId: docId,
+      eSignUrl: signUrl,
+      eSignDetails: apiResult.data
+    } : s));
+
+    if (sale.leadId) {
+      setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+        ...l,
+        disposition: 'Awaiting Client E-Sign',
+        history: [...(l.history || []), {
+          date: today.toISOString().split('T')[0],
+          text: `Leegality e-KYC & E-Sign triggered (Doc ID: ${docId}, Workflow: LzfDhWc). Invitation sent to ${phone} & ${email}.`
+        }]
+      } : l));
+    }
+
+    addNotification({
+      title: 'e-KYC & E-Sign Dispatched',
+      message: `Leegality e-KYC & E-Sign package dispatched for '${clientName}' (Doc ID: ${docId}).`,
+      type: 'success',
+      targetUserId: sale.submittedByUserId,
+      actionPayload: { saleId }
+    });
+
+    return { sale, apiResult };
+  };
+
   // ─── Automated Voice Call Completion ────────────────────────────────────
   const completeVoiceCallVerification = (saleId) => {
     const sale = sales.find(s => s.id === saleId);
@@ -3007,6 +3083,7 @@ export const CRMProvider = ({ children }) => {
       checkDuplicatePhone2,
       submitClientInformationReview,
       superAdminApproveSale,
+      triggerEKycAndESign,
       completeVoiceCallVerification,
       completeESignProcess,
       // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ────────

@@ -53,14 +53,16 @@ import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { LeegalityESignModal } from './components/LeegalityESignModal';
+import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchModal';
 
 const AppContent = () => {
-  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions } = useCRM();
+  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign } = useCRM();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
   const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
   const [globalESignSale, setGlobalESignSale] = useState(null);
   const [globalESignAutoRun, setGlobalESignAutoRun] = useState(false);
+  const [globalLiveDispatchData, setGlobalLiveDispatchData] = useState(null);
 
   // Enforce permission-based tab guards: user roles do not inherently restrict availability
   React.useEffect(() => {
@@ -176,9 +178,21 @@ const AppContent = () => {
         sale={globalReviewSale}
         onClose={() => setGlobalReviewSale(null)}
         onExecuteVoiceCall={(sale) => setGlobalVoiceSale(sale)}
-        onSkipVoiceCall={(sale) => {
-          setGlobalESignSale(sale);
-          setGlobalESignAutoRun(false);
+        onSkipVoiceCall={async (sale) => {
+          try {
+            const res = await triggerEKycAndESign(sale.id);
+            setGlobalLiveDispatchData({ sale, result: res.apiResult });
+          } catch (err) {
+            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+          }
+        }}
+        onTriggerEKycAndESign={async (sale) => {
+          try {
+            const res = await triggerEKycAndESign(sale.id);
+            setGlobalLiveDispatchData({ sale, result: res.apiResult });
+          } catch (err) {
+            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+          }
         }}
       />
 
@@ -187,13 +201,26 @@ const AppContent = () => {
         isOpen={!!globalVoiceSale}
         sale={globalVoiceSale}
         onClose={() => setGlobalVoiceSale(null)}
-        onProceedToESign={(sale) => {
-          setGlobalESignSale(sale);
-          setGlobalESignAutoRun(true);
+        onProceedToESign={async (sale) => {
+          try {
+            const res = await triggerEKycAndESign(sale.id);
+            setGlobalLiveDispatchData({ sale, result: res.apiResult });
+          } catch (err) {
+            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+          }
         }}
       />
 
-      {/* Global Leegality E-Sign Execution Modal */}
+      {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal (Replaces simulation) */}
+      <LiveLeegalityDispatchModal
+        isOpen={!!globalLiveDispatchData}
+        sale={globalLiveDispatchData?.sale}
+        dispatchResult={globalLiveDispatchData?.result}
+        onClose={() => setGlobalLiveDispatchData(null)}
+        onFinalized={() => setGlobalLiveDispatchData(null)}
+      />
+
+      {/* Global Leegality E-Sign Execution Modal for Completed Deals */}
       <LeegalityESignModal
         isOpen={!!globalESignSale}
         sale={globalESignSale}
