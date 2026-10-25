@@ -41,7 +41,7 @@ import {
   PenTool
 } from 'lucide-react';
 import { HarshalParmarESign } from './HarshalParmarESign';
-import { getPrimarySignatory } from '../services/digitalSignatureService';
+import { getPrimarySignatory, getMyUserSignature } from '../services/digitalSignatureService';
 import { 
   dispatchLeegalitySignRequest, 
   maskToken, 
@@ -128,13 +128,16 @@ const LeegalityDocumentPreview = ({
   netSales,
   gst,
   date1,
+  executionTimestamp24h = '',
+  currentUser = null,
   paymentDate,
   isSignAffixed,
   activeStep,
   isCompleted,
   documentId
 }) => {
-  const primarySig = getPrimarySignatory();
+  const myUserSig = getMyUserSignature(currentUser);
+  const primarySig = myUserSig || getPrimarySignatory();
   return (
     <div style={{
       flex: 1,
@@ -388,23 +391,25 @@ const LeegalityDocumentPreview = ({
             <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                  For {primarySig?.signerName || 'Authorized Signatory'}
+                  For {myUserSig?.signerName || primarySig?.signerName || 'Authorized Signatory'}
                 </div>
                 <div>
                   <HarshalParmarESign
                     date={date1}
+                    executionTime={executionTimestamp24h}
+                    currentUser={currentUser}
                     isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
                     showCyanBorder={true}
                     documentId={documentId}
-                    signerName={primarySig?.signerName}
-                    designation={primarySig?.designation}
-                    sebiReg={primarySig?.sebiReg}
+                    signerName={myUserSig?.signerName || primarySig?.signerName}
+                    designation={myUserSig?.designation || primarySig?.designation}
+                    sebiReg={myUserSig?.sebiReg || primarySig?.sebiReg}
                   />
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                   <div>Signature:</div>
-                  <div>Name: {primarySig?.signerName || 'Authorized Signatory'}</div>
-                  <div>Designation: {primarySig?.designation || 'Principal Officer'}</div>
+                  <div>Name: {myUserSig?.signerName || primarySig?.signerName || 'Authorized Signatory'}</div>
+                  <div>Designation: {myUserSig?.designation || primarySig?.designation || 'Principal Officer'}</div>
                 </div>
               </div>
 
@@ -482,23 +487,25 @@ const LeegalityDocumentPreview = ({
             {/* Signature Block Page 14 */}
             <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px dashed #cbd5e1' }}>
               <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                For {primarySig?.signerName || 'Authorized Signatory'}
+                For {myUserSig?.signerName || primarySig?.signerName || 'Authorized Signatory'}
               </div>
               <div>
                 <HarshalParmarESign
                   date={date1}
+                  executionTime={executionTimestamp24h}
+                  currentUser={currentUser}
                   isConfirmed={isSignAffixed || activeStep > 1 || isCompleted}
                   showCyanBorder={true}
                   documentId={documentId}
-                  signerName={primarySig?.signerName}
-                  designation={primarySig?.designation}
-                  sebiReg={primarySig?.sebiReg}
+                  signerName={myUserSig?.signerName || primarySig?.signerName}
+                  designation={myUserSig?.designation || primarySig?.designation}
+                  sebiReg={myUserSig?.sebiReg || primarySig?.sebiReg}
                 />
               </div>
               <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
                 <div>Signature:</div>
-                <div>Name: {primarySig?.signerName || 'Authorized Signatory'}</div>
-                <div>Designation: {primarySig?.designation || 'Principal Officer'}</div>
+                <div>Name: {myUserSig?.signerName || primarySig?.signerName || 'Authorized Signatory'}</div>
+                <div>Designation: {myUserSig?.designation || primarySig?.designation || 'Principal Officer'}</div>
               </div>
             </div>
 
@@ -550,15 +557,21 @@ export const LeegalityESignModal = ({
     return `${dd}/${mm}/${yyyy}`;
   };
 
+  // Exact 24-hour timestamp (HH:mm:ss)
+  const getDynamic24HourTime = () => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  };
+
   const [date1, setDate1] = useState(getDynamicDateFormatted());
   const [date1Iso, setDate1Iso] = useState(new Date().toISOString().split('T')[0]);
+  const [executionTimestamp24h, setExecutionTimestamp24h] = useState(getDynamic24HourTime);
 
-  // Checkbox 1 Options (bound to tenure)
-  const [checkboxOptions, setCheckboxOptions] = useState({
-    option1: true,
-    option2: true,
-    option3: true
-  });
+  // Checkbox 1 (dynamically linked to Service Tenure)
+  const [checkbox1Checked, setCheckbox1Checked] = useState(true);
 
   const [allowFirstInviteeToFill, setAllowFirstInviteeToFill] = useState(false);
   const [isSignAffixed, setIsSignAffixed] = useState(true);
@@ -660,8 +673,10 @@ export const LeegalityESignModal = ({
         modalInitializedRef.current = sale?.id;
         setActiveStep(1);
         const dynamicDate = getDynamicDateFormatted();
+        const dynamic24h = getDynamic24HourTime();
         setDate1(dynamicDate);
         setDate1Iso(new Date().toISOString().split('T')[0]);
+        setExecutionTimestamp24h(dynamic24h);
         setInviteSent(false);
         setIsCompleted(false);
         setIsSendingDoc(false);
@@ -670,11 +685,7 @@ export const LeegalityESignModal = ({
         setOtpInput('');
         setDocumentId('LEEG-' + Date.now().toString().slice(-8));
         setActiveDocTab('mitc');
-        setCheckboxOptions({
-          option1: true,
-          option2: true,
-          option3: true
-        });
+        setCheckbox1Checked(true);
         setRequestFixedOrder(false);
         setIWantToSign(false); // MUST BE DISABLED
         setPreviewLegacyInvestEQ(false);
@@ -700,6 +711,49 @@ export const LeegalityESignModal = ({
       clearAutoRunTimers();
     }
   }, [isOpen, sale?.id, clientName, phone, email]);
+
+  const handleToggleIWantToSign = (checked) => {
+    setIWantToSign(checked);
+    if (checked) {
+      setInvitees([
+        {
+          id: 'inv-investeq',
+          name: 'InvestEQ',
+          contact: '8494953754',
+          phone: '8494953754',
+          email: '',
+          enterBoth: false,
+          signatureType: 'Aadhaar E-Sign (OTP)',
+          role: 'Signer'
+        },
+        {
+          id: 'inv-client-1',
+          name: clientName,
+          phone: phone,
+          email: email,
+          contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+          enterBoth: true,
+          signatureType: 'Aadhaar E-Sign (OTP)',
+          role: 'Signer'
+        }
+      ]);
+      showToast('Self-signing enabled: "InvestEQ" added as first signer.', 'info');
+    } else {
+      setInvitees([
+        {
+          id: 'inv-client-1',
+          name: clientName,
+          phone: phone,
+          email: email,
+          contact: [phone, email].filter(Boolean).join(' / ') || phone || email,
+          enterBoth: true,
+          signatureType: 'Aadhaar E-Sign (OTP)',
+          role: 'Signer'
+        }
+      ]);
+      showToast('"I want to sign this document" disabled! Only Client will sign.', 'success');
+    }
+  };
 
   const handleDateIsoChange = (e) => {
     const val = e.target.value;
@@ -730,8 +784,9 @@ export const LeegalityESignModal = ({
     setActiveTab('Templates');
     const dynamicDate = getDynamicDateFormatted();
     setDate1(dynamicDate);
-    setDate1Iso(new Date().toISOString().split('T')[0]);
-    setCheckboxOptions({ option1: true, option2: true, option3: true });
+    setCheckbox1Checked(true);
+    const dynamic24h = getDynamic24HourTime();
+    setExecutionTimestamp24h(dynamic24h);
 
     showToast(`⚡ 1-Click Auto-Execution [Step 1]: Document accessed & execution date stamped (${dynamicDate})`, 'info');
 
@@ -825,12 +880,12 @@ export const LeegalityESignModal = ({
 
   // Step 1: Create Document -> Moves to Step 2 (Invite)
   const handleCreateDocument = () => {
-    if (!checkboxOptions.option1 || !checkboxOptions.option2 || !checkboxOptions.option3) {
-      showToast('Please check all template agreement options to proceed.', 'warning');
+    if (!checkbox1Checked) {
+      showToast(`Please check Checkbox 1 (Service Tenure: ${tenure}) to proceed.`, 'warning');
       return;
     }
     setActiveStep(2);
-    showToast('Document initialized! Review invitees in Leegality Step 2: Invite.', 'info');
+    showToast('Document created! Proceeding to Step 2: Invite.', 'info');
   };
 
   // Step 2 Invitee Handlers
@@ -1385,6 +1440,8 @@ export const LeegalityESignModal = ({
               activeStep={activeStep}
               isCompleted={isCompleted}
               documentId={documentId}
+              currentUser={currentUser}
+              executionTimestamp24h={executionTimestamp24h}
             />
 
             {/* RIGHT COLUMN: TEMPLATE FORM FIELDS */}
@@ -1521,108 +1578,50 @@ export const LeegalityESignModal = ({
                   </div>
                 </div>
 
-                {/* Checkbox 1 (Bound to Tenure) */}
+                {/* Checkbox 1: Dynamically linked to Service Tenure field on Client Information Page */}
                 <div style={{
                   marginBottom: '22px',
-                  border: '1.5px dashed #0284c7',
+                  border: '1.5px solid #0284c7',
                   borderRadius: '8px',
-                  padding: '12px',
-                  backgroundColor: 'rgba(2, 132, 199, 0.03)'
+                  padding: '12px 14px',
+                  backgroundColor: 'rgba(2, 132, 199, 0.04)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
                       Checkbox 1
                     </label>
                     <span style={{ fontSize: '0.68rem', backgroundColor: '#dcfce7', color: '#166534', padding: '1px 6px', borderRadius: '3px', fontWeight: 700 }}>
-                      Tenure Bound
+                      ✓ Synced from Client Info
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      fontSize: '0.8rem',
-                      color: '#1e293b',
-                      cursor: 'pointer',
-                      padding: '6px 8px',
-                      backgroundColor: checkboxOptions.option1 ? '#f0fdf4' : '#ffffff',
-                      border: checkboxOptions.option1 ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                      borderRadius: '4px'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={checkboxOptions.option1}
-                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option1: e.target.checked })}
-                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 600 }}>
-                          Option 1: Service Tenure: <strong style={{ color: '#0284c7' }}>{tenure}</strong>
-                        </div>
-                        <span style={{ fontSize: '0.69rem', color: '#16a34a', display: 'block', marginTop: '1px' }}>
-                          ✓ Exact Service Tenure selected on Client Information Page
-                        </span>
-                      </div>
-                    </label>
-
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      fontSize: '0.8rem',
-                      color: '#1e293b',
-                      cursor: 'pointer',
-                      padding: '6px 8px',
-                      backgroundColor: checkboxOptions.option2 ? '#f8fafc' : '#ffffff',
-                      border: checkboxOptions.option2 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
-                      borderRadius: '4px'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={checkboxOptions.option2}
-                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option2: e.target.checked })}
-                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 500 }}>
-                          Option 2: Service Plan ({serviceName})
-                        </div>
-                        <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
-                          Fee: {grossSales} • RA Scope Confirmed
-                        </span>
-                      </div>
-                    </label>
-
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      fontSize: '0.8rem',
-                      color: '#1e293b',
-                      cursor: 'pointer',
-                      padding: '6px 8px',
-                      backgroundColor: checkboxOptions.option3 ? '#f8fafc' : '#ffffff',
-                      border: checkboxOptions.option3 ? '1px solid #e2e8f0' : '1px solid #e2e8f0',
-                      borderRadius: '4px'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={checkboxOptions.option3}
-                        onChange={(e) => setCheckboxOptions({ ...checkboxOptions, option3: e.target.checked })}
-                        style={{ accentColor: '#0284c7', width: '15px', height: '15px', marginTop: '2px' }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 500 }}>
-                          Option 3: MITC & Leegality E-Sign Consent
-                        </div>
-                        <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '1px' }}>
-                          SEBI (Research Analyst) Regulations, 2014 Terms
-                        </span>
-                      </div>
-                    </label>
-                  </div>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '0.84rem',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    padding: '8px 10px',
+                    backgroundColor: checkbox1Checked ? '#f0fdf4' : '#ffffff',
+                    border: checkbox1Checked ? '1px solid #86efac' : '1px solid #cbd5e1',
+                    borderRadius: '5px',
+                    fontWeight: 600
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={checkbox1Checked}
+                      onChange={(e) => {
+                        setCheckbox1Checked(e.target.checked);
+                        setCheckboxOptions(prev => ({ ...prev, option1: e.target.checked }));
+                      }}
+                      style={{ accentColor: '#0284c7', width: '16px', height: '16px' }}
+                    />
+                    <span>{tenure}</span>
+                  </label>
+                  <span style={{ fontSize: '0.69rem', color: '#64748b', display: 'block', marginTop: '6px' }}>
+                    Automatically fetched from the selected Service Tenure on the Client Information Page.
+                  </span>
                 </div>
 
                 {/* Invitee Metadata Box */}
@@ -1741,35 +1740,35 @@ export const LeegalityESignModal = ({
                   </label>
                 </div>
 
-                {/* Switch 2: I want to sign this document (CIRCLED IN CYAN - MUST BE DISABLED) */}
+                {/* Switch 2: I want to sign this document (Per requirement 5: Disabled by default, removes InvestEQ) */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '14px',
                   padding: '12px 14px',
-                  backgroundColor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '8px'
+                  backgroundColor: !iWantToSign ? '#f8fafc' : '#f0f9ff',
+                  border: !iWantToSign ? '1px solid #e2e8f0' : '1px solid #bae6fd',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease'
                 }}>
                   <LeegalityToggle
                     id="toggle-self-sign"
-                    checked={previewLegacyInvestEQ}
-                    disabled={true} // Strictly disabled per requirement
-                    onChange={() => {}}
+                    checked={iWantToSign}
+                    onChange={handleToggleIWantToSign}
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <label 
                         htmlFor="toggle-self-sign" 
-                        style={{ fontSize: '0.88rem', color: '#64748b', fontWeight: 600, cursor: 'not-allowed' }}
+                        style={{ fontSize: '0.88rem', color: '#1e293b', fontWeight: 600, cursor: 'pointer' }}
                       >
                         I want to sign this document
                       </label>
                       <span style={{
                         fontSize: '0.7rem',
-                        backgroundColor: '#fee2e2',
-                        color: '#b91c1c',
-                        border: '1px solid #fca5a5',
+                        backgroundColor: !iWantToSign ? '#ecfdf5' : '#fee2e2',
+                        color: !iWantToSign ? '#065f46' : '#991b1b',
+                        border: !iWantToSign ? '1px solid #a7f3d0' : '1px solid #fecaca',
                         padding: '2px 8px',
                         borderRadius: '4px',
                         fontWeight: 700,
@@ -1777,82 +1776,21 @@ export const LeegalityESignModal = ({
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        <Lock size={11} /> Must be disabled (API Policy)
+                        {!iWantToSign ? '✓ Disabled (Client Only)' : 'Self-Signing Enabled (InvestEQ + Client)'}
                       </span>
                     </div>
 
                     <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45 }}>
-                      In Leegality (eKYC API portal), this toggle <strong>must be disabled</strong>. Disabling this removes <code>InvestEQ (8494953754)</code> from signers so only the client signs, since {primarySig?.signerName || 'authorized signatory'}'s digital signature is already pre-affixed on the documents.
+                      {!iWantToSign ? (
+                        <>
+                          Disabled as per workflow: <code>InvestEQ (8494953754)</code> is removed from signers so only the client signs. The research analyst signature is already pre-affixed.
+                        </>
+                      ) : (
+                        <>
+                          Enabled: <code>InvestEQ (8494953754)</code> is added as Signer 1 (Self), and Client is Signer 2.
+                        </>
+                      )}
                     </p>
-
-                    {/* Interactive Comparison Preview Button */}
-                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Preview Modes:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewLegacyInvestEQ(false);
-                          setInvitees([
-                            {
-                              id: 'inv-client-1',
-                              name: clientName,
-                              phone: phone,
-                              email: email,
-                              contact: phone,
-                              enterBoth: true, // "once disabled, 'enter both' must be selected"
-                              signatureType: 'Aadhaar E-Sign (OTP)',
-                              role: 'Signer'
-                            }
-                          ]);
-                          showToast('Switched to API Mode: InvestEQ disabled, Enter Both selected for Client.', 'success');
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '0.7rem',
-                          borderRadius: '4px',
-                          border: !previewLegacyInvestEQ ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                          backgroundColor: !previewLegacyInvestEQ ? '#e0f2fe' : '#ffffff',
-                          color: !previewLegacyInvestEQ ? '#0284c7' : '#64748b',
-                          fontWeight: !previewLegacyInvestEQ ? 700 : 500,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ✓ API Mode: Client (Enter Both Active)
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPreviewLegacyInvestEQ(true);
-                          setInvitees([
-                            {
-                              id: 'inv-investeq',
-                              name: 'InvestEQ',
-                              contact: '8494953754',
-                              phone: '8494953754',
-                              email: '',
-                              enterBoth: false,
-                              signatureType: 'Aadhaar E-Sign (OTP)',
-                              role: 'Signer'
-                            }
-                          ]);
-                          showToast('Showing screenshot state: self-sign enabled adds InvestEQ.', 'warning');
-                        }}
-                        style={{
-                          padding: '2px 8px',
-                          fontSize: '0.7rem',
-                          borderRadius: '4px',
-                          border: previewLegacyInvestEQ ? '1px solid #ef4444' : '1px solid #cbd5e1',
-                          backgroundColor: previewLegacyInvestEQ ? '#fee2e2' : '#ffffff',
-                          color: previewLegacyInvestEQ ? '#dc2626' : '#64748b',
-                          fontWeight: previewLegacyInvestEQ ? 700 : 500,
-                          cursor: 'pointer'
-                        }}
-                        title="Simulate what happened in the screenshot when self-sign was turned ON"
-                      >
-                        Screenshot Mode: InvestEQ (Self-Sign ON)
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

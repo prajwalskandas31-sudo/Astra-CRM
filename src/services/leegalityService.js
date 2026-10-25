@@ -146,7 +146,7 @@ export const buildSignRequestPayload = ({
         { name: 'Client Name', value: clientNameVal },
         { name: 'Phone', value: phoneVal },
         { name: 'Email', value: emailVal },
-        { name: 'Checkbox 1', value: 'Agreed' }
+        { name: 'Checkbox 1', value: tenure }
       ]
     },
     invitees: (invitees && invitees.length > 0 ? invitees : [{ name: clientNameVal, email: emailVal, phone: phoneVal }]).map((inv, idx) => {

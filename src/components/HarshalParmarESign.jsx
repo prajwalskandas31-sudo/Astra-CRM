@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { getSignature, DEFAULT_OFFICER_SIGNATURE, generateDemoSignaturePNG } from '../services/digitalSignatureService';
+import { ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import { 
+  getSignature, 
+  getMyUserSignature,
+  DEFAULT_OFFICER_SIGNATURE, 
+  generateDemoSignaturePNG 
+} from '../services/digitalSignatureService';
 
 /**
  * OfficialDigitalSignatureStamp (also exported as HarshalParmarESign for compatibility)
- * Renders the authentic digital E-Sign for the designated Authorized Signatory
+ * Renders the authentic digital E-Sign from "My User Signature" block
  * specifically fitted into the marked cyan box between "For [Signatory Name]" and "Signature:"
- * Dynamically adapts to any user or authorized signatory, rendering uploaded JPG/PNG files
- * or generating realistic calligraphy cursive signatures for the active signer.
+ * Automatically displays uploaded JPG/PNG user signatures and exact 24-hour execution timestamps.
  */
 export const HarshalParmarESign = ({
   date = '',
+  executionTime = '',
+  currentUser = null,
   isConfirmed = true,
   showCyanBorder = true,
   documentId = '',
@@ -21,32 +27,44 @@ export const HarshalParmarESign = ({
   entity = '',
   overrideSignatureUrl = null
 }) => {
-  const [activeSig, setActiveSig] = useState(() => getSignature('master_officer') || DEFAULT_OFFICER_SIGNATURE);
+  const [activeSig, setActiveSig] = useState(() => getMyUserSignature(currentUser) || DEFAULT_OFFICER_SIGNATURE);
   const [customSigUrl, setCustomSigUrl] = useState(() => {
     if (overrideSignatureUrl) return overrideSignatureUrl;
-    return getSignature('master_officer')?.signatureDataUrl || null;
+    const userSig = getMyUserSignature(currentUser);
+    return userSig?.signatureDataUrl || null;
   });
 
+  // Keep signature in sync with My User Signature block updates
   useEffect(() => {
     if (overrideSignatureUrl) {
       setCustomSigUrl(overrideSignatureUrl);
       return;
     }
-    const updateHandler = (e) => {
-      if (!e?.detail?.key || e.detail.key === 'master_officer') {
-        const sig = getSignature('master_officer') || DEFAULT_OFFICER_SIGNATURE;
-        setActiveSig(sig);
-        setCustomSigUrl(sig?.signatureDataUrl || null);
-      }
+    const updateHandler = () => {
+      const userSig = getMyUserSignature(currentUser);
+      setActiveSig(userSig);
+      setCustomSigUrl(userSig?.signatureDataUrl || null);
     };
     window.addEventListener('astra:digital_signature_updated', updateHandler);
     return () => window.removeEventListener('astra:digital_signature_updated', updateHandler);
-  }, [overrideSignatureUrl]);
+  }, [overrideSignatureUrl, currentUser]);
 
   const activeName = signerName || activeSig.signerName || 'Authorized Signatory';
   const activeDesignation = designation || activeSig.designation || 'Authorized Officer';
   const activeReg = sebiReg || activeSig.sebiReg || 'Verified Signatory';
   const displayDate = date || new Date().toLocaleDateString('en-GB');
+
+  // Exact 24-hour execution time (HH:mm:ss)
+  const get24HourTime = () => {
+    if (executionTime) return executionTime;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  };
+
+  const exact24HourTime = get24HourTime();
 
   if (!isConfirmed) {
     return (
@@ -140,9 +158,24 @@ export const HarshalParmarESign = ({
         </span>
       )}
 
-      {/* Signature Graphic Area */}
+      {/* Signature Graphic Area with 24-hour execution timestamp directly beneath */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
         {signatureGraphic}
+        {/* Exact 24-hour execution timestamp placed directly beneath the signature */}
+        <div style={{
+          marginTop: '4px',
+          fontSize: compact ? '0.56rem' : '0.62rem',
+          fontWeight: 700,
+          color: '#0369a1',
+          fontFamily: "'Courier New', monospace, sans-serif",
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          letterSpacing: '0.2px'
+        }}>
+          <Clock size={10} color="#0891b2" />
+          <span>{displayDate} {exact24HourTime}</span>
+        </div>
       </div>
 
       {/* Cryptographic Digital Stamp with Dynamic Signer Credentials */}
@@ -168,7 +201,7 @@ export const HarshalParmarESign = ({
         <div>{activeDesignation}</div>
         <div>{activeReg}</div>
         <div style={{ color: '#0284c7', fontSize: '0.58rem', marginTop: '1px' }}>
-          Date: {displayDate} • Leegality v2.1
+          Time: {exact24HourTime} (24-hr) • Leegality v3.0
         </div>
         {documentId && (
           <div style={{ color: '#64748b', fontSize: '0.55rem' }}>

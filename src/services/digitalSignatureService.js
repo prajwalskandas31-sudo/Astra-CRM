@@ -136,6 +136,42 @@ export const getPrimarySignatory = () => {
 };
 
 /**
+ * Retrieve the active user signature uploaded in "My User Signature" block.
+ * Priority:
+ * 1. Current user specific signature if custom uploaded
+ * 2. 'current_user' or 'my_user_signature' key if custom uploaded
+ * 3. Matching user name signature
+ * 4. Master officer signature if custom uploaded
+ * 5. Default officer signature
+ */
+export const getMyUserSignature = (currentUser = null) => {
+  const all = getAllSignatures();
+  if (currentUser?.id && all[currentUser.id]?.signatureDataUrl) {
+    return all[currentUser.id];
+  }
+  if (all['current_user']?.signatureDataUrl) {
+    return all['current_user'];
+  }
+  if (all['my_user_signature']?.signatureDataUrl) {
+    return all['my_user_signature'];
+  }
+  if (currentUser?.name) {
+    const byName = Object.values(all).find(s => 
+      s.signerName?.toLowerCase() === currentUser.name?.toLowerCase() && s.signatureDataUrl
+    );
+    if (byName) return byName;
+  }
+  if (all['master_officer']?.signatureDataUrl) {
+    return all['master_officer'];
+  }
+  return (currentUser?.id && all[currentUser.id]) 
+    || all['current_user'] 
+    || all['my_user_signature'] 
+    || all['master_officer'] 
+    || DEFAULT_OFFICER_SIGNATURE;
+};
+
+/**
  * Verify if password matches the current user or standard administrator override passwords
  */
 export const verifySignerPassword = (inputPassword, currentUser, allUsers = []) => {
@@ -183,12 +219,20 @@ export const saveDigitalSignature = ({
   };
 
   all[key] = updated;
+  if (key === currentUser?.id || key === 'current_user' || key === 'my_user_signature') {
+    all['my_user_signature'] = updated;
+  }
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
     window.dispatchEvent(new CustomEvent('astra:digital_signature_updated', {
       detail: { key, signature: updated }
     }));
+    if (key !== 'my_user_signature') {
+      window.dispatchEvent(new CustomEvent('astra:digital_signature_updated', {
+        detail: { key: 'my_user_signature', signature: updated }
+      }));
+    }
   } catch (err) {
     console.error('Error saving digital signature to localStorage:', err);
     throw new Error('Failed to save signature: Storage quota exceeded or invalid format.');
