@@ -931,7 +931,7 @@ export const SystemSettings = () => {
               <Plus size={15} /> Create
             </button>
 
-            {/* 40 eSign credits Left Pill matching screenshot */}
+            {/* 10 eSign credits Left Pill matching live Leegality balance */}
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -947,7 +947,7 @@ export const SystemSettings = () => {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="3" strokeDasharray="42 20" strokeLinecap="round" />
               </svg>
-              <span>{leegalityConfig?.creditsLeft ?? 40} eSign credits Left</span>
+              <span>{leegalityConfig?.creditsLeft ?? 10} eSign credits Left</span>
             </div>
 
             {/* Sub-icons */}

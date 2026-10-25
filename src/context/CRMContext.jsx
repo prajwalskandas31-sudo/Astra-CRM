@@ -2620,8 +2620,8 @@ export const CRMProvider = ({ children }) => {
       ],
       leegalityAuthToken: eSignDetails.authTokenMasked || 'JsAEa0...RbxM',
       leegalityMac: eSignDetails.webhookMac || 'hFBCLu...RAhG',
-      apiGateway: 'POST https://api.leegality.com/api/v2.1/sign/request',
-      creditsRemaining: eSignDetails.creditsRemaining !== undefined ? eSignDetails.creditsRemaining : (leegalityConfig?.creditsLeft || 40)
+      apiGateway: 'POST https://app1.leegality.com/api/v3.0/sign/request',
+      creditsRemaining: eSignDetails.creditsRemaining !== undefined ? eSignDetails.creditsRemaining : (leegalityConfig?.creditsLeft || 10)
     };
 
     setESignRecords(prev => {
@@ -2711,7 +2711,7 @@ export const CRMProvider = ({ children }) => {
       status: 'Sent & E-Signed',
       authTokenMasked: apiResult?.data?.authTokenMasked || 'JsAEa0...RbxM',
       webhookMac: apiResult?.data?.webhookMac || 'mac-verified',
-      creditsRemaining: apiResult?.data?.creditsRemaining ?? 39,
+      creditsRemaining: apiResult?.data?.creditsRemaining ?? (leegalityConfig?.creditsLeft ?? 9),
       signUrl: apiResult?.data?.signUrl || `https://app.leegality.com/sign/${docId.toLowerCase()}`
     };
 

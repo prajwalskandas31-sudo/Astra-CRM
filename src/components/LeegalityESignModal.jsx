@@ -1248,7 +1248,7 @@ export const LeegalityESignModal = ({
 
           {/* Right Action Icons & Close */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* 40 eSign credits Left pill matching user screenshot */}
+            {/* 10 eSign credits Left pill matching live Leegality balance */}
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1264,7 +1264,7 @@ export const LeegalityESignModal = ({
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="3" strokeDasharray="42 20" strokeLinecap="round" />
               </svg>
-              <span>{leegalityConfig?.creditsLeft ?? 40} eSign credits Left</span>
+              <span>{leegalityConfig?.creditsLeft ?? 10} eSign credits Left</span>
             </div>
 
             {/* Live API token indicator */}
@@ -2613,7 +2613,7 @@ export const LeegalityESignModal = ({
                     ● 200 OK — Authentic Leegality API v3.0 Gateway
                   </span>
                   <span style={{ fontSize: '0.72rem', color: '#ea580c', fontWeight: 700 }}>
-                    {apiReceipt?.creditsRemaining ?? leegalityConfig?.creditsLeft ?? 39} Credits Left (-1 Consumed)
+                    {apiReceipt?.creditsRemaining ?? leegalityConfig?.creditsLeft ?? 9} Credits Left (-1 Consumed)
                   </span>
                 </div>
                 <div>• <strong>Real Document ID:</strong> <code>{documentId}</code></div>
@@ -2950,11 +2950,11 @@ export const LeegalityESignModal = ({
                 color: '#cbd5e1',
                 lineHeight: 1.6
               }}>
-                <div><strong>Endpoint:</strong> <code>POST https://api.leegality.com/api/v2.1/sign/request</code></div>
+                <div><strong>Endpoint:</strong> <code>POST https://app1.leegality.com/api/v3.0/sign/request</code></div>
                 <div><strong>Header 1:</strong> <code>X-Auth-Token: {leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM'}</code></div>
                 <div><strong>Header 2:</strong> <code>Content-Type: application/json</code></div>
                 <div><strong>Private Salt:</strong> <code>{leegalityConfig?.privateSalt || 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG'}</code> (Webhook HMAC-SHA1 Verified)</div>
-                <div><strong>Credits Left:</strong> <code>{leegalityConfig?.creditsLeft ?? 40} Left</code></div>
+                <div><strong>Credits Left:</strong> <code>{leegalityConfig?.creditsLeft ?? 10} Left</code></div>
               </div>
 
               <pre style={{

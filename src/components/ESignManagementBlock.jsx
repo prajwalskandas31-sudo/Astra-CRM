@@ -284,11 +284,11 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               Leegality Gateway API
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0284c7' }}>
-              API v2.1 Live
+              API v3.0 Live
             </div>
             <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
               <span>● Token: {leegalityConfig?.legacyAuthToken ? `${leegalityConfig.legacyAuthToken.slice(0, 6)}...` : 'JsAEa0...'}</span>
-              <span>• {leegalityConfig?.creditsLeft ?? 40} Credits Left</span>
+              <span>• {leegalityConfig?.creditsLeft ?? 10} Credits Left</span>
             </div>
           </div>
         </div>

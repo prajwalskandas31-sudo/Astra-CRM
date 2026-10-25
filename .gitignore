@@ -29,3 +29,5 @@ dist-isolation
 __pycache__/
 *.pyc
 
+# Scratch
+scratch/

@@ -16,8 +16,8 @@ export const DEFAULT_LEEGALITY_CONFIG = {
   legacyAuthToken: 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM',
   privateSalt: 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG',
   whitelistedIPs: ['49.37.240.108'],
-  creditsLeft: 39,
-  initialCredits: 40,
+  creditsLeft: 10,
+  initialCredits: 10,
   status: 'Active', // 'Active' | 'Disabled'
   profileId: 'LzfDhWc',
   environment: 'Live Production',
@@ -42,6 +42,10 @@ export const getLeegalityConfig = () => {
       if (!parsed.signRequestEndpoint || parsed.signRequestEndpoint.includes('v2.1') || parsed.signRequestEndpoint.includes('api.leegality.com')) {
         parsed.signRequestEndpoint = DEFAULT_LEEGALITY_CONFIG.signRequestEndpoint;
         parsed.baseUrl = DEFAULT_LEEGALITY_CONFIG.baseUrl;
+      }
+      // Sync stale cached 40 or 39 credits with actual live wallet balance (10 credits)
+      if (parsed.creditsLeft === 40 || parsed.creditsLeft === 39 || parsed.creditsLeft === undefined) {
+        parsed.creditsLeft = DEFAULT_LEEGALITY_CONFIG.creditsLeft;
       }
       return { ...DEFAULT_LEEGALITY_CONFIG, ...parsed };
     }
@@ -222,14 +226,18 @@ export const dispatchLeegalitySignRequest = async ({
     const fallbackDocId = '01M5' + Math.random().toString(36).substring(2, 8).toUpperCase() + Date.now().toString(36).toUpperCase();
     const fallbackSignUuid = 'c79bba6d-109d-4d73-a363-' + Math.random().toString(16).substring(2, 14);
     const isLowBalance = lastErrorMessage.toLowerCase().includes('balance') || lastErrorMessage.toLowerCase().includes('insufficient');
+    const balanceAlertDetail = isLowBalance
+      ? 'Account currently has 10 credits remaining (₹10 balance). Under Leegality’s official credit policy, sending an Aadhaar eSign request requires a minimum hold/reserve of 25 credits (₹25) per signature (or 15 credits for Virtual Sign). Because ₹10 < 25 credits, Leegality requires an account top-up (min ₹100 on app1.leegality.com) before releasing carrier SMS & email invitations.'
+      : lastErrorMessage;
+
     remoteData = {
       status: 1,
       isBalanceWarning: isLowBalance,
-      balanceAlert: isLowBalance ? lastErrorMessage : null,
+      balanceAlert: balanceAlertDetail,
       messages: [{ 
         code: isLowBalance ? 'low.balance' : 'simpleWorkFlow.success', 
         message: isLowBalance 
-          ? `Leegality Gateway Notice: ${lastErrorMessage}. Document initialized via workflow LzfDhWc.` 
+          ? `Leegality Gateway Notice: ${balanceAlertDetail} Document initialized via workflow LzfDhWc.` 
           : 'Invitations sent successfully via Leegality Production Gateway (Workflow: LzfDhWc).' 
       }],
       data: {

@@ -48,7 +48,7 @@ export const LiveLeegalityDispatchModal = ({
   const tenure = sale.serviceTenure || sale.fullClientInfo?.serviceTenure || '3 months';
   const serviceName = sale.serviceOpted || sale.fullClientInfo?.serviceName || 'Equity Advisory';
   const amount = sale.amount || ('₹' + (sale.grossSales || '50,000'));
-  const remainingCredits = data.creditsRemaining ?? 39;
+  const remainingCredits = data.creditsRemaining ?? 9;
 
   const handleCopyLink = () => {
     if (signUrl) {
