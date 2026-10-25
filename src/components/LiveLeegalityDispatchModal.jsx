@@ -260,7 +260,11 @@ export const LiveLeegalityDispatchModal = ({
               alignItems: 'flex-start',
               gap: '12px'
             }}>
-              <AlertTriangle size={18} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
               <div style={{ flex: 1, fontSize: '0.78rem' }}>
                 <div style={{ fontWeight: 700, color: '#facc15' }}>
                   Leegality Production Server Alert: Insufficient eSign Balance

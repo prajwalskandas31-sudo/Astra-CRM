@@ -34,5 +34,15 @@ export default defineConfig({
         }
       }
     }
+  },
+  build: {
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/app-[hash].js`,
+        chunkFileNames: `assets/chunk-[hash].js`,
+        assetFileNames: `assets/asset-[hash].[ext]`
+      }
+    }
   }
 })
