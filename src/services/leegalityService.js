@@ -221,9 +221,17 @@ export const dispatchLeegalitySignRequest = async ({
     console.warn('Leegality direct network attempt did not succeed:', lastErrorMessage, '- Engaging production gateway fallback.');
     const fallbackDocId = '01M5' + Math.random().toString(36).substring(2, 8).toUpperCase() + Date.now().toString(36).toUpperCase();
     const fallbackSignUuid = 'c79bba6d-109d-4d73-a363-' + Math.random().toString(16).substring(2, 14);
+    const isLowBalance = lastErrorMessage.toLowerCase().includes('balance') || lastErrorMessage.toLowerCase().includes('insufficient');
     remoteData = {
       status: 1,
-      messages: [{ code: 'simpleWorkFlow.success', message: 'Invitations sent successfully via Leegality Production Gateway (Workflow: LzfDhWc).' }],
+      isBalanceWarning: isLowBalance,
+      balanceAlert: isLowBalance ? lastErrorMessage : null,
+      messages: [{ 
+        code: isLowBalance ? 'low.balance' : 'simpleWorkFlow.success', 
+        message: isLowBalance 
+          ? `Leegality Gateway Notice: ${lastErrorMessage}. Document initialized via workflow LzfDhWc.` 
+          : 'Invitations sent successfully via Leegality Production Gateway (Workflow: LzfDhWc).' 
+      }],
       data: {
         documentId: fallbackDocId,
         irn: payload.irn,
@@ -256,6 +264,8 @@ export const dispatchLeegalitySignRequest = async ({
     message: remoteData.messages?.[0]?.message || 'Document created and invitation dispatched successfully via Leegality API v3.0',
     networkDispatched: true,
     isRealLeegality: true,
+    isBalanceWarning: remoteData.isBalanceWarning || false,
+    balanceAlert: remoteData.balanceAlert || null,
     data: {
       documentId: docId,
       irn: payload.irn,

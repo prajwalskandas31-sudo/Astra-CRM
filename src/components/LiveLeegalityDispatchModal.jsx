@@ -248,6 +248,32 @@ export const LiveLeegalityDispatchModal = ({
             </div>
           </div>
 
+          {/* Real-time Leegality Server Balance Notice */}
+          {(dispatchResult?.balanceAlert || dispatchResult?.isBalanceWarning) && (
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(234, 179, 8, 0.12)',
+              border: '1px solid rgba(234, 179, 8, 0.35)',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px'
+            }}>
+              <AlertTriangle size={18} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div style={{ flex: 1, fontSize: '0.78rem' }}>
+                <div style={{ fontWeight: 700, color: '#facc15' }}>
+                  Leegality Production Server Alert: Insufficient eSign Balance
+                </div>
+                <div style={{ color: '#e2e8f0', marginTop: '3px', lineHeight: 1.45 }}>
+                  {dispatchResult?.balanceAlert || 'Insufficient eSign Balance on Leegality account.'} The CRM has pre-assembled the document package and signing route. For Leegality to send real carrier SMS & email invitations directly, please top up credits on{' '}
+                  <a href="https://app1.leegality.com" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', textDecoration: 'underline', fontWeight: 600 }}>
+                    app1.leegality.com
+                  </a>.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Telemetry Grid */}
           <div style={{
             display: 'grid',

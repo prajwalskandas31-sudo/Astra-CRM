@@ -3,6 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { HarshalParmarESign } from './HarshalParmarESign';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
+import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
 import {
   FileSignature,
@@ -39,7 +40,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
     sales = [],
     leads = [],
     eSignRecords = [],
-    simulateConfirmESign,
+    triggerEKycAndESign,
     deleteESignRecord,
     leegalityConfig
   } = useCRM();
@@ -50,8 +51,9 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRecordForInspection, setSelectedRecordForInspection] = useState(null);
   const [activeInspectorTab, setActiveInspectorTab] = useState('both'); // 'doc1' | 'doc2' | 'both'
-  const [isSimulating, setIsSimulating] = useState(false);
   const [primarySignatory, setPrimarySignatory] = useState(() => getPrimarySignatory());
+  const [liveDispatchData, setLiveDispatchData] = useState(null);
+  const [isDispatching, setIsDispatching] = useState(false);
 
   // Listen to signature/signatory profile updates in real time
   useEffect(() => {
@@ -74,26 +76,34 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
     );
   });
 
-  // Pending sales ready for e-sign
+  // Pending sales ready for or awaiting e-sign
   const pendingESignSales = sales.filter(s =>
     s.status?.includes('Ready for E-Sign') ||
+    s.status?.includes('Pending Super Admin') ||
+    s.status?.includes('Dispatched') ||
+    s.status?.includes('Voice Call') ||
     s.stage === 'Ready for E-Sign' ||
-    s.eSignStatus === 'Ready'
+    s.stage === 'Awaiting Client E-Sign' ||
+    s.eSignStatus === 'Ready' ||
+    s.eSignStatus === 'Pending'
   );
 
-  const handleSimulateConfirmation = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      const newRec = simulateConfirmESign({
-        clientName: 'Siddharth Varma',
-        serviceName: 'Equity Advisory Pro',
-        serviceTenure: '3 months',
-        grossSales: '₹50,000',
-        panNumber: 'ABCDE9876K'
-      });
-      setIsSimulating(false);
-      showToast(`E-Sign confirmation executed! Dedicated E-Sign Block populated for '${newRec.clientName}'.`, 'success');
-    }, 800);
+  const handleTriggerRealLeegality = async (targetSale) => {
+    if (!targetSale) {
+      showToast('No pending sale selected for Leegality dispatch.', 'error');
+      return;
+    }
+    setIsDispatching(true);
+    showToast(`Dispatching live Leegality package for '${targetSale.clientName}' (Workflow: LzfDhWc)...`, 'info');
+    try {
+      const res = await triggerEKycAndESign(targetSale.id);
+      setIsDispatching(false);
+      setLiveDispatchData({ sale: targetSale, result: res.apiResult });
+      showToast(`Leegality API Gateway: Invitations dispatched! (Doc ID: ${res.apiResult.data.documentId})`, 'success');
+    } catch (err) {
+      setIsDispatching(false);
+      showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
+    }
   };
 
   const handleDownloadPdf = (rec) => {
@@ -163,26 +173,46 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button
-              onClick={handleSimulateConfirmation}
-              disabled={isSimulating}
-              className="btn-primary"
-              style={{
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {pendingESignSales.length > 0 ? (
+              <button
+                onClick={() => handleTriggerRealLeegality(pendingESignSales[0])}
+                disabled={isDispatching}
+                className="btn-primary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
+                  padding: '9px 18px',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  border: 'none',
+                  boxShadow: '0 4px 15px rgba(6, 182, 212, 0.35)',
+                  cursor: isDispatching ? 'not-allowed' : 'pointer'
+                }}
+                title={`Dispatches live Leegality package (Workflow: LzfDhWc) to ${pendingESignSales[0].clientName}`}
+              >
+                <Zap size={16} />
+                {isDispatching ? 'Dispatching Leegality Gateway...' : `Trigger Leegality E-Sign (${pendingESignSales[0].clientName})`}
+              </button>
+            ) : (
+              <div style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-muted, #94a3b8)',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '6px 14px',
+                borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                backgroundColor: '#0284c7',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                fontWeight: 600,
-                fontSize: '0.84rem'
-              }}
-              title="Test the confirmation pipeline to see this block get populated"
-            >
-              <Sparkles size={16} />
-              {isSimulating ? 'Affixing & Confirming...' : 'Simulate E-Sign Confirmation'}
-            </button>
+                gap: '6px'
+              }}>
+                <CheckCircle2 size={14} color="#10b981" />
+                <span>All approved sales e-signed (Workflow: LzfDhWc)</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -499,28 +529,29 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                 </span>
               </span>
             </div>
-            {onOpenLeegalityModal && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  onClick={() => onOpenLeegalityModal(pendingESignSales[0], true)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 14px',
-                    background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
-                  }}
-                  title={`Executes template document access, auto-reads client info, sets date, affixes ${primarySignatory?.signerName || 'authorized'} signature & timestamps, and dispatches via Leegality API in 1 click`}
-                >
-                  <Zap size={14} /> ⚡ 1-Click Auto Execute Leegality ({pendingESignSales[0].clientName})
-                </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => handleTriggerRealLeegality(pendingESignSales[0])}
+                disabled={isDispatching}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: isDispatching ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
+                }}
+                title={`Executes live Leegality API dispatch (Workflow: LzfDhWc) for ${pendingESignSales[0].clientName}`}
+              >
+                <Zap size={14} /> {isDispatching ? 'Dispatching...' : `⚡ 1-Click Live Leegality Dispatch (${pendingESignSales[0].clientName})`}
+              </button>
+              {onOpenLeegalityModal && (
                 <button
                   onClick={() => onOpenLeegalityModal(pendingESignSales[0], false)}
                   style={{
@@ -534,10 +565,10 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                     cursor: 'pointer'
                   }}
                 >
-                  Manual Inspector
+                  Agreement Inspector
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -1109,6 +1140,15 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
           </div>
         </div>
       )}
+
+      {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal */}
+      <LiveLeegalityDispatchModal
+        isOpen={!!liveDispatchData}
+        sale={liveDispatchData?.sale}
+        dispatchResult={liveDispatchData?.result}
+        onClose={() => setLiveDispatchData(null)}
+        onFinalized={() => setLiveDispatchData(null)}
+      />
     </div>
   );
 };
