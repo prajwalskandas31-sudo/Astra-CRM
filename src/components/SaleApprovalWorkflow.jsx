@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
-import { LeegalityESignModal } from './LeegalityESignModal';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
+import { isRealLeegalityDispatch } from '../services/leegalityService';
 
 export const SaleApprovalWorkflow = () => {
   const { 
@@ -38,8 +38,6 @@ export const SaleApprovalWorkflow = () => {
   const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [selectedReviewSale, setSelectedReviewSale] = useState(null);
   const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
-  const [selectedESignSale, setSelectedESignSale] = useState(null);
-  const [isAutoRunMode, setIsAutoRunMode] = useState(false);
   const [liveDispatchData, setLiveDispatchData] = useState(null); // { sale, result }
   const [isDispatchingDirect, setIsDispatchingDirect] = useState(false);
 
@@ -75,7 +73,7 @@ export const SaleApprovalWorkflow = () => {
       const res = await triggerEKycAndESign(targetSale.id);
       setIsDispatchingDirect(false);
       setLiveDispatchData({ sale: targetSale, result: res.apiResult });
-      showToast(`Leegality API Gateway: Invitations dispatched successfully! (Doc ID: ${res.apiResult.data.documentId})`, 'success');
+      showToast(`Leegality created document ${res.apiResult.documentId} for '${targetSale.clientName}'.`, 'success');
     } catch (err) {
       setIsDispatchingDirect(false);
       showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
@@ -196,7 +194,17 @@ export const SaleApprovalWorkflow = () => {
                       <td>
                         {hasPermission('sale-approvals') ? (
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {/* Direct provision to trigger e-KYC & E-Sign process */}
+                            {/* Direct provision to trigger e-KYC & E-Sign process (or check status once dispatched) */}
+                            {isRealLeegalityDispatch(s) ? (
+                              <button
+                                className="btn-secondary"
+                                style={{ padding: '3px 10px', fontSize: '0.74rem', gap: '5px', fontWeight: 700, borderColor: '#0ea5e9', color: '#38bdf8' }}
+                                onClick={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
+                                title="Live signing status from Leegality"
+                              >
+                                <ShieldCheck size={12} /> Leegality Status
+                              </button>
+                            ) : (
                             <button
                               className="btn-primary"
                               style={{
@@ -215,6 +223,7 @@ export const SaleApprovalWorkflow = () => {
                             >
                               <Sparkles size={12} /> Trigger e-KYC & E-Sign
                             </button>
+                            )}
 
                             {/* Open Review Email Modal */}
                             <button
@@ -289,6 +298,7 @@ export const SaleApprovalWorkflow = () => {
                 processedSales.map(s => {
                   const isReadyForESign = s.stage?.includes('Ready for E-Sign') || s.status?.includes('Ready for E-Sign');
                   const isESigned = s.status?.includes('E-Signed') || s.eSignStatus === 'Completed';
+                  const isVerifiedESign = isESigned && !!s.eSignDetails?.verifiedByLeegality;
 
                   return (
                     <tr key={s.id}>
@@ -305,7 +315,9 @@ export const SaleApprovalWorkflow = () => {
                         {isESigned ? (
                           <div className="status-indicator">
                             <span className="status-dot active" />
-                            <span style={{ color: '#10b981', fontWeight: 600 }}>Leegality E-Signed</span>
+                            <span style={{ color: isVerifiedESign ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                              {isVerifiedESign ? 'Leegality E-Signed' : 'Unverified (old simulated record)'}
+                            </span>
                           </div>
                         ) : isReadyForESign ? (
                           <span className="badge" style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f630' }}>
@@ -317,42 +329,21 @@ export const SaleApprovalWorkflow = () => {
                       </td>
                       <td>
                         {isReadyForESign ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              className="btn-primary"
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '0.74rem',
-                                background: '#10b981',
-                                gap: '5px',
-                                fontWeight: 700,
-                                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
-                              }}
-                              onClick={() => {
-                                setSelectedESignSale(s);
-                                setIsAutoRunMode(true);
-                              }}
-                              title="Single-click execution: Auto-read Client Info, Date stamp, Affix E-signs & timestamps, and Dispatch via Leegality API"
-                            >
-                              <Sparkles size={12} /> ⚡ 1-Click E-Sign
-                            </button>
-                            <button
-                              className="btn-secondary"
-                              style={{ padding: '4px 8px', fontSize: '0.74rem' }}
-                              onClick={() => {
-                                setSelectedESignSale(s);
-                                setIsAutoRunMode(false);
-                              }}
-                              title="Manual Step-by-Step Leegality Inspector"
-                            >
-                              Manual
-                            </button>
-                          </div>
-                        ) : isESigned ? (
+                          <button
+                            className="btn-primary"
+                            style={{ padding: '4px 10px', fontSize: '0.74rem', background: '#10b981', gap: '5px', fontWeight: 700 }}
+                            onClick={() => handleDirectTriggerEKycAndESign(s)}
+                            disabled={isDispatchingDirect}
+                            title="Create the real Leegality signing request (Workflow LzfDhWc)"
+                          >
+                            <Sparkles size={12} /> Trigger e-KYC & E-Sign
+                          </button>
+                        ) : isESigned && s.eSignDocumentId ? (
                           <button
                             className="btn-secondary"
                             style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
-                            onClick={() => setSelectedESignSale(s)}
+                            onClick={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
+                            title="Live status and signed copy from Leegality"
                           >
                             <ShieldCheck size={12} color="#10b981" /> View Agreement
                           </button>
@@ -438,25 +429,14 @@ export const SaleApprovalWorkflow = () => {
         onProceedToESign={(sale) => handleDirectTriggerEKycAndESign(sale)}
       />
 
-      {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal (Replaces simulation) */}
+      {/* Leegality e-KYC & E-Sign status modal (live data via CRM backend) */}
       <LiveLeegalityDispatchModal
         isOpen={!!liveDispatchData}
         sale={liveDispatchData?.sale}
         dispatchResult={liveDispatchData?.result}
         onClose={() => setLiveDispatchData(null)}
-        onFinalized={() => setLiveDispatchData(null)}
       />
 
-      {/* Leegality Agreement Inspector Modal for Completed Deals */}
-      <LeegalityESignModal
-        isOpen={!!selectedESignSale}
-        sale={selectedESignSale}
-        autoRun={isAutoRunMode}
-        onClose={() => {
-          setSelectedESignSale(null);
-          setIsAutoRunMode(false);
-        }}
-      />
     </div>
   );
 };

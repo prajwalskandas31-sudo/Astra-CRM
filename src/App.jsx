@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
-import { ToastProvider } from './components/ToastNotification';
+import { ToastProvider, useToast } from './components/ToastNotification';
 import { LoginPage } from './components/LoginPage';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -52,16 +52,15 @@ import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
-import { LeegalityESignModal } from './components/LeegalityESignModal';
+import { isRealLeegalityDispatch } from './services/leegalityService';
 import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchModal';
 
 const AppContent = () => {
   const { authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign } = useCRM();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
   const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
-  const [globalESignSale, setGlobalESignSale] = useState(null);
-  const [globalESignAutoRun, setGlobalESignAutoRun] = useState(false);
   const [globalLiveDispatchData, setGlobalLiveDispatchData] = useState(null);
 
   // Enforce permission-based tab guards: user roles do not inherently restrict availability
@@ -113,6 +112,16 @@ const AppContent = () => {
     'feature-access': 'Feature Access & Permissions Master Block'
   };
 
+  // Real Leegality status for dispatched sales; anything else is sent from Sale Approvals
+  const openLeegalityForSale = (sale) => {
+    if (sale && isRealLeegalityDispatch(sale)) {
+      setGlobalLiveDispatchData({ sale, result: sale.eSignDetails });
+      return;
+    }
+    setActiveTab('sale-approvals');
+    showToast('Send the agreement with "Trigger e-KYC & E-Sign" in Sale Approvals.', 'info');
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -133,12 +142,7 @@ const AppContent = () => {
         return <SaleApprovalWorkflow />;
       case 'esign-block':
         return (
-          <ESignManagementBlock
-            onOpenLeegalityModal={(sale, autoRun = false) => {
-              setGlobalESignSale(sale);
-              setGlobalESignAutoRun(!!autoRun);
-            }}
-          />
+          <ESignManagementBlock />
         );
       case 'lead-reassignment':
         return <LeadReassignmentView />;
@@ -160,10 +164,7 @@ const AppContent = () => {
         <Navbar 
           currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} 
           onOpenReviewModal={(sale) => setGlobalReviewSale(sale)}
-          onOpenESignModal={(sale, autoRun = false) => {
-            setGlobalESignSale(sale);
-            setGlobalESignAutoRun(!!autoRun);
-          }}
+          onOpenESignModal={openLeegalityForSale}
         />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
@@ -183,7 +184,7 @@ const AppContent = () => {
             const res = await triggerEKycAndESign(sale.id);
             setGlobalLiveDispatchData({ sale, result: res.apiResult });
           } catch (err) {
-            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+            showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
           }
         }}
         onTriggerEKycAndESign={async (sale) => {
@@ -191,7 +192,7 @@ const AppContent = () => {
             const res = await triggerEKycAndESign(sale.id);
             setGlobalLiveDispatchData({ sale, result: res.apiResult });
           } catch (err) {
-            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+            showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
           }
         }}
       />
@@ -206,30 +207,19 @@ const AppContent = () => {
             const res = await triggerEKycAndESign(sale.id);
             setGlobalLiveDispatchData({ sale, result: res.apiResult });
           } catch (err) {
-            console.error('Failed to trigger Leegality e-KYC & E-Sign:', err);
+            showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
           }
         }}
       />
 
-      {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal (Replaces simulation) */}
+      {/* Leegality e-KYC & E-Sign status modal (live data via CRM backend) */}
       <LiveLeegalityDispatchModal
         isOpen={!!globalLiveDispatchData}
         sale={globalLiveDispatchData?.sale}
         dispatchResult={globalLiveDispatchData?.result}
         onClose={() => setGlobalLiveDispatchData(null)}
-        onFinalized={() => setGlobalLiveDispatchData(null)}
       />
 
-      {/* Global Leegality E-Sign Execution Modal for Completed Deals */}
-      <LeegalityESignModal
-        isOpen={!!globalESignSale}
-        sale={globalESignSale}
-        autoRun={globalESignAutoRun}
-        onClose={() => {
-          setGlobalESignSale(null);
-          setGlobalESignAutoRun(false);
-        }}
-      />
     </div>
   );
 };

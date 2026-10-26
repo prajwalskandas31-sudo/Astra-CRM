@@ -8,9 +8,11 @@ from pydantic import BaseModel, EmailStr
 try:
     from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from backend.auth import create_access_token, get_current_user, require_roles
+    from backend.leegality import router as leegality_router
 except ImportError:
     from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from auth import create_access_token, get_current_user, require_roles
+    from leegality import router as leegality_router
 
 
 app = FastAPI(title="Srinivas CRM API", version="1.0.0")
@@ -23,6 +25,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(leegality_router)
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):

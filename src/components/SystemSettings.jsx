@@ -9,7 +9,7 @@ import {
   ChevronRight, ArrowLeft, Power, Zap, Send, Settings as SettingsIcon,
   Building2, CheckCircle2
 } from 'lucide-react';
-import { computeHmacSha1, maskToken } from '../services/leegalityService';
+import { getLeegalityBackendStatus, getLeegalityWallet } from '../services/leegalityService';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
 
 export const SystemSettings = () => {
@@ -47,26 +47,32 @@ export const SystemSettings = () => {
   const { showToast } = useToast();
 
   // Leegality Settings State matching screenshot
-  const [copiedToken, setCopiedToken] = useState(false);
-  const [copiedSalt, setCopiedSalt] = useState(false);
   const [leegalityActiveSubTab, setLeegalityActiveSubTab] = useState('API');
   const [isLeegalitySettingsOpen, setIsLeegalitySettingsOpen] = useState(true);
-  const [newWhitelistedIP, setNewWhitelistedIP] = useState('');
-  const [isTestingLeegalityHandshake, setIsTestingLeegalityHandshake] = useState(false);
-  const [handshakeResult, setHandshakeResult] = useState(null);
-  const [tokenInput, setTokenInput] = useState(leegalityConfig?.legacyAuthToken || 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM');
-  const [saltInput, setSaltInput] = useState(leegalityConfig?.privateSalt || 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG');
+  const [leegalityWallet, setLeegalityWallet] = useState(null);
+  const [walletError, setWalletError] = useState('');
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false);
+
+  // eSign credit balance comes from Leegality's wallet API via the backend
+  const loadLeegalityWallet = async () => {
+    setIsLoadingWallet(true);
+    try {
+      const wallet = await getLeegalityWallet();
+      if (wallet.error) throw new Error(wallet.error);
+      setLeegalityWallet(wallet);
+      setWalletError('');
+    } catch (err) {
+      setWalletError(err.message);
+    } finally {
+      setIsLoadingWallet(false);
+    }
+  };
 
   useEffect(() => {
-    if (leegalityConfig?.legacyAuthToken) {
-      setTokenInput(leegalityConfig.legacyAuthToken);
-    }
-    if (leegalityConfig?.privateSalt) {
-      setSaltInput(leegalityConfig.privateSalt);
-    }
-  }, [leegalityConfig]);
-
-
+    loadLeegalityWallet();
+  }, []);
+  const [isTestingLeegalityHandshake, setIsTestingLeegalityHandshake] = useState(false);
+  const [handshakeResult, setHandshakeResult] = useState(null);
   const canManageSettings = hasPermission('system-settings');
   const [docTypeForm, setDocTypeForm] = useState({ name: '', required: false, description: '' });
   const [customFieldForm, setCustomFieldForm] = useState({ fieldName: '', subField1Name: '', subField2Name: '' });
@@ -931,7 +937,7 @@ export const SystemSettings = () => {
               <Plus size={15} /> Create
             </button>
 
-            {/* 10 eSign credits Left Pill matching live Leegality balance */}
+            {/* eSign credits pill (live Leegality wallet balance) */}
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -947,7 +953,7 @@ export const SystemSettings = () => {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="9" stroke="#ea580c" strokeWidth="3" strokeDasharray="42 20" strokeLinecap="round" />
               </svg>
-              <span>{leegalityConfig?.creditsLeft ?? 50} eSign credits Left</span>
+              <span>{leegalityWallet ? `${leegalityWallet.unused} eSign credits unused` : 'Credits: unavailable'}</span>
             </div>
 
             {/* Sub-icons */}
@@ -1211,301 +1217,63 @@ export const SystemSettings = () => {
 
             {/* Form Fields matching the screenshot */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '22px', maxWidth: '880px' }}>
-              {/* Field 1: Legacy Auth Token */}
+              {/* Credentials: held only by the CRM backend */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
-                    Legacy Auth Token
+                    Auth Token & Private Salt
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
-                    Unique identifier which lets Leegality validate the API calls.
+                    From Leegality Dashboard &gt; API Settings.
                   </div>
                 </div>
-
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    value={tokenInput}
-                    onChange={(e) => {
-                      setTokenInput(e.target.value);
-                      updateLeegalityConfig({ legacyAuthToken: e.target.value });
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 84px 10px 14px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.86rem',
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      color: '#0f172a',
-                      fontWeight: 500
-                    }}
-                  />
-                  {/* Actions on right: Copy & Refresh */}
-                  <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText?.(tokenInput);
-                        setCopiedToken(true);
-                        showToast('Legacy Auth Token copied to clipboard!', 'success');
-                        setTimeout(() => setCopiedToken(false), 2000);
-                      }}
-                      title="Copy Auth Token"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: copiedToken ? '#16a34a' : '#64748b'
-                      }}
-                    >
-                      {copiedToken ? <CheckCheck size={16} /> : <Copy size={16} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm('Regenerate Legacy Auth Token? Active API integrations will need to update headers.')) {
-                          const randStr = 'JsAEa0' + Math.random().toString(36).substring(2, 10) + 'cildpFZad1RbxM';
-                          setTokenInput(randStr);
-                          updateLeegalityConfig({ legacyAuthToken: randStr });
-                          showToast('Auth Token refreshed successfully.', 'info');
-                        }
-                      }}
-                      title="Regenerate Token"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: '#64748b'
-                      }}
-                    >
-                      <RefreshCw size={15} />
-                    </button>
-                  </div>
+                <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
+                  Stored in <code>backend/.env</code> on the CRM server (<code>LEEGALITY_AUTH_TOKEN</code>, <code>LEEGALITY_PRIVATE_SALT</code>).
+                  They are never sent to the browser. Use the check below to confirm Leegality accepts them.
                 </div>
               </div>
 
-              {/* Field 2: Private Salt */}
+              {/* Field: eSign Credits (live Leegality wallet) */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
-                    Private Salt
+                    eSign Credits
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
-                    Used to verify the webhook calls made by Leegality.
+                    Live balance from Leegality's wallet API.
                   </div>
                 </div>
 
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    value={saltInput}
-                    onChange={(e) => {
-                      setSaltInput(e.target.value);
-                      updateLeegalityConfig({ privateSalt: e.target.value });
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px 48px 10px 14px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.86rem',
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      color: '#0f172a',
-                      fontWeight: 500
-                    }}
-                  />
-                  {/* Action on right: Copy */}
-                  <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText?.(saltInput);
-                        setCopiedSalt(true);
-                        showToast('Private Salt copied to clipboard!', 'success');
-                        setTimeout(() => setCopiedSalt(false), 2000);
-                      }}
-                      title="Copy Private Salt"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: copiedSalt ? '#16a34a' : '#64748b'
-                      }}
-                    >
-                      {copiedSalt ? <CheckCheck size={16} /> : <Copy size={16} />}
-                    </button>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.82rem', color: '#334155' }}>
+                  {leegalityWallet ? (
+                    <>
+                      <span><strong style={{ color: '#0f172a', fontSize: '1rem' }}>{leegalityWallet.unused}</strong> unused</span>
+                      <span><strong>{leegalityWallet.reserved}</strong> reserved</span>
+                      <span><strong>{leegalityWallet.consumed}</strong> consumed</span>
+                      <span><strong>{leegalityWallet.expired}</strong> expired</span>
+                      <span style={{ color: '#64748b' }}>({leegalityWallet.total} total)</span>
+                    </>
+                  ) : (
+                    <span style={{ color: walletError ? '#b91c1c' : '#64748b' }}>{walletError || 'Loading balance…'}</span>
+                  )}
+                  <button type="button" className="btn-secondary" onClick={loadLeegalityWallet} disabled={isLoadingWallet} style={{ padding: '4px 10px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <RefreshCw size={12} /> {isLoadingWallet ? 'Refreshing…' : 'Refresh'}
+                  </button>
                 </div>
               </div>
 
-              {/* Field: Active eSign Credits */}
-              <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
-                    Active eSign Credits
-                  </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
-                    Remaining credit balance in your Leegality account wallet.
-                  </div>
-                </div>
-
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input
-                    type="number"
-                    min="0"
-                    value={leegalityConfig?.creditsLeft ?? 50}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      updateLeegalityConfig({ creditsLeft: isNaN(val) ? 0 : val });
-                    }}
-                    style={{
-                      width: '120px',
-                      padding: '8px 12px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      fontSize: '0.86rem',
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                      color: '#0f172a',
-                      fontWeight: 600
-                    }}
-                  />
-                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>credits available</span>
-                </div>
-              </div>
-
-              {/* Field 3: Whitelisted IPs */}
+              {/* Field: Whitelisted IPs (managed in Leegality) */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
                     Whitelisted IPs
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
-                    Whitelist IPs that can make API calls to Leegality.
+                    Leegality only accepts API calls from these IPs.
                   </div>
                 </div>
-
-                <div>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-                    <input
-                      type="text"
-                      placeholder="xxx . xxx . xxx . xxx"
-                      value={newWhitelistedIP}
-                      onChange={(e) => setNewWhitelistedIP(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const ip = newWhitelistedIP.trim();
-                          if (ip) {
-                            const cur = leegalityConfig?.whitelistedIPs || ['103.21.244.0', '192.168.1.100'];
-                            if (!cur.includes(ip)) {
-                              updateLeegalityConfig({ whitelistedIPs: [...cur, ip] });
-                              showToast(`IP ${ip} added to Leegality Whitelist.`, 'success');
-                              setNewWhitelistedIP('');
-                            }
-                          }
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '10px 48px 10px 14px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        fontSize: '0.86rem',
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                        color: '#0f172a'
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const ip = newWhitelistedIP.trim();
-                        if (ip) {
-                          const cur = leegalityConfig?.whitelistedIPs || ['103.21.244.0', '192.168.1.100'];
-                          if (!cur.includes(ip)) {
-                            updateLeegalityConfig({ whitelistedIPs: [...cur, ip] });
-                            showToast(`IP ${ip} added to Leegality Whitelist.`, 'success');
-                            setNewWhitelistedIP('');
-                          } else {
-                            showToast(`IP ${ip} is already whitelisted.`, 'warning');
-                          }
-                        }
-                      }}
-                      title="Add Whitelisted IP"
-                      style={{
-                        position: 'absolute',
-                        right: '10px',
-                        background: 'none',
-                        border: 'none',
-                        padding: '4px',
-                        cursor: 'pointer',
-                        color: '#64748b'
-                      }}
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </div>
-
-                  {/* Active Whitelisted IP Chips */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                    {(leegalityConfig?.whitelistedIPs || ['103.21.244.0', '192.168.1.100']).map((ip) => (
-                      <span
-                        key={ip}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '3px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: '#f1f5f9',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.74rem',
-                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                          color: '#334155'
-                        }}
-                      >
-                        <code>{ip}</code>
-                        <X
-                          size={12}
-                          style={{ cursor: 'pointer', color: '#94a3b8' }}
-                          onClick={() => {
-                            const cur = leegalityConfig?.whitelistedIPs || ['103.21.244.0', '192.168.1.100'];
-                            updateLeegalityConfig({ whitelistedIPs: cur.filter(x => x !== ip) });
-                            showToast(`IP ${ip} removed from Leegality whitelist.`, 'info');
-                          }}
-                        />
-                      </span>
-                    ))}
-                    {detectedIP && !(leegalityConfig?.whitelistedIPs || []).includes(detectedIP) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cur = leegalityConfig?.whitelistedIPs || ['103.21.244.0', '192.168.1.100'];
-                          updateLeegalityConfig({ whitelistedIPs: [...cur, detectedIP] });
-                          showToast(`Current network IP ${detectedIP} added to whitelist!`, 'success');
-                        }}
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#eff6ff',
-                          border: '1px dashed #60a5fa',
-                          color: '#2563eb',
-                          fontSize: '0.72rem',
-                          cursor: 'pointer',
-                          fontWeight: 500
-                        }}
-                      >
-                        + Whitelist My Current IP ({detectedIP})
-                      </button>
-                    )}
-                  </div>
+                <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
+                  Managed in Leegality Dashboard &gt; API Settings. The CRM backend's outbound IP is shown by the check below; it must be on that list.
                 </div>
               </div>
 
@@ -1527,7 +1295,7 @@ export const SystemSettings = () => {
                       Leegality API Handshake & Reality Sync
                     </span>
                     <span style={{ fontSize: '0.72rem', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                      Endpoint: POST /api/v2.1/sign/request
+                      Read-only check via CRM backend
                     </span>
                   </div>
 
@@ -1538,23 +1306,13 @@ export const SystemSettings = () => {
                       setIsTestingLeegalityHandshake(true);
                       setHandshakeResult(null);
                       try {
-                        const testDocId = 'TEST-LEEG-' + Date.now().toString().slice(-6);
-                        const mac = await computeHmacSha1(testDocId, saltInput);
-                        setTimeout(() => {
-                          setIsTestingLeegalityHandshake(false);
-                          setHandshakeResult({
-                            status: 'SUCCESS',
-                            code: 200,
-                            tokenValidated: true,
-                            mac,
-                            testDocId,
-                            timestamp: new Date().toLocaleTimeString()
-                          });
-                          showToast('Leegality API Handshake 200 OK! Token validated & HMAC-SHA1 verified.', 'success');
-                        }, 600);
+                        const result = await getLeegalityBackendStatus();
+                        setHandshakeResult({ ...result, timestamp: new Date().toLocaleTimeString() });
+                        showToast(result.tokenAccepted ? 'Leegality accepted the auth token.' : `Leegality did not accept the request: ${result.leegalityResponse}`, result.tokenAccepted ? 'success' : 'error');
                       } catch (err) {
+                        showToast('Leegality check failed: ' + err.message, 'error');
+                      } finally {
                         setIsTestingLeegalityHandshake(false);
-                        showToast('Handshake error: ' + err.message, 'error');
                       }
                     }}
                     style={{
@@ -1577,56 +1335,35 @@ export const SystemSettings = () => {
                   </button>
                 </div>
 
-                {/* Handshake Result Feedback */}
+                {/* Handshake Result Feedback (values returned by Leegality via the backend) */}
                 {handshakeResult && (
                   <div style={{
                     padding: '10px 14px',
                     borderRadius: '6px',
-                    backgroundColor: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
+                    backgroundColor: handshakeResult.tokenAccepted ? '#f0fdf4' : '#fef2f2',
+                    border: `1px solid ${handshakeResult.tokenAccepted ? '#bbf7d0' : '#fecaca'}`,
                     fontSize: '0.76rem',
-                    color: '#166534',
+                    color: handshakeResult.tokenAccepted ? '#166534' : '#991b1b',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'
                   }}>
                     <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle2 size={14} color="#16a34a" />
-                      <span>200 OK — Leegality Production Gateway Handshake Succeeded ({handshakeResult.timestamp})</span>
+                      <CheckCircle2 size={14} />
+                      <span>{handshakeResult.tokenAccepted ? 'Token accepted by Leegality' : 'Token NOT accepted by Leegality'} ({handshakeResult.timestamp})</span>
                     </div>
-                    <div>• <strong>X-Auth-Token:</strong> <code>{maskToken(tokenInput)}</code> (Validated via Gateway)</div>
-                    <div>• <strong>Webhook HMAC-SHA1:</strong> <code>{handshakeResult.mac}</code> (Verified with Private Salt)</div>
-                    <div>• <strong>Test Envelope:</strong> <code>{handshakeResult.testDocId}</code></div>
+                    <div>• <strong>Leegality response:</strong> {handshakeResult.leegalityResponse}</div>
+                    <div>• <strong>Backend outbound IP:</strong> <code>{handshakeResult.outboundIp || 'unknown'}</code> (must be whitelisted in Leegality)</div>
+                    <div>• <strong>Workflow / Template:</strong> <code>{handshakeResult.profileId}</code> / <code>{handshakeResult.templateId}</code></div>
+                    {handshakeResult.wallet && !handshakeResult.wallet.error && (
+                      <div>• <strong>eSign credits:</strong> {handshakeResult.wallet.unused} unused, {handshakeResult.wallet.reserved} reserved, {handshakeResult.wallet.consumed} consumed</div>
+                    )}
+                    <div>• <strong>Webhook salt configured:</strong> {handshakeResult.webhookSaltConfigured ? 'Yes' : 'No'}</div>
+                    {handshakeResult.fieldsWithoutIds?.length > 0 && (
+                      <div>• <strong>Template fields without IDs (sent by name):</strong> {handshakeResult.fieldsWithoutIds.join(', ')}</div>
+                    )}
                   </div>
                 )}
-
-                {/* Simulated Steps Implemented in Reality Checklist */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '10px',
-                  fontSize: '0.76rem',
-                  color: '#475569',
-                  paddingTop: '8px',
-                  borderTop: '1px solid #e2e8f0'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Check size={14} color="#16a34a" />
-                    <span><strong>Step 1:</strong> Pre-affixed Authorized Signatory & Digital Stamp</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Check size={14} color="#16a34a" />
-                    <span><strong>Step 2:</strong> "I want to sign this document" <strong>Disabled</strong></span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Check size={14} color="#16a34a" />
-                    <span><strong>Step 3:</strong> <strong>"Enter both"</strong> Active (SMS + Email)</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Check size={14} color="#16a34a" />
-                    <span><strong>Step 4:</strong> Auto-synced into <strong>Dedicated E-Sign Block</strong></span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

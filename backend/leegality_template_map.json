@@ -1,0 +1,27 @@
+{
+  "_comment": "Maps CRM data onto template fields of Leegality workflow LzfDhWc (template hm6uV8X). Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only.",
+  "profileId": "LzfDhWc",
+  "templateId": "hm6uV8X",
+  "dateField": {
+    "id": null,
+    "name": "Date 1",
+    "type": "text",
+    "format": "%d/%m/%Y"
+  },
+  "tenureCheckbox": {
+    "name": "Checkbox 1",
+    "options": [
+      { "id": null, "name": "Option 1", "label": "Monthly", "tenures": ["1 month"] },
+      { "id": null, "name": "Option 2", "label": "Quarterly", "tenures": ["3 months"] },
+      { "id": null, "name": "Option 3", "label": "Yearly", "tenures": ["12 months"] }
+    ]
+  },
+  "signatureImageFields": [
+    { "id": null, "name": "RA Signature Page 7", "width": "200", "height": "80" },
+    { "id": null, "name": "RA Signature Page 14", "width": "200", "height": "80" }
+  ],
+  "signatureImageValue": "base64",
+  "timestampFormat": "%d-%m-%Y %H:%M:%S",
+  "timezoneOffsetMinutes": 330,
+  "timezoneLabel": "IST"
+}

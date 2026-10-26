@@ -1,53 +1,32 @@
 /**
- * Leegality API v3.0 Service Integration
- * 
- * Authenticated with:
- * - Legacy Auth Token: JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM
- * - Private Salt: hFBCLusGymhRFGNsdEUUISXtJynqRAhG
- * - Endpoint: POST https://app1.leegality.com/api/v3.0/sign/request
+ * Leegality e-KYC & E-Sign client (Workflow LzfDhWc).
+ *
+ * The browser never talks to Leegality directly: Leegality's API only accepts
+ * server-side calls from whitelisted IPs, and the auth token / private salt must
+ * not ship in the frontend bundle. Every call goes through the CRM backend
+ * (backend/leegality.py), and every value shown in the CRM comes from Leegality.
  */
 
 import { getPrimarySignatory } from './digitalSignatureService';
 
 const STORAGE_KEY = 'astra_leegality_api_config';
-const AUDIT_STORAGE_KEY = 'astra_leegality_audit_log';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
+// UI-only preferences. Credentials live in backend/.env, never here.
 export const DEFAULT_LEEGALITY_CONFIG = {
-  legacyAuthToken: 'JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM',
-  privateSalt: 'hFBCLusGymhRFGNsdEUUISXtJynqRAhG',
-  whitelistedIPs: ['49.37.240.108'],
-  creditsLeft: 50,
-  initialCredits: 50,
   status: 'Active', // 'Active' | 'Disabled'
   profileId: 'LzfDhWc',
-  environment: 'Live Production',
-  baseUrl: 'https://app1.leegality.com/api/v3.0',
-  signRequestEndpoint: '/api-leegality/api/v3.0/sign/request'
+  templateId: 'hm6uV8X',
+  environment: 'Live Production'
 };
 
-/**
- * Retrieve saved Leegality configuration or fallback to defaults
- */
 export const getLeegalityConfig = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (!parsed.profileId || parsed.profileId === 'LEEG_ASTRA_PORTAL_01' || parsed.profileId === 'hm6uV8X') {
-        parsed.profileId = DEFAULT_LEEGALITY_CONFIG.profileId;
-      }
-      if (!parsed.legacyAuthToken || parsed.legacyAuthToken === 'JsAEa0QGumZ0PaNII2cildpFZad1RbxM') {
-        parsed.legacyAuthToken = DEFAULT_LEEGALITY_CONFIG.legacyAuthToken;
-      }
-      if (!parsed.signRequestEndpoint || parsed.signRequestEndpoint.includes('v2.1') || parsed.signRequestEndpoint.includes('api.leegality.com')) {
-        parsed.signRequestEndpoint = DEFAULT_LEEGALITY_CONFIG.signRequestEndpoint;
-        parsed.baseUrl = DEFAULT_LEEGALITY_CONFIG.baseUrl;
-      }
-      // Sync stale cached 10, 9, 39, or 40 credits with updated live wallet balance
-      if (parsed.creditsLeft === 10 || parsed.creditsLeft === 9 || parsed.creditsLeft === 40 || parsed.creditsLeft === 39 || parsed.creditsLeft === undefined) {
-        parsed.creditsLeft = DEFAULT_LEEGALITY_CONFIG.creditsLeft;
-      }
-      return { ...DEFAULT_LEEGALITY_CONFIG, ...parsed };
+      // Drop credentials cached by older builds of the CRM
+      const { legacyAuthToken, privateSalt, creditsLeft, whitelistedIPs, ...rest } = JSON.parse(raw);
+      return { ...DEFAULT_LEEGALITY_CONFIG, ...rest, profileId: DEFAULT_LEEGALITY_CONFIG.profileId };
     }
   } catch (err) {
     console.warn('Error reading Leegality config from localStorage:', err);
@@ -55,14 +34,11 @@ export const getLeegalityConfig = () => {
   return { ...DEFAULT_LEEGALITY_CONFIG };
 };
 
-/**
- * Save Leegality configuration
- */
 export const saveLeegalityConfig = (newConfig) => {
   try {
-    const updated = { ...getLeegalityConfig(), ...newConfig };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+    const { legacyAuthToken, privateSalt, ...safe } = { ...getLeegalityConfig(), ...newConfig };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+    return safe;
   } catch (err) {
     console.error('Error saving Leegality config:', err);
     return newConfig;
@@ -70,52 +46,17 @@ export const saveLeegalityConfig = (newConfig) => {
 };
 
 /**
- * Deduct 1 eSign credit upon document dispatch
+ * Compute HMAC-SHA1 (used by Settings to illustrate webhook MAC verification)
  */
-export const deductCredit = () => {
-  const current = getLeegalityConfig();
-  const nextCredits = Math.max(0, (current.creditsLeft || DEFAULT_LEEGALITY_CONFIG.creditsLeft) - 1);
-  const updated = saveLeegalityConfig({ creditsLeft: nextCredits });
-  return updated.creditsLeft;
+export const computeHmacSha1 = async (message, secret) => {
+  const enc = new TextEncoder();
+  const cryptoKey = await window.crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, enc.encode(message));
+  return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
 /**
- * Compute HMAC-SHA1 using Web Crypto API and the Private Salt
- */
-export const computeHmacSha1 = async (message, secret = DEFAULT_LEEGALITY_CONFIG.privateSalt) => {
-  try {
-    if (window?.crypto?.subtle) {
-      const enc = new TextEncoder();
-      const keyData = enc.encode(secret);
-      const msgData = enc.encode(message);
-      const cryptoKey = await window.crypto.subtle.importKey(
-        'raw',
-        keyData,
-        { name: 'HMAC', hash: 'SHA-1' },
-        false,
-        ['sign']
-      );
-      const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, msgData);
-      return Array.from(new Uint8Array(signature))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
-  } catch (err) {
-    console.warn('SubtleCrypto error, using fallback HMAC calculation:', err);
-  }
-
-  // Fallback hash simulation if subtle crypto is blocked in iframe/insecure origin
-  let hash = 0;
-  const combined = secret + ':' + message;
-  for (let i = 0; i < combined.length; i++) {
-    hash = ((hash << 5) - hash) + combined.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(16).padStart(40, 'a');
-};
-
-/**
- * Mask token for secure UI presentation (e.g. "JsAEa0...RbxM")
+ * Mask token for secure UI presentation (e.g. "abc123••••wxyz")
  */
 export const maskToken = (token, leadChars = 6, tailChars = 4) => {
   if (!token) return '';
@@ -123,213 +64,94 @@ export const maskToken = (token, leadChars = 6, tailChars = 4) => {
   return `${token.slice(0, leadChars)}••••••••${token.slice(-tailChars)}`;
 };
 
-/**
- * Build standard Leegality v3.0 sign request payload
- */
-export const buildSignRequestPayload = ({
-  sale,
-  invitees,
-  tenure = '3 months',
-  date1 = new Date().toLocaleDateString('en-GB'),
-  config = getLeegalityConfig()
-}) => {
-  const primary = (invitees && invitees[0]) || {};
-  const phoneVal = (primary.phone || (primary.contact && !primary.contact.includes('@') ? primary.contact : '') || sale?.phone1 || '').trim();
-  const emailVal = (primary.email || (primary.contact && primary.contact.includes('@') ? primary.contact : '') || sale?.email || '').trim();
-  const clientNameVal = (primary.name || sale?.clientName || 'Client').trim();
-
-  return {
-    profileId: config.profileId || DEFAULT_LEEGALITY_CONFIG.profileId,
-    irn: sale?.id || `SALE-${Date.now()}`,
-    file: {
-      name: `SEBI_MITC_Agreement_${clientNameVal.replace(/\s+/g, '_')}.pdf`,
-      fields: [
-        { name: 'Date', value: date1 },
-        { name: 'Date 1', value: date1 },
-        { name: 'Service Tenure', value: tenure },
-        { name: 'Client Name', value: clientNameVal },
-        { name: 'Phone', value: phoneVal },
-        { name: 'Email', value: emailVal },
-        { name: 'Checkbox 1', value: tenure }
-      ]
-    },
-    invitees: (invitees && invitees.length > 0 ? invitees : [{ name: clientNameVal, email: emailVal, phone: phoneVal }]).map((inv, idx) => {
-      const p = (inv.phone || (inv.contact && !inv.contact.includes('@') ? inv.contact : '') || phoneVal).trim();
-      const e = (inv.email || (inv.contact && inv.contact.includes('@') ? inv.contact : '') || emailVal).trim();
-      return {
-        name: inv.name || clientNameVal || `Invitee ${idx + 1}`,
-        email: e,
-        phone: p
-      };
-    })
-  };
+// ─── Backend transport ──────────────────────────────────────────────────────
+const backendFetch = async (path, options = {}) => {
+  const token = localStorage.getItem('crm_token');
+  if (!token) {
+    throw new Error('Not signed in to the CRM backend. Start the backend (port 8000) and sign in again as Super Admin.');
+  }
+  let res;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+    });
+  } catch {
+    throw new Error(`CRM backend is not reachable at ${API_BASE_URL}. Start it with: python -m uvicorn backend.main:app --port 8000`);
+  }
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      detail = (await res.json()).detail || detail;
+    } catch { /* non-JSON error body */ }
+    if (res.status === 401 || res.status === 403) {
+      detail = `${detail} — sign in again as Super Admin while the backend is running.`;
+    }
+    throw new Error(detail);
+  }
+  return res;
 };
 
 /**
- * Execute Leegality v3.0 E-Sign Dispatch API Call
- * Authenticated via X-Auth-Token: JsAEa0QGumZ0PaNll2ciIdpFZad1RbxM
+ * Read-only connectivity check: is the token accepted, from which IP, which fields lack IDs.
  */
-export const dispatchLeegalitySignRequest = async ({
-  sale,
-  invitees,
-  tenure,
-  date1
-}) => {
-  const config = getLeegalityConfig();
+export const getLeegalityBackendStatus = async () => (await backendFetch('/leegality/status')).json();
 
-  if (config.status === 'Disabled') {
+/**
+ * Create the real Leegality signing request for a sale.
+ * Returns Leegality's response as recorded by the backend: documentId, invitees (with signUrl),
+ * messages, Date 1, tenure option and signature timestamps.
+ */
+export const dispatchLeegalitySignRequest = async ({ saleId, clientName, email, phone, serviceTenure }) => {
+  if (getLeegalityConfig().status === 'Disabled') {
     throw new Error('Leegality API is currently disabled in Settings. Please enable API to dispatch.');
   }
-
-  const payload = buildSignRequestPayload({ sale, invitees, tenure, date1, config });
-
-  // Priority endpoint candidates: Vite dev proxy first (avoids browser CORS), then direct production endpoint
-  const endpointCandidates = [
-    '/api-leegality/api/v3.0/sign/request',
-    config.signRequestEndpoint,
-    'https://app1.leegality.com/api/v3.0/sign/request'
-  ].filter((v, i, a) => Boolean(v) && a.indexOf(v) === i);
-
-  let remoteData = null;
-  let lastErrorMessage = '';
-
-  for (const ep of endpointCandidates) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      const response = await fetch(ep, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': config.legacyAuthToken
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-
-      const resJson = await response.json();
-      if (resJson && resJson.status === 1) {
-        remoteData = resJson;
-        break;
-      } else if (resJson && resJson.messages && resJson.messages.length > 0) {
-        lastErrorMessage = resJson.messages.map(m => m.message).join(' | ');
-      }
-    } catch (err) {
-      lastErrorMessage = err.message;
-    }
-  }
-
-  if (!remoteData || !remoteData.data) {
-    console.warn('Leegality direct network attempt did not succeed:', lastErrorMessage, '- Engaging production gateway fallback.');
-    const fallbackDocId = '01M5' + Math.random().toString(36).substring(2, 8).toUpperCase() + Date.now().toString(36).toUpperCase();
-    const fallbackSignUuid = 'c79bba6d-109d-4d73-a363-' + Math.random().toString(16).substring(2, 14);
-    const isLowBalance = lastErrorMessage.toLowerCase().includes('balance') || lastErrorMessage.toLowerCase().includes('insufficient');
-    const balanceAlertDetail = isLowBalance
-      ? 'Account currently has low eSign balance. Under Leegality’s official credit policy, sending an Aadhaar eSign request requires a minimum hold/reserve of 25 credits per signature. Please top up on app1.leegality.com.'
-      : null;
-
-    remoteData = {
-      status: 1,
-      isBalanceWarning: isLowBalance,
-      balanceAlert: balanceAlertDetail,
-      messages: [{ 
-        code: isLowBalance ? 'low.balance' : 'simpleWorkFlow.success', 
-        message: isLowBalance 
-          ? `Leegality Gateway Notice: ${balanceAlertDetail} Document initialized via workflow LzfDhWc.` 
-          : 'Invitations sent successfully via Leegality Production Gateway (Workflow: LzfDhWc).' 
-      }],
-      data: {
-        documentId: fallbackDocId,
-        irn: payload.irn,
-        invitees: payload.invitees.map(inv => ({
-          ...inv,
-          signUrl: `https://app1.leegality.com/sign/${fallbackSignUuid}`,
-          active: true,
-          expiryDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
-        }))
-      }
-    };
-  }
-
-  const realData = remoteData.data;
-  const docId = realData.documentId;
-  const primaryInvitee = realData.invitees?.[0] || {};
-  const signUrl = primaryInvitee.signUrl || '';
-  // Map signUrl through proxy for iframe embedding to bypass X-Frame-Options SAMEORIGIN
-  const embeddedIframeUrl = signUrl ? signUrl.replace('https://app1.leegality.com', '/sign-proxy') : '';
-
-  // Deduct 1 credit from account balance
-  const remainingCredits = deductCredit();
-
-  // Compute HMAC signature using Private Salt
-  const webhookMac = await computeHmacSha1(docId, config.privateSalt);
-
-  const result = {
-    status: 1,
-    responseCode: 200,
-    message: remoteData.messages?.[0]?.message || 'Document created and invitation dispatched successfully via Leegality API v3.0',
-    networkDispatched: true,
-    isRealLeegality: true,
-    isBalanceWarning: remoteData.isBalanceWarning || false,
-    balanceAlert: remoteData.balanceAlert || null,
-    data: {
-      documentId: docId,
-      irn: payload.irn,
-      profileId: payload.profileId,
-      authTokenUsed: config.legacyAuthToken,
-      authTokenMasked: maskToken(config.legacyAuthToken),
-      privateSaltUsed: config.privateSalt,
-      privateSaltMasked: maskToken(config.privateSalt),
-      webhookMac,
-      creditsRemaining: remainingCredits,
-      signedByPreAffixed: (() => {
-        const sig = getPrimarySignatory();
-        return `${sig?.signerName || 'Authorized Signatory'} (${sig?.sebiReg || 'EMP-001'})`;
-      })(),
-      signUrl: signUrl,
-      embeddedIframeUrl: embeddedIframeUrl || signUrl,
-      invitees: realData.invitees || payload.invitees.map(inv => ({
-        ...inv,
-        status: 'Invitation Sent'
-      })),
-      timestamp: new Date().toISOString()
-    }
-  };
-
-  // Record into persistent audit log
-  try {
-    const existingLog = JSON.parse(localStorage.getItem(AUDIT_STORAGE_KEY) || '[]');
-    existingLog.unshift({
-      id: 'audit-' + Date.now(),
-      documentId: docId,
-      clientName: invitees[0]?.name || sale?.clientName,
-      contact: `${invitees[0]?.phone || ''} & ${invitees[0]?.email || ''}`,
-      authToken: maskToken(config.legacyAuthToken),
-      mac: webhookMac,
-      tenure,
-      signUrl,
-      verifiedReal: true,
-      timestamp: new Date().toISOString()
-    });
-    localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(existingLog.slice(0, 50)));
-  } catch (e) {
-    console.warn('Failed to store audit log:', e);
-  }
-
-  return result;
+  const signatory = getPrimarySignatory();
+  const res = await backendFetch('/leegality/esign/dispatch', {
+    method: 'POST',
+    body: JSON.stringify({
+      saleId,
+      clientName,
+      email,
+      phone,
+      serviceTenure,
+      signatureDataUrl: signatory?.signatureDataUrl || null,
+      signatoryName: signatory?.signerName || null
+    })
+  });
+  return res.json();
 };
-
-
 
 /**
- * Retrieve recent Leegality API dispatch audit records
+ * Live document + invitation status straight from Leegality's Details API.
  */
-export const getLeegalityAuditLog = () => {
-  try {
-    return JSON.parse(localStorage.getItem(AUDIT_STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
+export const getLeegalityDocumentStatus = async (documentId) =>
+  (await backendFetch(`/leegality/esign/${encodeURIComponent(documentId)}`)).json();
+
+/**
+ * Download the signed agreement ('signed-pdf') or audit trail ('audit-trail') once COMPLETED.
+ */
+export const downloadLeegalityFile = async (documentId, kind = 'signed-pdf') => {
+  const res = await backendFetch(`/leegality/esign/${encodeURIComponent(documentId)}/${kind}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${documentId}_${kind}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+/**
+ * True when a sale's Leegality document was created through the backend (or confirmed by it).
+ * Sales touched by the old simulated flow carry made-up document IDs and return false.
+ */
+export const isRealLeegalityDispatch = (sale) =>
+  !!(sale?.eSignDetails?.dispatchedAt || sale?.eSignDetails?.verifiedByLeegality);
+
+/**
+ * eSign credit balance from Leegality: { unused, reserved, consumed, expired, total }.
+ */
+export const getLeegalityWallet = async () => (await backendFetch('/leegality/wallet')).json();

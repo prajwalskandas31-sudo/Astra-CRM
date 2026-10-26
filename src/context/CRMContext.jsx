@@ -2,9 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { 
   getLeegalityConfig, 
   saveLeegalityConfig, 
-  deductCredit, 
   dispatchLeegalitySignRequest,
-  DEFAULT_LEEGALITY_CONFIG 
+  getLeegalityDocumentStatus,
+  isRealLeegalityDispatch
 } from '../services/leegalityService';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
 
@@ -2435,10 +2435,15 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
-  // ─── Direct e-KYC & E-Sign Trigger via Real Leegality Gateway (Workflow LzfDhWc) ───
+  // ─── e-KYC & E-Sign Trigger via Leegality (Workflow LzfDhWc, through the CRM backend) ───
   const triggerEKycAndESign = async (saleId) => {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) throw new Error(`Sale with ID '${saleId}' not found`);
+    // One Leegality document per sale: re-sending would create a duplicate document and spend another credit
+    const canResend = ['Rejected by Client', 'Invitation Expired'].includes(sale.eSignStatus);
+    if (isRealLeegalityDispatch(sale) && !canResend) {
+      throw new Error(`Already sent to Leegality (Doc ID: ${sale.eSignDocumentId}). Open its Leegality status instead.`);
+    }
 
     const matchingLead = (leads || []).find(l => 
       (sale?.leadId && l.id === sale.leadId) ||
@@ -2446,39 +2451,21 @@ export const CRMProvider = ({ children }) => {
       (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
     );
 
+    // Name, email, phone and tenure come from the Client Information Page
     const clientInfo = sale?.fullClientInfo || sale?.clientInfo || matchingLead?.clientInfo || {};
-    const clientName = clientInfo.clientName 
-      || (clientInfo.clientPrefix && clientInfo.clientName ? `${clientInfo.clientPrefix} ${clientInfo.clientName}` : '')
-      || clientInfo.fullName 
-      || sale?.clientName 
-      || 'Client';
+    const clientName = clientInfo.clientName || clientInfo.fullName || sale?.clientName;
     const phone = (clientInfo.phone1 || clientInfo.phone || sale?.phone1 || matchingLead?.phone || '').trim();
     const email = (clientInfo.email || sale?.email || matchingLead?.email || '').trim();
-    const tenure = clientInfo.serviceTenure || sale?.serviceTenure || '3 months';
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const date1 = `${dd}/${mm}/${yyyy}`;
+    const tenure = clientInfo.serviceTenure || sale?.serviceTenure;
+    if (!clientName) throw new Error('Client Name is missing on the Client Information Page.');
+    if (!tenure) throw new Error('Service Tenure is missing on the Client Information Page.');
 
-    const invitees = [{
-      name: clientName,
-      phone,
-      email
-    }];
+    const apiResult = await dispatchLeegalitySignRequest({ saleId, clientName, email, phone, serviceTenure: tenure });
 
-    // Dispatch via real Leegality API (Workflow ID: LzfDhWc)
-    const apiResult = await dispatchLeegalitySignRequest({
-      sale,
-      invitees,
-      tenure,
-      date1
-    });
+    const docId = apiResult.documentId;
+    const signUrl = apiResult.invitees?.[0]?.signUrl || '';
+    const leegalityMessage = (apiResult.messages || []).map(m => m.message).filter(Boolean).join(' | ') || 'request accepted';
 
-    const docId = apiResult.data.documentId;
-    const signUrl = apiResult.data.signUrl;
-
-    // Update sale state
     setSales(prev => prev.map(s => s.id === saleId ? {
       ...s,
       status: 'e-KYC & E-Sign Dispatched',
@@ -2486,7 +2473,7 @@ export const CRMProvider = ({ children }) => {
       eSignStatus: 'Dispatched',
       eSignDocumentId: docId,
       eSignUrl: signUrl,
-      eSignDetails: apiResult.data
+      eSignDetails: apiResult
     } : s));
 
     if (sale.leadId) {
@@ -2494,21 +2481,54 @@ export const CRMProvider = ({ children }) => {
         ...l,
         disposition: 'Awaiting Client E-Sign',
         history: [...(l.history || []), {
-          date: today.toISOString().split('T')[0],
-          text: `Leegality e-KYC & E-Sign triggered (Doc ID: ${docId}, Workflow: LzfDhWc). Invitation sent to ${phone} & ${email}.`
+          date: new Date().toISOString().split('T')[0],
+          text: `Leegality e-KYC & E-Sign request created (Doc ID: ${docId}, Workflow: LzfDhWc). Leegality: ${leegalityMessage}`
         }]
       } : l));
     }
 
     addNotification({
       title: 'e-KYC & E-Sign Dispatched',
-      message: `Leegality e-KYC & E-Sign package dispatched for '${clientName}' (Doc ID: ${docId}).`,
+      message: `Leegality created document ${docId} for '${clientName}'. Leegality: ${leegalityMessage}`,
       type: 'success',
       targetUserId: sale.submittedByUserId,
       actionPayload: { saleId }
     });
 
     return { sale, apiResult };
+  };
+
+  // ─── Live Leegality status; a deal is finalized only when Leegality reports COMPLETED ───
+  const refreshESignStatus = async (saleId, documentIdOverride = null) => {
+    const sale = sales.find(s => s.id === saleId);
+    const documentId = documentIdOverride || sale?.eSignDocumentId;
+    if (!documentId) throw new Error('This sale has no Leegality document yet.');
+
+    const details = await getLeegalityDocumentStatus(documentId);
+    const signer = (details.invitations || []).find(i => i.inviteeType !== 'APPROVER') || details.invitations?.[0] || {};
+
+    if (sale && details.documentStatus === 'COMPLETED' && sale.eSignStatus !== 'Completed') {
+      const record = details.crmRecord || sale.eSignDetails || {};
+      completeESignProcess(saleId, {
+        ...record,
+        documentId,
+        date1: record.date1,
+        signedAt: signer.signDate || details.completionDate,
+        signedBy: signer.name,
+        serviceTenure: record.serviceTenure,
+        status: 'Completed on Leegality',
+        usedSignatureType: signer.usedSignatureType,
+        signatureStamps: record.signatureStamps,
+        signUrl: signer.signUrl
+      });
+    } else if (sale && (signer.rejected || signer.expired) && sale.eSignStatus !== 'Completed') {
+      setSales(prev => prev.map(s => s.id === saleId ? {
+        ...s,
+        eSignStatus: signer.rejected ? 'Rejected by Client' : 'Invitation Expired',
+        stage: signer.rejected ? 'Client Rejected E-Sign' : 'E-Sign Invitation Expired'
+      } : s));
+    }
+    return details;
   };
 
   // ─── Automated Voice Call Completion ────────────────────────────────────
@@ -2550,7 +2570,9 @@ export const CRMProvider = ({ children }) => {
     if (!sale) return;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const docId = eSignDetails.documentId || 'LEEG-DOC-' + Date.now();
+    // Only called once Leegality reports the document COMPLETED (see refreshESignStatus)
+    const docId = eSignDetails.documentId;
+    if (!docId) return;
 
     setSales(prev => prev.map(s => s.id === saleId ? {
       ...s,
@@ -2558,8 +2580,8 @@ export const CRMProvider = ({ children }) => {
       stage: 'Deal Finalized & Active',
       eSignStatus: 'Completed',
       eSignDocumentId: docId,
-      eSignedAt: eSignDetails.signedAt || new Date().toISOString(),
-      eSignDetails
+      eSignedAt: eSignDetails.signedAt,
+      eSignDetails: { ...eSignDetails, verifiedByLeegality: true }
     } : s));
 
     if (sale.leadId) {
@@ -2567,18 +2589,18 @@ export const CRMProvider = ({ children }) => {
         ...l,
         disposition: 'Paid / Converted',
         eSignCompleted: true,
-        history: [...(l.history || []), { date: todayStr, text: `Leegality E-Sign executed successfully (Ref: ${docId}). Service Tenure: ${eSignDetails.serviceTenure || sale.serviceTenure || '3 months'}. MITC & Contract Agreement signed. Date 1 dynamically recorded as ${eSignDetails.date1 || todayStr}.` }]
+        history: [...(l.history || []), { date: todayStr, text: `Leegality reports document ${docId} COMPLETED (signed ${eSignDetails.signedAt || 'date not returned'}). Service Tenure: ${eSignDetails.serviceTenure || sale.serviceTenure}. Date 1: ${eSignDetails.date1}.` }]
       } : l));
     }
 
     // Build the completed E-Sign registry record to fill the dedicated E-Sign block
     const clientInfo = sale.fullClientInfo || sale.clientInfo || {};
     const matchingLead = (leads || []).find(l => l.id === sale.leadId);
-    const tenure = eSignDetails.serviceTenure || sale.serviceTenure || clientInfo.serviceTenure || matchingLead?.clientInfo?.serviceTenure || '3 months';
-    const clientName = clientInfo.clientName || sale.clientName || 'Client';
-    const panNumber = eSignDetails.pan || sale.panNumber || clientInfo.panNumber || 'ABCDE1234F';
-    const grossVal = eSignDetails.grossSales || sale.amount || ('₹' + (sale.grossSales || '50,000'));
-    const date1Val = eSignDetails.date1 || todayStr;
+    const tenure = eSignDetails.serviceTenure || sale.serviceTenure || clientInfo.serviceTenure || matchingLead?.clientInfo?.serviceTenure || '';
+    const clientName = clientInfo.clientName || sale.clientName || '';
+    const panNumber = sale.panNumber || clientInfo.panNumber || '';
+    const grossVal = sale.amount || (sale.grossSales ? '₹' + sale.grossSales : '');
+    const date1Val = eSignDetails.date1 || '';
 
     const newRecord = {
       id: 'esign-' + Date.now(),
@@ -2586,18 +2608,20 @@ export const CRMProvider = ({ children }) => {
       leadId: sale.leadId,
       documentId: docId,
       clientName,
-      clientPrefix: clientInfo.clientPrefix || 'Mr.',
+      clientPrefix: clientInfo.clientPrefix || '',
       panNumber,
-      phone: sale.phone1 || clientInfo.phone1 || '+91 98765 43210',
-      email: sale.email || clientInfo.email || 'client@example.com',
-      serviceName: eSignDetails.serviceName || sale.serviceOpted || clientInfo.serviceName || 'Equity Advisory',
+      phone: sale.phone1 || clientInfo.phone1 || '',
+      email: sale.email || clientInfo.email || '',
+      serviceName: sale.serviceOpted || clientInfo.serviceName || '',
       serviceTenure: tenure,
       grossSales: grossVal,
-      netSales: eSignDetails.netSales || sale.netSales || '₹42,372.88',
-      gst: eSignDetails.gst || sale.gst || '₹7,627.12',
+      netSales: sale.netSales || '',
+      gst: sale.gst || '',
       date1: date1Val,
-      confirmedAt: eSignDetails.signedAt || new Date().toISOString(),
-      status: 'Confirmed & Sealed',
+      confirmedAt: eSignDetails.signedAt,
+      verifiedByLeegality: true,
+      usedSignatureType: eSignDetails.usedSignatureType || '',
+      status: 'Completed on Leegality',
       signerOfficer: (() => {
         const sig = getPrimarySignatory();
         return {
@@ -2605,23 +2629,21 @@ export const CRMProvider = ({ children }) => {
           designation: sig?.designation || 'Principal Officer',
           sebiReg: sig?.sebiReg || 'EMP-001',
           entity: sig?.entity || 'Astra CRM Enterprise',
-          eSignStatus: 'Affixed & Verified',
-          signatureMarked: true
+          eSignStatus: (eSignDetails.signatureStamps || []).length ? `Affixed in ${eSignDetails.signatureStamps.length} places` : 'Not affixed',
+          signatureMarked: (eSignDetails.signatureStamps || []).length > 0
         };
       })(),
       clientSigner: {
         name: clientName,
-        eSignStatus: 'Aadhaar OTP Verified',
+        eSignStatus: eSignDetails.usedSignatureType || 'Signed on Leegality',
         signatureMarked: true
       },
       documentsInterlinked: [
         'Document 1: Most Important Terms & Conditions (MITC) - Image 1 Ref',
         'Document 2: Terms and Conditions Agreement (Page 14 of 14) - Image 2 Ref'
       ],
-      leegalityAuthToken: eSignDetails.authTokenMasked || 'JsAEa0...RbxM',
-      leegalityMac: eSignDetails.webhookMac || 'hFBCLu...RAhG',
-      apiGateway: 'POST https://app1.leegality.com/api/v3.0/sign/request',
-      creditsRemaining: eSignDetails.creditsRemaining !== undefined ? eSignDetails.creditsRemaining : (leegalityConfig?.creditsLeft || 50)
+      signatureStamps: eSignDetails.signatureStamps || [],
+      apiGateway: 'POST https://app1.leegality.com/api/v3.0/sign/request (via CRM backend)'
     };
 
     setESignRecords(prev => {
@@ -2636,178 +2658,6 @@ export const CRMProvider = ({ children }) => {
       targetUserId: sale.submittedByUserId,
       actionPayload: { saleId }
     });
-  };
-
-  // ─── Single-Click Automated Leegality E-Sign Pipeline ──────────────────────
-  // Executes the complete Leegality journey end-to-end:
-  // 1. Accesses internal template document
-  // 2. Stamps today's execution date into Date 1
-  // 3. Auto-reads Name, Phone number, and Email from Client Information Page
-  // 4. Disables "I want to sign this document" and activates "Enter both"
-  // 5. Affixes official digital signature, Client E-Signature & live timestamps
-  // 6. Dispatches via Leegality API v2.1 & saves executed agreement into Dedicated E-Sign Block
-  const executeOneClickLeegalityESign = async (saleId) => {
-    const targetSale = sales.find(s => s.id === saleId);
-    if (!targetSale) {
-      throw new Error(`Sale with ID '${saleId}' not found`);
-    }
-
-    const matchingLead = (leads || []).find(l => 
-      (targetSale.leadId && l.id === targetSale.leadId) ||
-      (targetSale.clientName && (l.clientName === targetSale.clientName || l.contactPerson === targetSale.clientName || l.clientInfo?.clientName === targetSale.clientName)) ||
-      (targetSale.phone1 && (l.phone === targetSale.phone1 || l.clientInfo?.phone1 === targetSale.phone1))
-    );
-
-    const clientInfo = targetSale.fullClientInfo || targetSale.clientInfo || matchingLead?.clientInfo || {};
-    const clientName = clientInfo.clientName 
-      || (clientInfo.clientPrefix && clientInfo.clientName ? `${clientInfo.clientPrefix} ${clientInfo.clientName}` : '')
-      || clientInfo.fullName 
-      || targetSale.clientName 
-      || 'Client';
-    const phone = (clientInfo.phone1 || clientInfo.phone || targetSale.phone1 || matchingLead?.phone || '7022463268').trim();
-    const email = (clientInfo.email || targetSale.email || matchingLead?.email || 'bgatreshh@gmail.com').trim();
-    const tenure = clientInfo.serviceTenure || targetSale.serviceTenure || '3 months';
-
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const date1 = `${dd}/${mm}/${yyyy}`;
-
-    const invitees = [{
-      id: 'inv-client-1',
-      name: clientName,
-      phone,
-      email,
-      contact: `${phone} / ${email}`,
-      enterBoth: true,
-      signatureType: 'Aadhaar E-Sign (OTP)',
-      role: 'Signer'
-    }];
-
-    // Dispatch via Leegality API v2.1
-    const apiResult = await dispatchLeegalitySignRequest({
-      sale: targetSale,
-      invitees,
-      tenure,
-      date1
-    });
-
-    const docId = apiResult?.data?.documentId || ('LEEG-' + Date.now().toString().slice(-8));
-
-    const signMetadata = {
-      documentId: docId,
-      date1,
-      signedAt: new Date().toISOString(),
-      signedBy: clientName,
-      pan: clientInfo.panNumber || targetSale.panNumber || 'ABCDE1234F',
-      serviceName: clientInfo.serviceName || targetSale.serviceOpted || 'Equity Advisory Pro',
-      serviceTenure: tenure,
-      grossSales: targetSale.amount || ('₹' + (clientInfo.grossSales || targetSale.grossSales || '50,000')),
-      netSales: clientInfo.netSales || targetSale.netSales || '₹42,372.88',
-      gst: clientInfo.gst || targetSale.gst || '₹7,627.12',
-      iWantToSignDisabled: true,
-      signers: invitees,
-      status: 'Sent & E-Signed',
-      authTokenMasked: apiResult?.data?.authTokenMasked || 'JsAEa0...RbxM',
-      webhookMac: apiResult?.data?.webhookMac || 'mac-verified',
-      creditsRemaining: apiResult?.data?.creditsRemaining ?? (leegalityConfig?.creditsLeft ? Math.max(0, leegalityConfig.creditsLeft - 1) : 49),
-      signUrl: apiResult?.data?.signUrl || `https://app.leegality.com/sign/${docId.toLowerCase()}`
-    };
-
-    completeESignProcess(targetSale.id, signMetadata);
-
-    return {
-      success: true,
-      sale: targetSale,
-      apiResult,
-      signMetadata,
-      docId
-    };
-  };
-
-  const simulateConfirmESign = (customData = {}) => {
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    const date1Str = `${dd}/${mm}/${yyyy}`;
-    const docId = 'LEEG-DOC-' + Math.floor(10000000 + Math.random() * 90000000);
-
-    const testSaleId = 'sale-sim-' + Date.now();
-    const clientName = customData.clientName || 'Rajesh Kumar';
-    const serviceName = customData.serviceName || 'Equity Advisory Pro';
-    const serviceTenure = customData.serviceTenure || '3 months';
-    const grossSales = customData.grossSales || '₹50,000';
-
-    const simulatedSale = {
-      id: testSaleId,
-      date: today.toISOString().split('T')[0],
-      clientName,
-      amount: grossSales,
-      employeeName: currentUser?.name || 'AKSHATA',
-      submittedByUserId: currentUser?.id || 'usr-7',
-      stage: 'Deal Finalized & Active',
-      status: 'E-Signed & Converted',
-      serviceOpted: serviceName,
-      serviceTenure,
-      panNumber: customData.panNumber || 'ABCDE1234F',
-      eSignStatus: 'Completed',
-      eSignDocumentId: docId,
-      eSignedAt: new Date().toISOString()
-    };
-
-    setSales(prev => [simulatedSale, ...prev]);
-
-    const newRecord = {
-      id: 'esign-' + Date.now(),
-      saleId: testSaleId,
-      documentId: docId,
-      clientName,
-      clientPrefix: 'Mr.',
-      panNumber: customData.panNumber || 'ABCDE1234F',
-      phone: '+91 98451 98210',
-      email: 'rajesh.kumar@example.com',
-      serviceName,
-      serviceTenure,
-      grossSales,
-      netSales: '₹42,372.88',
-      gst: '₹7,627.12',
-      date1: date1Str,
-      confirmedAt: new Date().toISOString(),
-      status: 'Confirmed & Sealed',
-      signerOfficer: (() => {
-        const sig = getPrimarySignatory();
-        return {
-          name: sig?.signerName || 'Authorized Signatory',
-          designation: sig?.designation || 'Principal Officer',
-          sebiReg: sig?.sebiReg || 'EMP-001',
-          entity: sig?.entity || 'Astra CRM Enterprise',
-          eSignStatus: 'Affixed & Verified',
-          signatureMarked: true
-        };
-      })(),
-      clientSigner: {
-        name: clientName,
-        eSignStatus: 'Aadhaar OTP Verified',
-        signatureMarked: true
-      },
-      documentsInterlinked: [
-        'Document 1: Most Important Terms & Conditions (MITC) - Image 1 Ref',
-        'Document 2: Terms and Conditions Agreement (Page 14 of 14) - Image 2 Ref'
-      ]
-    };
-
-    setESignRecords(prev => [newRecord, ...prev]);
-
-    addNotification({
-      title: 'E-Sign Confirmed',
-      message: `Agreement digitally executed & filled in E-Sign Block for '${clientName}'. Service Tenure: ${serviceTenure}. Document: ${docId}`,
-      type: 'success',
-      targetUserId: currentUser?.id
-    });
-
-    return newRecord;
   };
 
   const deleteESignRecord = (recordId) => {
@@ -3084,13 +2934,12 @@ export const CRMProvider = ({ children }) => {
       submitClientInformationReview,
       superAdminApproveSale,
       triggerEKycAndESign,
+      refreshESignStatus,
       completeVoiceCallVerification,
       completeESignProcess,
       // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ────────
       eSignRecords,
-      simulateConfirmESign,
       deleteESignRecord,
-      executeOneClickLeegalityESign,
       // ─── Leegality API Integration Config & Credentials ────────
       leegalityConfig,
       updateLeegalityConfig

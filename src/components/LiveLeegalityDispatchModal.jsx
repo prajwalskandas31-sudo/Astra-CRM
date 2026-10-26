@@ -1,114 +1,140 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { 
-  X, 
-  ExternalLink, 
-  Copy, 
-  Check, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Smartphone, 
-  Mail, 
-  KeyRound, 
-  Calendar, 
-  FileText, 
-  Zap,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Sparkles,
+import { downloadLeegalityFile } from '../services/leegalityService';
+import {
+  X,
+  ExternalLink,
+  Copy,
+  Check,
+  CheckCircle2,
+  Smartphone,
+  Mail,
+  RefreshCw,
+  Download,
+  FileText,
+  Clock,
   AlertTriangle,
-  Lock
+  PenTool
 } from 'lucide-react';
+
+const POLL_INTERVAL_MS = 20000;
+
+const tileStyle = {
+  padding: '12px 14px',
+  borderRadius: '10px',
+  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  border: '1px solid rgba(255, 255, 255, 0.08)'
+};
+const tileLabelStyle = { fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 };
+const tileValueStyle = { fontSize: '0.86rem', color: '#ffffff', fontWeight: 700, marginTop: '4px' };
+const smallBtnStyle = {
+  padding: '5px 12px',
+  borderRadius: '6px',
+  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  border: '1px solid rgba(255, 255, 255, 0.15)',
+  color: '#f8fafc',
+  fontSize: '0.74rem',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '5px'
+};
+
+const describeInvitation = (inv) => {
+  if (!inv) return { text: 'Waiting for Leegality status…', color: '#94a3b8' };
+  if (inv.signed) return { text: `Signed on Leegality${inv.signDate ? ` at ${inv.signDate}` : ''}${inv.usedSignatureType ? ` (${inv.usedSignatureType})` : ''}`, color: '#34d399' };
+  if (inv.rejected) return { text: `Rejected by client${inv.signRejectionMessage ? `: ${inv.signRejectionMessage}` : ''}`, color: '#f87171' };
+  if (inv.expired) return { text: `Invitation expired${inv.failureReason ? ` (${inv.failureReason})` : ''}`, color: '#f87171' };
+  if (inv.active) return { text: `Awaiting client signature${inv.expiryDate ? ` · link valid until ${inv.expiryDate}` : ''}`, color: '#facc15' };
+  return { text: 'Invitation created, not yet active', color: '#94a3b8' };
+};
 
 export const LiveLeegalityDispatchModal = ({
   isOpen,
   onClose,
   sale,
-  dispatchResult,
-  onFinalized = null
+  dispatchResult
 }) => {
-  const { completeESignProcess, leegalityConfig } = useCRM();
+  const { refreshESignStatus } = useCRM();
   const { showToast } = useToast();
 
   const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedDocId, setCopiedDocId] = useState(false);
-  const [showIframePreview, setShowIframePreview] = useState(false);
-  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [liveStatus, setLiveStatus] = useState(null);
+  const [statusError, setStatusError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [downloading, setDownloading] = useState('');
+
+  const record = dispatchResult || {};
+  const documentId = record.documentId || sale?.eSignDocumentId;
+  const isCompleted = liveStatus?.documentStatus === 'COMPLETED';
+  const isUnknownToLeegality = /document not found/i.test(statusError);
+
+  const refresh = useCallback(async (silent = false) => {
+    if (!sale || !documentId) return;
+    setIsRefreshing(true);
+    try {
+      const details = await refreshESignStatus(sale.id, documentId);
+      setLiveStatus(details);
+      setStatusError('');
+    } catch (err) {
+      setStatusError(err.message);
+      if (!silent) showToast(`Leegality status check failed: ${err.message}`, 'error');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [sale, documentId, refreshESignStatus, showToast]);
+
+  useEffect(() => {
+    setLiveStatus(null);
+    setStatusError('');
+  }, [documentId]);
+
+  // Poll Leegality while the modal is open until the document is completed
+  useEffect(() => {
+    if (!isOpen || !documentId || isCompleted || isUnknownToLeegality) return undefined;
+    refresh(true);
+    const timer = setInterval(() => refresh(true), POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, documentId, isCompleted, isUnknownToLeegality]);
 
   if (!isOpen || !sale || !dispatchResult) return null;
 
-  const data = dispatchResult.data || {};
-  const documentId = data.documentId || sale.eSignDocumentId || '01M5...';
-  const signUrl = data.signUrl || (data.invitees && data.invitees[0]?.signUrl) || sale.eSignUrl || `https://app1.leegality.com/sign/${documentId.toLowerCase()}`;
-  const invitee = (data.invitees && data.invitees[0]) || {};
-  const clientName = invitee.name || sale.clientName || 'Client';
-  const phone = invitee.phone || sale.phone1 || '';
-  const email = invitee.email || sale.email || '';
-  const tenure = sale.serviceTenure || sale.fullClientInfo?.serviceTenure || '3 months';
-  const serviceName = sale.serviceOpted || sale.fullClientInfo?.serviceName || 'Equity Advisory';
-  const amount = sale.amount || ('₹' + (sale.grossSales || '50,000'));
-  const remainingCredits = data.creditsRemaining ?? (leegalityConfig?.creditsLeft ? Math.max(0, leegalityConfig.creditsLeft - 1) : 49);
+  const sentInvitee = (record.invitees && record.invitees[0]) || {};
+  const liveInvitation = (liveStatus?.invitations || []).find(i => i.inviteeType !== 'APPROVER') || liveStatus?.invitations?.[0];
+  const signUrl = liveInvitation?.signUrl || sentInvitee.signUrl || '';
+  const invitationState = describeInvitation(liveInvitation);
+  const leegalityMessages = (record.messages || []).map(m => m.message).filter(Boolean);
+  // Only requests created through the backend carry dispatchedAt; older simulated records do not
+  const wasDispatchedByBackend = !!record.dispatchedAt;
+  const delivery = record.deliveryConfig?.invitees?.[0];
+  const documentStatus = liveStatus?.documentStatus || (wasDispatchedByBackend ? record.documentStatus : null);
 
   const handleCopyLink = () => {
-    if (signUrl) {
-      navigator.clipboard?.writeText?.(signUrl);
-      setCopiedLink(true);
-      showToast('Live Leegality signing URL copied to clipboard!', 'success');
-      setTimeout(() => setCopiedLink(false), 2000);
+    navigator.clipboard?.writeText?.(signUrl);
+    setCopiedLink(true);
+    showToast('Leegality signing URL copied to clipboard', 'success');
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleDownload = async (kind) => {
+    setDownloading(kind);
+    try {
+      await downloadLeegalityFile(documentId, kind);
+    } catch (err) {
+      showToast(`Download failed: ${err.message}`, 'error');
+    } finally {
+      setDownloading('');
     }
-  };
-
-  const handleCopyDocId = () => {
-    navigator.clipboard?.writeText?.(documentId);
-    setCopiedDocId(true);
-    showToast('Document ID copied!', 'info');
-    setTimeout(() => setCopiedDocId(false), 2000);
-  };
-
-  const handleOpenSigningUrl = () => {
-    if (signUrl) {
-      window.open(signUrl, '_blank', 'noopener,noreferrer');
-      showToast('Opening Leegality official signing gateway in a new tab...', 'info');
-    }
-  };
-
-  const handleMarkAsFinalized = () => {
-    setIsFinalizing(true);
-    const signMetadata = {
-      documentId,
-      date1: new Date().toLocaleDateString('en-GB'),
-      signedAt: new Date().toISOString(),
-      signedBy: clientName,
-      pan: sale.panNumber || sale.fullClientInfo?.panNumber || 'ABCDE1234F',
-      serviceName,
-      serviceTenure: tenure,
-      grossSales: amount,
-      status: 'Sent & E-Signed',
-      authTokenMasked: data.authTokenMasked || 'JsAEa0...RbxM',
-      webhookMac: data.webhookMac || 'mac-verified',
-      creditsRemaining: remainingCredits,
-      signUrl
-    };
-
-    setTimeout(() => {
-      completeESignProcess(sale.id, signMetadata);
-      setIsFinalizing(false);
-      showToast(`Sale for '${clientName}' finalized! Recorded in Dedicated E-Sign Block.`, 'success');
-      if (onFinalized) {
-        onFinalized(signMetadata);
-      }
-      onClose();
-    }, 600);
   };
 
   return (
-    <div 
-      className="modal-overlay" 
-      style={{ 
-        zIndex: 1400, 
-        backgroundColor: 'rgba(2, 6, 23, 0.92)', 
+    <div
+      className="modal-overlay"
+      style={{
+        zIndex: 1400,
+        backgroundColor: 'rgba(2, 6, 23, 0.92)',
         backdropFilter: 'blur(16px)',
         padding: '16px',
         display: 'flex',
@@ -116,11 +142,11 @@ export const LiveLeegalityDispatchModal = ({
         justifyContent: 'center'
       }}
     >
-      <div 
-        className="modal-content" 
-        style={{ 
-          maxWidth: '820px', 
-          width: '100%', 
+      <div
+        className="modal-content"
+        style={{
+          maxWidth: '820px',
+          width: '100%',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
@@ -133,7 +159,7 @@ export const LiveLeegalityDispatchModal = ({
         }}
       >
         {/* Modal Header */}
-        <div 
+        <div
           style={{
             padding: '18px 24px',
             background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(14, 165, 233, 0.15) 100%)',
@@ -143,452 +169,205 @@ export const LiveLeegalityDispatchModal = ({
             justifyContent: 'space-between'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Leegality Geometric Logo */}
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '10px',
-              backgroundColor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-            }}>
-              <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
-                <path d="M6 34 L20 6 L20 20 Z" fill="#E11D48" />
-                <path d="M20 6 L34 34 L20 20 Z" fill="#7C3AED" />
-                <path d="M6 34 L34 34 L20 20 Z" fill="#0284C7" />
-                <path d="M12 28 L28 28 L20 14 Z" fill="#06B6D4" opacity="0.8" />
-              </svg>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
+                Leegality e-KYC & E-Sign
+              </h3>
+              <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
+                Workflow ID: {record.profileId || 'LzfDhWc'}
+              </span>
             </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#ffffff' }}>
-                  Leegality Production e-KYC & E-Sign
-                </h3>
-                <span style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.4)',
-                  fontWeight: 600
-                }}>
-                  Workflow ID: LzfDhWc
-                </span>
-                <span style={{
-                  fontSize: '0.72rem',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(56, 189, 248, 0.2)',
-                  color: '#38bdf8',
-                  border: '1px solid rgba(56, 189, 248, 0.4)',
-                  fontWeight: 600
-                }}>
-                  API v3.0 Live Gateway
-                </span>
-              </div>
-              <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                Official SEBI-compliant agreement dispatch & Aadhaar verification process
-              </p>
-            </div>
+            <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+              Every value below was returned by Leegality.
+            </p>
           </div>
 
-          <button 
-            type="button" 
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '8px'
-            }}
-          >
+          <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '6px', borderRadius: '8px' }}>
             <X size={20} />
           </button>
         </div>
 
         {/* Modal Body */}
         <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          {/* Success Banner */}
-          <div style={{
-            padding: '14px 18px',
-            borderRadius: '12px',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <CheckCircle2 size={18} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#34d399' }}>
-                Actual Leegality Process Dispatched Successfully!
-              </div>
-              <div style={{ fontSize: '0.76rem', color: '#cbd5e1', marginTop: '2px' }}>
-                The simulation has been bypassed. Real Leegality e-KYC & E-Sign package created with pre-affixed Authorized Signatory.
-              </div>
-            </div>
-          </div>
 
-          {/* Real-time Leegality Server Balance Notice */}
-          {(dispatchResult?.balanceAlert || dispatchResult?.isBalanceWarning) && (
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(234, 179, 8, 0.12)',
-              border: '1px solid rgba(234, 179, 8, 0.35)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px'
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#facc15" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-              <div style={{ flex: 1, fontSize: '0.78rem' }}>
-                <div style={{ fontWeight: 700, color: '#facc15' }}>
-                  Leegality Production Server Alert: Insufficient eSign Balance
+          {/* Leegality response */}
+          {wasDispatchedByBackend ? (
+            <div style={{ padding: '14px 18px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CheckCircle2 size={22} color="#34d399" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#34d399' }}>
+                  Leegality created the signing request
                 </div>
-                <div style={{ color: '#e2e8f0', marginTop: '3px', lineHeight: 1.45 }}>
-                  {dispatchResult?.balanceAlert || 'Insufficient eSign Balance on Leegality account.'} The CRM has pre-assembled the document package and signing route. For Leegality to send real carrier SMS & email invitations directly, please top up credits on{' '}
-                  <a href="https://app1.leegality.com" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', textDecoration: 'underline', fontWeight: 600 }}>
-                    app1.leegality.com
-                  </a>.
+                <div style={{ fontSize: '0.76rem', color: '#cbd5e1', marginTop: '2px' }}>
+                  Leegality response: {leegalityMessages.length ? leegalityMessages.join(' | ') : 'status 1 (success), no message'}
                 </div>
               </div>
+            </div>
+          ) : isUnknownToLeegality ? (
+            <div style={{ padding: '14px 18px', borderRadius: '12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.35)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <AlertTriangle size={22} color="#f59e0b" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.8rem', color: '#fde68a' }}>
+                <strong>Leegality has no document with ID {documentId}.</strong> This record was produced by the old simulated flow and was never sent to Leegality.
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '12px 18px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '0.8rem', color: '#cbd5e1' }}>
+              Checking document {documentId} with Leegality…
             </div>
           )}
 
-          {/* Telemetry Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '12px'
-          }}>
-            <div style={{
-              padding: '12px 14px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
-                Document ID
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                <code style={{ fontSize: '0.82rem', color: '#38bdf8', fontWeight: 600 }}>
-                  {documentId}
-                </code>
-                <button
-                  type="button"
-                  onClick={handleCopyDocId}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedDocId ? '#34d399' : '#64748b' }}
-                  title="Copy Document ID"
-                >
-                  {copiedDocId ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-              </div>
+          {/* Request details */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <div style={tileStyle}>
+              <div style={tileLabelStyle}>Document ID</div>
+              <code style={{ ...tileValueStyle, display: 'block', fontSize: '0.8rem', color: '#38bdf8', wordBreak: 'break-all' }}>{documentId}</code>
             </div>
-
-            <div style={{
-              padding: '12px 14px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
-                Workflow Profile
-              </div>
-              <div style={{ fontSize: '0.86rem', color: '#ffffff', fontWeight: 700, marginTop: '4px' }}>
-                LzfDhWc
-              </div>
+            <div style={tileStyle}>
+              <div style={tileLabelStyle}>Date 1 (execution date)</div>
+              <div style={tileValueStyle}>{record.date1 || '—'}</div>
             </div>
-
-            <div style={{
-              padding: '12px 14px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
-                Leegality Credits
-              </div>
-              <div style={{ fontSize: '0.86rem', color: '#10b981', fontWeight: 700, marginTop: '4px' }}>
-                {remainingCredits} Credits Left <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>(-1 used)</span>
-              </div>
+            <div style={tileStyle}>
+              <div style={tileLabelStyle}>Checkbox 1 (Service Tenure)</div>
+              <div style={tileValueStyle}>{record.tenureOption || '—'} {record.serviceTenure && <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>({record.serviceTenure})</span>}</div>
             </div>
-
-            <div style={{
-              padding: '12px 14px',
-              borderRadius: '10px',
-              backgroundColor: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>
-                Webhook HMAC-SHA1
+            {record.walletAfterDispatch && !record.walletAfterDispatch.error && (
+              <div style={tileStyle}>
+                <div style={tileLabelStyle}>Leegality Credits</div>
+                <div style={tileValueStyle}>
+                  {record.walletAfterDispatch.unused} unused <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>({record.walletAfterDispatch.reserved} reserved)</span>
+                </div>
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#a78bfa', fontWeight: 600, marginTop: '4px' }}>
-                Verified via Salt
-              </div>
+            )}
+            <div style={tileStyle}>
+              <div style={tileLabelStyle}>Document Status</div>
+              <div style={{ ...tileValueStyle, color: isCompleted ? '#34d399' : '#facc15' }}>{documentStatus || '—'}</div>
             </div>
           </div>
 
-          {/* Client & Delivery Channels Card */}
-          <div style={{
-            padding: '16px 20px',
-            borderRadius: '12px',
-            backgroundColor: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Target Signer & Live Delivery Status
+          {/* Signature placements */}
+          {(record.signatureStamps || []).length > 0 && (
+            <div style={{ ...tileStyle, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ ...tileLabelStyle, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <PenTool size={13} /> Digital Signature Storage Block → agreement placements
+              </div>
+              {record.signatureStamps.map(st => (
+                <div key={st.field} style={{ fontSize: '0.8rem', color: '#e2e8f0' }}>
+                  {st.field}: <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{st.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Client & invitation status */}
+          <div style={{ padding: '16px 20px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#e2e8f0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Client Signer · Live Leegality Status
+              </div>
+              <button type="button" onClick={() => refresh(false)} disabled={isRefreshing} style={smallBtnStyle}>
+                <RefreshCw size={13} style={isRefreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
+                {isRefreshing ? 'Checking…' : 'Refresh Status'}
+              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
               <div>
                 <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Client Name</div>
-                <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#ffffff' }}>{clientName}</div>
+                <div style={{ fontSize: '0.94rem', fontWeight: 700 }}>{liveInvitation?.name || sentInvitee.name || record.clientName || sale.clientName}</div>
               </div>
-
-              <div>
-                <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Service & Tenure</div>
-                <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#38bdf8' }}>{serviceName} ({tenure})</div>
-              </div>
-
-              <div>
-                <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>Remittance Amount</div>
-                <div style={{ fontSize: '0.94rem', fontWeight: 700, color: '#10b981' }}>{amount}</div>
-              </div>
-            </div>
-
-            {/* Delivery Channels */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              marginTop: '6px',
-              paddingTop: '12px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.06)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                border: '1px solid rgba(16, 185, 129, 0.2)'
-              }}>
-                <Smartphone size={16} color="#34d399" />
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>SMS Delivery: {phone}</div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#34d399' }}>🟢 Sent via Leegality SMS Gateway</div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(56, 189, 248, 0.08)',
-                border: '1px solid rgba(56, 189, 248, 0.2)'
-              }}>
-                <Mail size={16} color="#38bdf8" />
-                <div>
-                  <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>Email Delivery: {email}</div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#38bdf8' }}>🟢 Sent via Leegality Mailer</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Live Signing Portal Action Card */}
-          <div style={{
-            padding: '18px 20px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Zap size={16} color="#38bdf8" />
-                <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#ffffff' }}>
-                  Live Leegality Signing URL
-                </span>
+                <Smartphone size={15} color="#94a3b8" />
+                <div style={{ fontSize: '0.82rem' }}>{liveInvitation?.phone || sentInvitee.phone || '—'}</div>
               </div>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: copiedLink ? '#34d399' : '#f8fafc',
-                    fontSize: '0.74rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  {copiedLink ? <Check size={13} /> : <Copy size={13} />}
-                  {copiedLink ? 'Copied' : 'Copy Link'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowIframePreview(!showIframePreview)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: '6px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#f8fafc',
-                    fontSize: '0.74rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  {showIframePreview ? <EyeOff size={13} /> : <Eye size={13} />}
-                  {showIframePreview ? 'Hide Portal Preview' : 'Show Portal Preview'}
-                </button>
+                <Mail size={15} color="#94a3b8" />
+                <div style={{ fontSize: '0.82rem', wordBreak: 'break-all' }}>{liveInvitation?.email || sentInvitee.email || '—'}</div>
               </div>
             </div>
 
-            {/* URL input box */}
-            <div style={{
-              padding: '10px 14px',
-              borderRadius: '8px',
-              backgroundColor: '#020617',
-              border: '1px solid #1e293b',
-              fontSize: '0.82rem',
-              fontFamily: 'monospace',
-              color: '#38bdf8',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {signUrl}
-            </div>
-
-            {/* Embedded Iframe Preview if toggled */}
-            {showIframePreview && (
-              <div style={{
-                marginTop: '10px',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                border: '1px solid #334155',
-                height: '420px',
-                backgroundColor: '#ffffff'
-              }}>
-                <iframe
-                  src={signUrl}
-                  title="Leegality Live Signing Gateway"
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                />
+            {/* Delivery settings Leegality applied to this document (read back after sending) */}
+            {delivery && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '0.8rem' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <span style={{ color: delivery.emailNotification ? '#34d399' : '#f87171' }}>
+                    <Mail size={13} style={{ verticalAlign: '-2px' }} /> Email by Leegality: {delivery.emailNotification ? 'ON' : 'OFF'}
+                  </span>
+                  <span style={{ color: delivery.smsNotification ? '#34d399' : '#f87171' }}>
+                    <Smartphone size={13} style={{ verticalAlign: '-2px' }} /> SMS by Leegality: {delivery.smsNotification ? 'ON' : 'OFF'}
+                  </span>
+                  <span style={{ color: '#94a3b8' }}>
+                    Signature types: {delivery.allowedSignatures.join(', ') || '—'}
+                  </span>
+                </div>
+                {['email', 'phone'].filter(k => record.sentContact?.[k] && !delivery[k]).map(k => (
+                  <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: '#fca5a5' }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    Leegality dropped the client's {k === 'phone' ? `mobile number (${record.sentContact.phone}), so no SMS will be sent` : `email (${record.sentContact.email}), so no email will be sent`}. Set the workflow signer to accept both email and phone ("Enter both").
+                  </div>
+                ))}
+                {!delivery.emailNotification && !delivery.smsNotification && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: '#fca5a5' }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    Workflow LzfDhWc has email and SMS notifications turned off, so the client was not notified. Share the signing link below manually, or enable notifications for the signer in the Leegality workflow.
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Primary Action Button */}
-            <button
-              type="button"
-              onClick={handleOpenSigningUrl}
-              style={{
-                width: '100%',
-                padding: '11px',
-                borderRadius: '8px',
-                backgroundColor: '#0284c7',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '0.86rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)'
-              }}
-            >
-              <ExternalLink size={15} /> Open Live Leegality Signing Portal
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '0.82rem', fontWeight: 600, color: invitationState.color }}>
+              {isCompleted ? <CheckCircle2 size={15} /> : <Clock size={15} />}
+              {isUnknownToLeegality ? 'No Leegality invitation exists for this record' : invitationState.text}
+            </div>
+
+            {statusError && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.78rem', color: '#fca5a5' }}>
+                <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} /> {statusError}
+              </div>
+            )}
           </div>
+
+          {/* Signing link */}
+          {signUrl && (
+            <div style={{ padding: '16px 20px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.3)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontSize: '0.86rem', fontWeight: 700 }}>Client Signing URL</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={handleCopyLink} style={{ ...smallBtnStyle, color: copiedLink ? '#34d399' : '#f8fafc' }}>
+                    {copiedLink ? <Check size={13} /> : <Copy size={13} />} {copiedLink ? 'Copied' : 'Copy Link'}
+                  </button>
+                  <button type="button" onClick={() => window.open(signUrl, '_blank', 'noopener,noreferrer')} style={smallBtnStyle}>
+                    <ExternalLink size={13} /> Open
+                  </button>
+                </div>
+              </div>
+              <div style={{ padding: '10px 14px', borderRadius: '8px', backgroundColor: '#020617', border: '1px solid #1e293b', fontSize: '0.8rem', fontFamily: 'monospace', color: '#38bdf8', wordBreak: 'break-all' }}>
+                {signUrl}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
-        <div style={{
-          padding: '16px 24px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          backgroundColor: '#020617',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '10px'
-        }}>
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={onClose}
-            style={{ padding: '8px 16px', fontSize: '0.82rem' }}
-          >
-            Keep in Awaiting Queue
-          </button>
-
-          <button
-            type="button"
-            onClick={handleMarkAsFinalized}
-            disabled={isFinalizing}
-            style={{
-              padding: '9px 20px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
-            }}
-          >
-            <ShieldCheck size={15} />
-            {isFinalizing ? 'Finalizing Deal...' : 'Mark as Client Signed & Finalize Deal'}
-          </button>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+          <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+            {isCompleted ? 'Signed copy is available from Leegality.' : `Status re-checked with Leegality every ${POLL_INTERVAL_MS / 1000}s while open. The deal finalizes automatically once Leegality reports COMPLETED.`}
+          </span>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {isCompleted && (
+              <>
+                <button type="button" className="btn-secondary" onClick={() => handleDownload('audit-trail')} disabled={!!downloading} style={{ padding: '8px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={14} /> {downloading === 'audit-trail' ? 'Downloading…' : 'Audit Trail'}
+                </button>
+                <button type="button" onClick={() => handleDownload('signed-pdf')} disabled={!!downloading} style={{ padding: '8px 16px', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Download size={14} /> {downloading === 'signed-pdf' ? 'Downloading…' : 'Signed Agreement'}
+                </button>
+              </>
+            )}
+            <button type="button" className="btn-secondary" onClick={onClose} style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

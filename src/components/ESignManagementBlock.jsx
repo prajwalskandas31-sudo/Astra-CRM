@@ -5,6 +5,7 @@ import { HarshalParmarESign } from './HarshalParmarESign';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
+import { downloadLeegalityFile } from '../services/leegalityService';
 import {
   FileSignature,
   ShieldCheck,
@@ -34,7 +35,7 @@ import {
   KeyRound
 } from 'lucide-react';
 
-export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
+export const ESignManagementBlock = () => {
   const {
     currentUser,
     sales = [],
@@ -49,8 +50,6 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
 
   const [activeBlockTab, setActiveBlockTab] = useState('registry'); // 'registry' | 'vault'
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRecordForInspection, setSelectedRecordForInspection] = useState(null);
-  const [activeInspectorTab, setActiveInspectorTab] = useState('both'); // 'doc1' | 'doc2' | 'both'
   const [primarySignatory, setPrimarySignatory] = useState(() => getPrimarySignatory());
   const [liveDispatchData, setLiveDispatchData] = useState(null);
   const [isDispatching, setIsDispatching] = useState(false);
@@ -99,18 +98,20 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
       const res = await triggerEKycAndESign(targetSale.id);
       setIsDispatching(false);
       setLiveDispatchData({ sale: targetSale, result: res.apiResult });
-      showToast(`Leegality API Gateway: Invitations dispatched! (Doc ID: ${res.apiResult.data.documentId})`, 'success');
+      showToast(`Leegality created document ${res.apiResult.documentId} for '${targetSale.clientName}'.`, 'success');
     } catch (err) {
       setIsDispatching(false);
       showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
     }
   };
 
-  const handleDownloadPdf = (rec) => {
-    showToast(`Downloading certified E-Signed agreement (${rec.documentId}) with ${primarySignatory?.signerName || 'authorized'} signature...`, 'info');
-    setTimeout(() => {
-      showToast(`Signed Agreement PDF downloaded successfully! Certified by Leegality.`, 'success');
-    }, 1200);
+  const handleDownloadPdf = async (rec) => {
+    showToast(`Fetching the signed agreement (${rec.documentId}) from Leegality...`, 'info');
+    try {
+      await downloadLeegalityFile(rec.documentId, 'signed-pdf');
+    } catch (err) {
+      showToast(`Download failed: ${err.message}`, 'error');
+    }
   };
 
   return (
@@ -287,8 +288,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               API v3.0 Live
             </div>
             <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
-              <span>● Token: {leegalityConfig?.legacyAuthToken ? `${leegalityConfig.legacyAuthToken.slice(0, 6)}...` : 'JsAEa0...'}</span>
-              <span>• {leegalityConfig?.creditsLeft ?? 50} Credits Left</span>
+              <span>● Token held by CRM backend</span>
             </div>
           </div>
         </div>
@@ -375,7 +375,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               First Invitee / Authorized Signer Master Profile
             </h3>
             <span style={{ fontSize: '0.76rem', color: 'var(--text-muted, #94a3b8)' }}>
-              His official digital signature is affixed in the marked cyan locations on both interlinked documents.
+              This stored signature is sent to Leegality with every request and placed in the two RA signature fields (pages 7 and 14) of the agreement.
             </span>
           </div>
 
@@ -407,7 +407,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             <div>• <strong>Designation:</strong> {primarySignatory?.designation || 'Principal Officer'}</div>
             <div>• <strong>Registered Entity:</strong> {primarySignatory?.entity || 'Astra CRM Enterprise'} ({primarySignatory?.sebiReg || 'EMP-001'})</div>
             <div>• <strong>Registered Office:</strong> {primarySignatory?.officeAddress || 'Corporate Headquarters, Bengaluru, Karnataka'}</div>
-            <div>• <strong>Execution Mode:</strong> Interlinked Two-Document E-Sign (MITC + 14-page Agreement)</div>
+            <div>• <strong>Execution Mode:</strong> Leegality Workflow LzfDhWc (RA Terms &amp; Conditions template)</div>
           </div>
 
           {/* Authentic E-Sign Preview */}
@@ -422,7 +422,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
             textAlign: 'center'
           }}>
             <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '8px', fontWeight: 600 }}>
-              Official Digital E-Sign Stamp (Affixed Upon Confirmation):
+              Stored Signature Preview:
             </span>
             <HarshalParmarESign
               date={new Date().toLocaleDateString('en-GB')}
@@ -433,7 +433,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               sebiReg={primarySignatory?.sebiReg}
             />
             <span style={{ fontSize: '0.68rem', color: '#06b6d4', marginTop: '6px' }}>
-              ✓ Automatically stamped into cyan-marked places above "Signature: / Name: {primarySignatory?.signerName || 'Authorized Signatory'}"
+              Sent with a 24-hour timestamp (e.g. "Signed: 26-10-2026 17:15:03 IST") taken at the moment of dispatch
             </span>
             <button
               type="button"
@@ -551,23 +551,6 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               >
                 <Zap size={14} /> {isDispatching ? 'Dispatching...' : `⚡ 1-Click Live Leegality Dispatch (${pendingESignSales[0].clientName})`}
               </button>
-              {onOpenLeegalityModal && (
-                <button
-                  onClick={() => onOpenLeegalityModal(pendingESignSales[0], false)}
-                  style={{
-                    padding: '6px 12px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                    color: '#e2e8f0',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '6px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Agreement Inspector
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -592,21 +575,8 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
               Dedicated E-Sign Block is Ready
             </h4>
             <p style={{ margin: '0 auto 20px auto', fontSize: '0.82rem', color: 'var(--text-muted, #94a3b8)', maxWidth: '520px', lineHeight: 1.5 }}>
-              This block will automatically be filled as soon as a client's sale confirmation is executed. Click the simulation button below to preview how confirmed agreements and {primarySignatory?.signerName || 'authorized'} E-Sign are filed here.
+              Agreements appear here once Leegality reports them COMPLETED. Send one with "Trigger e-KYC & E-Sign" in Sale Approvals.
             </p>
-            <button
-              onClick={handleSimulateConfirmation}
-              className="btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 18px',
-                fontSize: '0.84rem'
-              }}
-            >
-              <Sparkles size={16} /> Simulate / Fill E-Sign Record
-            </button>
           </div>
         ) : (
           <div className="table-responsive">
@@ -683,7 +653,7 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                         fontSize: '0.74rem',
                         fontWeight: 600
                       }}>
-                        <Check size={12} /> Affixed & Stamped
+                        <Check size={12} /> {rec.verifiedByLeegality ? (rec.signerOfficer?.eSignStatus || '—') : 'Unverified'}
                       </span>
                     </td>
                     <td>
@@ -699,20 +669,26 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                         fontSize: '0.74rem',
                         fontWeight: 600
                       }}>
-                        <CheckCircle2 size={12} /> Aadhaar Verified
+                        <CheckCircle2 size={12} /> {rec.verifiedByLeegality ? (rec.clientSigner?.eSignStatus || 'Signed on Leegality') : 'Unverified'}
                       </span>
                     </td>
                     <td>
-                      <span className="badge badge-success" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
-                        {rec.status || 'Confirmed & Sealed'}
-                      </span>
+                      {rec.verifiedByLeegality ? (
+                        <span className="badge badge-success" style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
+                          {rec.status}
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' }} title="Created by the old simulated flow; this document ID does not exist on Leegality">
+                          Unverified (old simulated record)
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                         <button
                           onClick={() => {
-                            setSelectedRecordForInspection(rec);
-                            setActiveInspectorTab('both');
+                            const sale = sales.find(s => s.id === rec.saleId) || { id: rec.saleId, clientName: rec.clientName };
+                            setLiveDispatchData({ sale, result: sale.eSignDetails?.documentId ? sale.eSignDetails : { documentId: rec.documentId } });
                           }}
                           className="btn-secondary"
                           style={{
@@ -722,9 +698,9 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
                             alignItems: 'center',
                             gap: '4px'
                           }}
-                          title="Inspect the interlinked documents showing his e-sign in marked places"
+                          title="Live status and signed copy from Leegality"
                         >
-                          <Eye size={13} /> View Documents
+                          <Eye size={13} /> Leegality Status
                         </button>
                         <button
                           onClick={() => handleDownloadPdf(rec)}
@@ -759,395 +735,12 @@ export const ESignManagementBlock = ({ onOpenLeegalityModal = null }) => {
     </>
   )}
 
-      {/* ─── INTERLINKED DOCUMENT INSPECTOR MODAL ─── */}
-      {selectedRecordForInspection && (
-        <div
-          className="modal-overlay"
-          style={{
-            zIndex: 1500,
-            backgroundColor: 'rgba(0, 0, 0, 0.95)',
-            backdropFilter: 'blur(16px)',
-            padding: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <div
-            className="modal-content"
-            style={{
-              maxWidth: '1200px',
-              width: '100%',
-              height: '92vh',
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: '#ffffff',
-              color: '#1e293b',
-              borderRadius: '10px',
-              overflow: 'hidden',
-              boxShadow: '0 30px 90px rgba(0, 0, 0, 0.9)',
-              fontFamily: "'Inter', sans-serif"
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{
-              padding: '14px 20px',
-              backgroundColor: '#0f172a',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              borderBottom: '1px solid #334155'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <FileCheck2 size={20} color="#06b6d4" />
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#f8fafc' }}>
-                    Interlinked E-Signed Documents • {selectedRecordForInspection.clientName}
-                  </h3>
-                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                    Ref ID: {selectedRecordForInspection.documentId} • Date: {selectedRecordForInspection.date1} • Service Tenure: {selectedRecordForInspection.serviceTenure}
-                    {selectedRecordForInspection.leegalityAuthToken && (
-                      <span style={{ marginLeft: '8px', color: '#38bdf8' }}>
-                        • Leegality Token: {selectedRecordForInspection.leegalityAuthToken}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              {/* Document Switcher Tabs */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorTab('doc1')}
-                  style={{
-                    padding: '5px 12px',
-                    fontSize: '0.76rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    backgroundColor: activeInspectorTab === 'doc1' ? '#0284c7' : '#1e293b',
-                    color: '#ffffff'
-                  }}
-                >
-                  Document 1 (MITC Signatures - Image 1)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorTab('doc2')}
-                  style={{
-                    padding: '5px 12px',
-                    fontSize: '0.76rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    backgroundColor: activeInspectorTab === 'doc2' ? '#0284c7' : '#1e293b',
-                    color: '#ffffff'
-                  }}
-                >
-                  Document 2 (Agreement Page 14 - Image 2)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveInspectorTab('both')}
-                  style={{
-                    padding: '5px 12px',
-                    fontSize: '0.76rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    backgroundColor: activeInspectorTab === 'both' ? '#0284c7' : '#1e293b',
-                    color: '#ffffff'
-                  }}
-                >
-                  Side-by-Side (Both Interlinked)
-                </button>
-
-                <button
-                  onClick={() => setSelectedRecordForInspection(null)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    marginLeft: '12px'
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            {/* Cyan Annotation Notice Bar */}
-            <div style={{
-              backgroundColor: '#ecfeff',
-              borderBottom: '1px solid #a5f3fc',
-              padding: '8px 20px',
-              fontSize: '0.76rem',
-              color: '#0e7490',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  backgroundColor: '#06b6d4',
-                  color: '#ffffff',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  padding: '1px 6px',
-                  borderRadius: '3px'
-                }}>
-                  CYAN BOX LOCATION
-                </span>
-                <span>
-                  <strong>Note: Both documents are interlinked.</strong> {primarySignatory?.signerName || 'Authorized Signatory'}'s digital E-Sign appears in the marked places above "Signature: / Name: {primarySignatory?.signerName || 'Authorized Signatory'}".
-                </span>
-              </div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-                Status: Filled & Certified
-              </span>
-            </div>
-
-            {/* Document Body Area */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '24px',
-              backgroundColor: '#f1f5f9',
-              display: 'flex',
-              gap: '24px',
-              justifyContent: 'center'
-            }}>
-              {/* ─── DOCUMENT 1: MITC & CLIENT EXECUTION (IMAGE 1 REF) ─── */}
-              {(activeInspectorTab === 'doc1' || activeInspectorTab === 'both') && (
-                <div style={{
-                  flex: 1,
-                  maxWidth: activeInspectorTab === 'both' ? '560px' : '720px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  padding: '36px 32px',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}>
-                  {/* Top Header */}
-                  <div style={{ textAlign: 'center', marginBottom: '16px', borderBottom: '2px solid #0284c7', paddingBottom: '10px' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>
-                      Document 1 (Image 1 Ref)
-                    </div>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: '2px 0', color: '#0f172a' }}>
-                      MOST IMPORTANT TERMS & CONDITIONS (MITC)
-                    </h3>
-                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: 0 }}>
-                      Service Tenure: <strong>{selectedRecordForInspection.serviceTenure}</strong> • Fee: <strong>{selectedRecordForInspection.grossSales}</strong>
-                    </p>
-                  </div>
-
-                  <p style={{ fontSize: '0.74rem', color: '#475569', lineHeight: 1.5, marginBottom: '20px' }}>
-                    This document certifies that <strong>{selectedRecordForInspection.clientPrefix} {selectedRecordForInspection.clientName}</strong> (PAN: {selectedRecordForInspection.panNumber}) has engaged research advisory services under SEBI (Research Analyst) Regulations, 2014 for the duration of <strong>{selectedRecordForInspection.serviceTenure}</strong>.
-                  </p>
-
-                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 1 ─── */}
-                  <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
-                    {/* Authorized Signatory Block */}
-                    <div style={{ marginBottom: '28px' }}>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
-                        For {primarySignatory?.signerName || 'Authorized Signatory'}
-                      </div>
-
-                      {/* CYAN MARKED BOX WHERE E-SIGN APPEARS */}
-                      <div>
-                        <HarshalParmarESign
-                          date={selectedRecordForInspection.date1}
-                          isConfirmed={true}
-                          showCyanBorder={true}
-                          documentId={selectedRecordForInspection.documentId}
-                          signerName={primarySignatory?.signerName}
-                          designation={primarySignatory?.designation}
-                          sebiReg={primarySignatory?.sebiReg}
-                        />
-                      </div>
-
-                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
-                        <div>Signature:</div>
-                        <div>Name: {primarySignatory?.signerName || 'Authorized Signatory'}</div>
-                        <div>Designation: {primarySignatory?.designation || 'Principal Officer'}</div>
-                      </div>
-                    </div>
-
-                    {/* For and on behalf of the Client */}
-                    <div>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
-                        For and on behalf of the Client
-                      </div>
-
-                      {/* Client Signature Area */}
-                      <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '6px 12px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                        border: '1px solid rgba(16, 185, 129, 0.4)',
-                        borderRadius: '6px',
-                        margin: '4px 0 8px 0'
-                      }}>
-                        <CheckCircle2 size={14} color="#10b981" />
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#166534' }}>
-                          Aadhaar E-Signed by {selectedRecordForInspection.clientName}
-                        </span>
-                        <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
-                          ({selectedRecordForInspection.date1})
-                        </span>
-                      </div>
-
-                      <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5 }}>
-                        <div>Signature:</div>
-                        <div>Name: {selectedRecordForInspection.clientName}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ─── DOCUMENT 2: TERMS AND CONDITIONS AGREEMENT (PAGE 14 OF 14 - IMAGE 2 REF) ─── */}
-              {(activeInspectorTab === 'doc2' || activeInspectorTab === 'both') && (
-                <div style={{
-                  flex: 1,
-                  maxWidth: activeInspectorTab === 'both' ? '560px' : '720px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '4px',
-                  padding: '36px 32px',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }}>
-                  {/* Top indicator */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>
-                      Document 2 (Image 2 Ref)
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                      Terms & Conditions Agreement
-                    </span>
-                  </div>
-
-                  {/* EXACT LEGAL TEXT FROM SCREENSHOT 2 */}
-                  <div style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.6, marginBottom: '24px' }}>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      rule, regulation, contract, or other instrument to which it is a party or to which any of its property is or may be subject;
-                    </p>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      iv. The maximum fee that may be charged by the RA is ₹1.51 lakhs per annum per family of the Client;
-                    </p>
-                    <p style={{ margin: '0 0 10px 0' }}>
-                      v. The recommendations provided by the RA do not provide any assurance of returns.
-                    </p>
-                    <p style={{ margin: '0 0 18px 0' }}>
-                      vi. It is not engaged in any additional professional or business activities, on a whole-time basis or in an executive capacity, which may interfere with, influence, or have the potential to interfere with/influence the independence of the research report and/or recommendations contained therein. <strong>**Only for Individual RA**</strong>
-                    </p>
-                  </div>
-
-                  {/* ─── EXACT SIGNATURE BLOCK FROM SCREENSHOT 2 ─── */}
-                  <div style={{ marginTop: 'auto' }}>
-                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f172a', marginBottom: '6px' }}>
-                      For {primarySignatory?.signerName || 'Authorized Signatory'}
-                    </div>
-
-                    {/* CYAN MARKED BOX WHERE E-SIGN APPEARS */}
-                    <div>
-                      <HarshalParmarESign
-                        date={selectedRecordForInspection.date1}
-                        isConfirmed={true}
-                        showCyanBorder={true}
-                        documentId={selectedRecordForInspection.documentId}
-                        signerName={primarySignatory?.signerName}
-                        designation={primarySignatory?.designation}
-                        sebiReg={primarySignatory?.sebiReg}
-                      />
-                    </div>
-
-                    <div style={{ fontSize: '0.82rem', color: '#1e293b', lineHeight: 1.5, marginTop: '4px' }}>
-                      <div>Signature:</div>
-                      <div>Name: {primarySignatory?.signerName || 'Authorized Signatory'}</div>
-                      <div>Designation: {primarySignatory?.designation || 'Principal Officer'}</div>
-                    </div>
-                  </div>
-
-                  {/* EXACT FOOTER FROM SCREENSHOT 2 */}
-                  <div style={{
-                    marginTop: '36px',
-                    paddingTop: '12px',
-                    borderTop: '1px solid #f1f5f9',
-                    fontSize: '0.74rem',
-                    color: '#64748b',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <span>Page 14 of 14</span>
-                    <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>SEBI INH000002099 Certified</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Bottom Controls */}
-            <div style={{
-              padding: '12px 20px',
-              backgroundColor: '#ffffff',
-              borderTop: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                Both documents interlinked and sealed via Leegality Cryptographic Timestamp.
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPdf(selectedRecordForInspection)}
-                  className="btn-primary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.8rem',
-                    padding: '6px 14px'
-                  }}
-                >
-                  <Download size={14} /> Download Certified Agreement
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRecordForInspection(null)}
-                  className="btn-secondary"
-                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Real Leegality e-KYC & E-Sign Live Dispatch Modal */}
       <LiveLeegalityDispatchModal
         isOpen={!!liveDispatchData}
         sale={liveDispatchData?.sale}
         dispatchResult={liveDispatchData?.result}
         onClose={() => setLiveDispatchData(null)}
-        onFinalized={() => setLiveDispatchData(null)}
       />
     </div>
   );
