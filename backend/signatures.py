@@ -86,26 +86,32 @@ def save_signatures(req: SignatureSave, current_user: dict = Depends(require_rol
 
     if len(req.signatures) > MAX_SIGNATURES:
         raise HTTPException(status_code=400, detail=f"At most {MAX_SIGNATURES} signatures can be stored.")
-
-    stored = read_signatures()
-    # The Primary Signatory signs every Leegality agreement, so only a Super Admin may change it
-    if current_user["role"] != "Super Admin" and _content(req.signatures.get(PRIMARY_KEY)) != _content(stored.get(PRIMARY_KEY)):
-        raise HTTPException(status_code=403, detail="Only a Super Admin can change the Primary Signatory signature.")
-
-    now = datetime.now(timezone.utc).isoformat()
-    stamped = {}
     for name, record in req.signatures.items():
         if not KEY_PATTERN.match(name):
             raise HTTPException(status_code=400, detail=f"Invalid signature key '{name}'.")
-        if _content(record) == _content(stored.get(name)):
-            stamped[name] = stored[name]  # unchanged: keep who saved it and when
-            continue
         if record.get("signatureDataUrl"):
             _validate_image(name, record["signatureDataUrl"])
-        stamped[name] = {**record, "serverSavedAt": now, "serverSavedBy": current_user["name"]}
-    if current_user["role"] != "Super Admin" and PRIMARY_KEY in stored and PRIMARY_KEY not in stamped:
-        stamped[PRIMARY_KEY] = stored[PRIMARY_KEY]
+
+    is_super_admin = current_user["role"] == "Super Admin"
+    now = datetime.now(timezone.utc).isoformat()
+    # Read, authorize and write under one lock so a concurrent save can't slip in between
     with _lock:
+        stored = read_signatures()
+        # The Primary Signatory signs every Leegality agreement, so only a Super Admin may change it
+        if not is_super_admin and _content(req.signatures.get(PRIMARY_KEY)) != _content(stored.get(PRIMARY_KEY)):
+            raise HTTPException(status_code=403, detail="Only a Super Admin can change the Primary Signatory signature.")
+
+        stamped = {}
+        for name, record in req.signatures.items():
+            if name == PRIMARY_KEY and not is_super_admin:
+                continue  # always taken from disk below, never from the request
+            if _content(record) == _content(stored.get(name)):
+                stamped[name] = stored[name]  # unchanged: keep who saved it and when
+            else:
+                stamped[name] = {**record, "serverSavedAt": now, "serverSavedBy": current_user["name"]}
+        if not is_super_admin and PRIMARY_KEY in stored:
+            stamped[PRIMARY_KEY] = stored[PRIMARY_KEY]
+
         os.makedirs(os.path.dirname(SIGNATURES_PATH), exist_ok=True)
         tmp = SIGNATURES_PATH + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
