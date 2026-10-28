@@ -153,11 +153,13 @@ def _find_login_user(identifier: str):
     ident = _normalize_identifier(identifier)
     if not ident:
         return None
-    matches = [
-        u for u in USERS_DB
-        if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())
-        or (len(ident) >= 10 and ident.isdigit() and ident == _digits(u.get("mobile")))
-    ]
+    # Email/employee ID are exact identities and take precedence, so nobody can shadow them via their mobile.
+    exact = [u for u in USERS_DB if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+    if len(ident) < 10 or not ident.isdigit():
+        return None
+    matches = [u for u in USERS_DB if ident == _digits(u.get("mobile"))]
     # An identifier that matches more than one account is refused rather than guessed.
     return matches[0] if len(matches) == 1 else None
 
