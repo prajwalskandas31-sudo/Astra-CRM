@@ -1,3 +1,5 @@
+import secrets
+
 import pytest
 
 from backend.tests.conftest import bearer
@@ -6,6 +8,8 @@ SA = "superadmin@company.com"
 ADMIN = "admin@company.com"
 EXEC = "tajayvarma76@gmail.com"
 EXEC_ID = "usr-3"
+# Generated per run so no credential-shaped literals live in the repo.
+STRONG = f"Sp-{secrets.token_hex(8)}"
 
 
 @pytest.fixture(scope="module")
@@ -71,8 +75,8 @@ def test_admin_limits(crm, tokens):
 
 
 @pytest.mark.parametrize("method,path,body", [
-    ("post", "/api/users", {"name": "x", "mobile": "9111111111", "password": "Long-Enough-123", "email": "n@x.com"}),
-    ("put", "/api/users/usr-1/password", {"newPassword": "Hacked-Password-1"}),
+    ("post", "/api/users", {"name": "x", "mobile": "9111111111", "password": STRONG, "email": "n@x.com"}),
+    ("put", "/api/users/usr-1/password", {"newPassword": STRONG}),
     ("post", "/api/sales/x/approve", None),
     ("post", "/api/dispositions", {"name": "x"}),
     ("delete", "/api/users/usr-9", None),
@@ -117,7 +121,7 @@ def test_leads_scoped_by_owner_id(crm, tokens):
 
 def test_identity_fields_must_be_unique(crm, tokens):
     sa = tokens["sa"]
-    base = {"name": "New Person", "mobile": "9000011111", "password": "Strong-Password-1", "email": "np@x.com", "reportingTo": "x"}
+    base = {"name": "New Person", "mobile": "9000011111", "password": STRONG, "email": "np@x.com", "reportingTo": "x"}
     assert crm.client.post("/api/users", json={**base, "employeeId": "EMP-001"}, headers=bearer(sa)).status_code == 400
     assert crm.client.post("/api/users", json={**base, "email": SA}, headers=bearer(sa)).status_code == 400
     assert crm.client.post("/api/users", json={**base, "name": "akshata"}, headers=bearer(sa)).status_code == 400

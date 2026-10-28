@@ -92,9 +92,7 @@ jobs:
     needs: [backend-tests, frontend-build, docker-integration]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: http://${{ secrets.DEPLOY_HOST }}:8080
+    environment: production
     concurrency:
       group: production-deploy
       cancel-in-progress: false

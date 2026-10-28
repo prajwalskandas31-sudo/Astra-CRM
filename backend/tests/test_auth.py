@@ -1,3 +1,5 @@
+import secrets
+
 import jwt
 
 from backend.tests.conftest import bearer
@@ -5,6 +7,8 @@ from backend.tests.conftest import bearer
 SA = "superadmin@company.com"
 ADMIN = "admin@company.com"
 EXEC = "tajayvarma76@gmail.com"
+# Generated per run so no credential-shaped literals live in the repo.
+NEW_PASSWORD = f"Np-{secrets.token_hex(8)}"
 
 
 def test_login_by_email_employee_id_and_mobile(crm):
@@ -68,13 +72,13 @@ def test_password_change_and_deactivation_revoke_sessions(crm):
     old = exec_user["access_token"]
     uid = exec_user["user"]["id"]
 
-    assert crm.client.put(f"/api/users/{uid}/password", json={"newPassword": "Fresh-Password-77"}, headers=bearer(sa)).status_code == 200
+    assert crm.client.put(f"/api/users/{uid}/password", json={"newPassword": NEW_PASSWORD}, headers=bearer(sa)).status_code == 200
     assert crm.client.get("/api/auth/me", headers=bearer(old)).status_code == 401
 
-    fresh = crm.login(EXEC, "Fresh-Password-77").json()["access_token"]
+    fresh = crm.login(EXEC, NEW_PASSWORD).json()["access_token"]
     assert crm.client.put(f"/api/users/{uid}/toggle-status", headers=bearer(sa)).status_code == 200
     assert crm.client.get("/api/auth/me", headers=bearer(fresh)).status_code in (401, 403)
-    assert crm.login(EXEC, "Fresh-Password-77").status_code == 403
+    assert crm.login(EXEC, NEW_PASSWORD).status_code == 403
 
 
 def test_verify_password_scopes(crm):
