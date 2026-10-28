@@ -9,6 +9,8 @@ import {
   resetToDefaultSignature,
   verifySignerPassword,
   primeSignerPassword,
+  pushSignaturesToServer,
+  syncSignaturesOnUnlock,
   isVaultUnlockedInSession,
   setVaultSessionUnlocked,
   processSignatureFile,
@@ -210,6 +212,15 @@ export const DigitalSignatureVault = ({
     }
   }, [isInlineEditing, selectedSignerKey]);
 
+  // Mirror every vault change to the server; if that fails the change exists in this browser only, so say so.
+  const storeSignaturesOnServer = async (password) => {
+    try {
+      await pushSignaturesToServer(password);
+    } catch (err) {
+      showToast(`Saved in this browser only. The server copy was not updated: ${err.message}`, 'error');
+    }
+  };
+
   // ─── Vault Unlock Handler ───────────────────────────────────────────────
   const handleUnlock = (e) => {
     e?.preventDefault();
@@ -232,6 +243,14 @@ export const DigitalSignatureVault = ({
         setPasswordInput('');
         setAuthError('');
         showToast('Digital Signature Vault unlocked successfully.', 'success');
+        syncSignaturesOnUnlock(trimmed)
+          .then((outcome) => {
+            setSignaturesMap(getAllSignatures());
+            if (outcome === 'uploaded') {
+              showToast('Signature stored on the server. Every admin browser and Leegality dispatch now use it.', 'success');
+            }
+          })
+          .catch((err) => showToast(`Could not store the signature on the server: ${err.message}`, 'error'));
       } else {
         setAuthError('Incorrect password. Please enter your valid account or administrator password.');
         showToast('Authentication failed: Incorrect password.', 'error');
@@ -284,6 +303,7 @@ export const DigitalSignatureVault = ({
         });
 
         setSignaturesMap(getAllSignatures());
+        await storeSignaturesOnServer(trimmedPassword);
         setIsSavingProfile(false);
         setIsProfileModalOpen(false);
         setProfilePassword('');
@@ -299,6 +319,38 @@ export const DigitalSignatureVault = ({
   };
 
   // ─── File Selection & OCR Processing ─────────────────────────────────────
+  // Fill only the fields OCR actually read; everything else keeps what the user already has.
+  const applyOcrResult = (extracted, { quiet = false } = {}) => {
+    setOcrData(extracted);
+    setStagedDetails(prev => ({
+      ...prev,
+      signerName: extracted.detectedName || prev.signerName,
+      designation: extracted.detectedDesignation || prev.designation,
+      entity: extracted.detectedEntity || prev.entity,
+      sebiReg: extracted.detectedRegId || prev.sebiReg,
+      officeAddress: extracted.detectedAddress || prev.officeAddress
+    }));
+    if (quiet) return;
+    if (extracted.ocrError) {
+      showToast(`OCR could not run: ${extracted.ocrError}`, 'error');
+      return;
+    }
+    const filled = [
+      extracted.detectedName && 'name',
+      extracted.detectedDesignation && 'designation',
+      extracted.detectedEntity && 'entity',
+      extracted.detectedRegId && 'registration ID',
+      extracted.detectedAddress && 'address'
+    ].filter(Boolean);
+    if (filled.length) {
+      showToast(`OCR filled ${filled.join(', ')} (${extracted.confidence}% confidence). Please review before saving.`, 'success');
+    } else if (extracted.hasPrintedText) {
+      showToast('OCR read some text but found no signatory details. Fill the fields below manually.', 'info');
+    } else {
+      showToast('No printed text found (handwritten signature). Fill the signatory details below.', 'info');
+    }
+  };
+
   const handleFileChange = async (file) => {
     if (!file) return;
     setIsProcessingImage(true);
@@ -324,21 +376,7 @@ export const DigitalSignatureVault = ({
       setIsOcrScanning(false);
       setOcrData(extracted);
 
-      if (extracted.success) {
-        setStagedDetails(prev => ({
-          ...prev,
-          signerName: extracted.detectedName || prev.signerName,
-          designation: extracted.detectedDesignation || prev.designation,
-          entity: extracted.detectedEntity || prev.entity,
-          sebiReg: extracted.detectedRegId || prev.sebiReg
-        }));
-
-        if (extracted.hasPrintedText) {
-          showToast(`OCR Scan complete: Detected '${extracted.detectedName}' from image text!`, 'success');
-        } else {
-          showToast(`Signature loaded. Stylized cursive detected (no machine typeface). Review or edit details below!`, 'info');
-        }
-      }
+      applyOcrResult(extracted);
     } catch (err) {
       showToast(err.message || 'Error processing signature file', 'error');
       setUpdateError(err.message);
@@ -362,15 +400,7 @@ export const DigitalSignatureVault = ({
         (p) => setOcrProgress(p),
         { sensitivity: ocrSensitivity, upscale: ocrUpscale, autoCrop: ocrAutoCrop, multiPass: true }
       );
-      setOcrData(extracted);
-      setStagedDetails(prev => ({
-        ...prev,
-        signerName: extracted.detectedName || prev.signerName,
-        designation: extracted.detectedDesignation || prev.designation,
-        entity: extracted.detectedEntity || prev.entity,
-        sebiReg: extracted.detectedRegId || prev.sebiReg
-      }));
-      showToast(`OCR re-analyzed: ${extracted.tags.join(' • ')}`, 'success');
+      applyOcrResult(extracted);
     } catch (err) {
       showToast('OCR analysis encountered an issue', 'error');
     } finally {
@@ -401,15 +431,7 @@ export const DigitalSignatureVault = ({
           multiPass: true
         }
       );
-      setOcrData(extracted);
-      setStagedDetails(prev => ({
-        ...prev,
-        signerName: extracted.detectedName || prev.signerName,
-        designation: extracted.detectedDesignation || prev.designation,
-        entity: extracted.detectedEntity || prev.entity,
-        sebiReg: extracted.detectedRegId || prev.sebiReg
-      }));
-      showToast(`Re-scanned with T=${extracted.threshold}: ${extracted.tags.slice(0, 3).join(' • ')}`, 'success');
+      applyOcrResult(extracted);
     } catch (err) {
       showToast('Re-scan error', 'error');
     } finally {
@@ -439,17 +461,7 @@ export const DigitalSignatureVault = ({
         (p) => setOcrProgress(p)
       );
 
-      setOcrData(extracted);
-      if (extracted.success) {
-        setStagedDetails(prev => ({
-          ...prev,
-          signerName: extracted.detectedName || prev.signerName,
-          designation: extracted.detectedDesignation || prev.designation,
-          entity: extracted.detectedEntity || prev.entity,
-          sebiReg: extracted.detectedRegId || prev.sebiReg
-        }));
-        showToast(`OCR Success: Read '${extracted.detectedName}' from stamp pixels!`, 'success');
-      }
+      applyOcrResult(extracted);
     } catch (err) {
       showToast('Error testing sample stamp OCR', 'error');
     } finally {
@@ -530,6 +542,7 @@ export const DigitalSignatureVault = ({
         });
 
         setSignaturesMap(getAllSignatures());
+        await storeSignaturesOnServer(trimmedPassword);
         setIsSavingInline(false);
         setIsInlineEditing(false);
         setInlinePassword('');
@@ -594,6 +607,7 @@ export const DigitalSignatureVault = ({
         });
 
         setSignaturesMap(getAllSignatures());
+        await storeSignaturesOnServer(trimmedPassword);
         setIsSaving(false);
         setIsUploadModalOpen(false);
         setStagedFile(null);
@@ -634,6 +648,7 @@ export const DigitalSignatureVault = ({
         });
 
         setSignaturesMap(getAllSignatures());
+        await storeSignaturesOnServer(trimmedPassword);
         setIsResetting(false);
         setIsResetModalOpen(false);
         setResetPassword('');
@@ -2472,7 +2487,11 @@ export const DigitalSignatureVault = ({
                       fontWeight: 700,
                       color: ocrData.hasPrintedText ? '#34d399' : '#38bdf8'
                     }}>
-                      {ocrData.hasPrintedText ? (
+                      {ocrData.ocrError ? (
+                        <>
+                          <Info size={14} /> OCR could not run: {ocrData.ocrError}
+                        </>
+                      ) : ocrData.hasPrintedText ? (
                         <>
                           <CheckCircle2 size={14} /> OCR Read Success ({ocrData.confidence}% Confidence)
                         </>
@@ -2501,7 +2520,7 @@ export const DigitalSignatureVault = ({
                     )}
                   </div>
 
-                  {!ocrData.hasPrintedText && (
+                  {!ocrData.hasPrintedText && !ocrData.ocrError && (
                     <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '8px', lineHeight: 1.4 }}>
                       Pure handwritten signatures contain ink loops rather than machine typeface. You can easily adjust or verify your name, title, and registration ID directly in the editable inputs below!
                     </div>
@@ -2520,7 +2539,7 @@ export const DigitalSignatureVault = ({
                           fontWeight: 500
                         }}
                       >
-                        ✓ {tag}
+                        {tag}
                       </span>
                     ))}
                   </div>

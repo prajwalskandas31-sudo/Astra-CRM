@@ -26,10 +26,12 @@ def crm(tmp_path_factory):
     os.environ["JWT_SECRET_KEY"] = secrets.token_hex(32)
 
     import backend.auth as auth
+    import backend.signatures as signatures
     import backend.leegality as leegality
     import backend.main as main
-    for module in (auth, leegality, main):
+    for module in (auth, signatures, leegality, main):
         importlib.reload(module)
+    signatures.SIGNATURES_PATH = str(tmp_path_factory.mktemp("data") / "signatures.json")
 
     client = TestClient(main.app)
     ip_counter = iter(range(1, 10_000))
@@ -46,7 +48,7 @@ def crm(tmp_path_factory):
         assert res.status_code == 200, res.text
         return res.json()["access_token"]
 
-    return SimpleNamespace(client=client, creds=creds, main=main, login=login, token=token)
+    return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, login=login, token=token)
 
 
 def bearer(tok):
