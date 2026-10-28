@@ -104,6 +104,8 @@ def load_credentials() -> None:
 # Brute-force protection
 # ==========================================
 _MAX_FAILURES = 5
+# An office shares one public IP, so the per-IP limit is looser than the per-account one.
+_MAX_FAILURES_PER_IP = 30
 _LOCKOUT_SECONDS = 15 * 60
 _failures: dict[str, list[float]] = {}
 _failures_lock = threading.Lock()
@@ -115,7 +117,8 @@ def check_not_locked(*keys: str) -> None:
         for key in keys:
             recent = [t for t in _failures.get(key, []) if now - t < _LOCKOUT_SECONDS]
             _failures[key] = recent
-            if len(recent) >= _MAX_FAILURES:
+            limit = _MAX_FAILURES_PER_IP if key.startswith("ip:") else _MAX_FAILURES
+            if len(recent) >= limit:
                 raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
 
 
