@@ -20,6 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CREDS = {c["email"]: c["password"] for c in json.load(open(os.path.join(ROOT, "secrets", "credentials.json")))}
 SA, ADMIN, MANAGER, EXEC = "superadmin@company.com", "admin@company.com", "vikram.manager@company.com", "tajayvarma76@gmail.com"
 AUTH_SPACING = 6.5  # nginx allows ~10 auth requests/minute per IP
+WRONG_PASSWORD = f"not-the-password-{secrets.token_hex(6)}"
 
 client = httpx.Client(base_url=BASE, timeout=60)
 results = []
@@ -94,10 +95,11 @@ for email, pw in CREDS.items():
     check(s, f"Login {email}", ok, role if ok else f"HTTP {res.status_code}")
 res = auth_post("/api/auth/login", {"email": "EMP-001", "password": CREDS[SA]})
 check(s, "Login by employee ID", res.status_code == 200)
-res = auth_post("/api/auth/login", {"email": SA, "password": "admin123"})
+# The retired seed default must stay rejected; it is public knowledge, not a secret.
+res = auth_post("/api/auth/login", {"email": SA, "password": "admin123"})  # ggignore
 check(s, "Old default password rejected", res.status_code == 401)
 ghost = f"e2e-ghost-{secrets.token_hex(4)}@invalid.example"
-codes = [auth_post("/api/auth/login", {"email": ghost, "password": "wrong"}).status_code for _ in range(6)]
+codes = [auth_post("/api/auth/login", {"email": ghost, "password": WRONG_PASSWORD}).status_code for _ in range(6)]
 check(s, "Lockout after 5 failures (throwaway account)", codes[:5] == [401] * 5 and codes[5] == 429, str(codes))
 check(s, "Forged token rejected", client.get("/api/auth/me", headers=h("forged.token.value")).status_code == 401)
 
@@ -112,7 +114,7 @@ check(s, "Admin can see staff bank details", any("bankAccountNumber" in u for u 
 me_ex = client.get("/api/auth/me", headers=h(ex)).json()
 denied = {
     "Executive -> self-promote to Super Admin": client.put(f"/api/users/{me_ex['id']}", json={"role": "Super Admin"}, headers=h(ex)),
-    "Executive -> create user": client.post("/api/users", json={"name": "x", "mobile": "1", "password": "x" * 12, "email": "x@x.x"}, headers=h(ex)),
+    "Executive -> create user": client.post("/api/users", json={"name": "x", "mobile": "1", "password": WRONG_PASSWORD, "email": "x@x.x"}, headers=h(ex)),
     "Executive -> approve sale": client.post("/api/sales/none/approve", headers=h(ex)),
     "Manager -> change a password": client.put("/api/users/usr-1/password", json={"newPassword": "x" * 12}, headers=h(mg)),
     "Admin -> edit Super Admin": client.put("/api/users/usr-1", json={"mobile": "9000000000"}, headers=h(ad)),
@@ -120,7 +122,7 @@ denied = {
     "Admin -> Leegality wallet": client.get("/api/leegality/wallet", headers=h(ad)),
     "Executive -> read Super Admin's documents": client.get("/api/users/usr-1/documents", headers=h(ex)),
     "Executive -> read stored signatures": client.get("/api/signatures", headers=h(ex)),
-    "Admin -> overwrite signatures with a wrong password": client.put("/api/signatures", json={"signatures": {}, "password": "wrong-password"}, headers=h(ad)),
+    "Admin -> overwrite signatures with a wrong password": client.put("/api/signatures", json={"signatures": {}, "password": WRONG_PASSWORD}, headers=h(ad)),
 }
 for name, r in denied.items():
     check(s, f"Blocked: {name}", r.status_code in (401, 403, 404), f"HTTP {r.status_code}")
