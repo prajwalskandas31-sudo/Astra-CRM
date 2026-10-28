@@ -139,23 +139,50 @@ def health_check():
     return {"status": "online", "system": "Srinivas CRM FastAPI Backend"}
 
 # Authentication Routes
+def _digits(value: Optional[str]) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+def _normalize_identifier(identifier: str) -> str:
+    """Canonical login identifier: a phone-shaped input becomes its digits, anything else is lowercased."""
+    ident = (identifier or "").strip()
+    if ident and all(ch.isdigit() or ch in "+- ()" for ch in ident):
+        return _digits(ident)
+    return ident.lower()
+
 def _find_login_user(identifier: str):
-    ident = (identifier or "").strip().lower()
-    digits = "".join(ch for ch in ident if ch.isdigit())
+    ident = _normalize_identifier(identifier)
+    if not ident:
+        return None
+    matches = [
+        u for u in USERS_DB
+        if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())
+        or (len(ident) >= 10 and ident.isdigit() and ident == _digits(u.get("mobile")))
+    ]
+    # An identifier that matches more than one account is refused rather than guessed.
+    return matches[0] if len(matches) == 1 else None
+
+def _ensure_unique_identity(exclude: Optional[dict] = None, name=None, email=None, mobile=None, employee_id=None):
+    """Names (used for lead ownership), emails, mobiles and employee IDs (used to sign in) must be unique."""
     for u in USERS_DB:
-        if ident and ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower()):
-            return u
-        if len(digits) >= 10 and digits == "".join(ch for ch in (u.get("mobile") or "") if ch.isdigit()):
-            return u
-    return None
+        if u is exclude:
+            continue
+        if name is not None and (u.get("name") or "").strip().lower() == name.strip().lower():
+            raise HTTPException(status_code=400, detail="A user with this name already exists.")
+        if email is not None and (u.get("email") or "").lower() == email:
+            raise HTTPException(status_code=400, detail="A user with this email already exists.")
+        if mobile is not None and _digits(mobile) and _digits(u.get("mobile")) == _digits(mobile):
+            raise HTTPException(status_code=400, detail="A user with this mobile number already exists.")
+        if employee_id is not None and (u.get("employeeId") or "").lower() == employee_id.strip().lower():
+            raise HTTPException(status_code=400, detail="A user with this employee ID already exists.")
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest, request: Request):
     ip_key = f"ip:{request.headers.get('x-real-ip') or (request.client.host if request.client else 'unknown')}"
-    account_key = f"acct:{(req.email or '').strip().lower()}"
+    user = _find_login_user(req.email)
+    # Lock by account, not by spelling: every identifier for the same user shares one counter.
+    account_key = f"acct:{user['id']}" if user else f"acct:unknown:{_normalize_identifier(req.email)}"
     check_not_locked(ip_key, account_key)
 
-    user = _find_login_user(req.email)
     if not user or not verify_password(req.password, user.get("passwordHash")):
         record_failure(ip_key, account_key)
         raise HTTPException(status_code=401, detail="Invalid credentials. Check your email/employee ID and password.")
@@ -220,8 +247,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     email = (req.email or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required.")
-    if any((u.get("email") or "").lower() == email for u in USERS_DB):
-        raise HTTPException(status_code=400, detail="A user with this email already exists.")
+    _ensure_unique_identity(name=req.name, email=email, mobile=req.mobile, employee_id=req.employeeId)
 
     new_user = {
         "id": f"usr-{uuid.uuid4().hex[:12]}",
@@ -244,7 +270,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     USERS_DB.insert(0, new_user)
     return public_user(new_user)
 
-_SELF_EDITABLE_FIELDS = {"name", "mobile", "bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "referredBy"}
+# Name is excluded: lead ownership can fall back to name matching, so only admins may rename.
+_SELF_EDITABLE_FIELDS = {"mobile", "bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "referredBy"}
 
 @app.put("/api/users/{user_id}")
 def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_current_user)):
@@ -262,7 +289,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"reportingTo"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -270,10 +297,13 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     else:
         raise HTTPException(status_code=403, detail="Access Denied: You can only edit your own profile.")
     if req.email is not None:
-        email = req.email.strip().lower()
-        if any(u is not user and (u.get("email") or "").lower() == email for u in USERS_DB):
-            raise HTTPException(status_code=400, detail="A user with this email already exists.")
-        req.email = email
+        req.email = req.email.strip().lower()
+    _ensure_unique_identity(
+        exclude=user,
+        name=req.name if "name" in changed else None,
+        email=req.email if "email" in changed else None,
+        mobile=req.mobile if "mobile" in changed else None,
+    )
 
     if req.name is not None: user["name"] = req.name
     if req.mobile is not None: user["mobile"] = req.mobile
@@ -396,8 +426,11 @@ def delete_disposition(disp_id: str, current_user: dict = Depends(require_roles(
 def _lead_visible_to(lead: dict, user: dict) -> bool:
     if user["role"] == "Super Admin":
         return True
+    owner_ids = {lead.get("assignedToId"), lead.get("assigned_user_id")} - {None, "", "unassigned"}
+    # Name matching is only a fallback for legacy leads that carry no owner ID.
+    owned = user["id"] in owner_ids if owner_ids else (lead.get("assignedToName") or "").strip().lower() == user["name"].strip().lower()
     return (
-        (lead.get("assignedToId") == user["id"] or lead.get("assigned_user_id") == user["id"] or (lead.get("assignedToName") or "").strip().lower() == user["name"].strip().lower())
+        owned
         and not lead.get("isUnassigned") and lead.get("assignedToId") != "unassigned" and lead.get("assignedToName") != "Unassigned"
     )
 
