@@ -1,0 +1,121 @@
+name: CI/CD
+
+# Every PR and every push to main is tested. Pushes to main that pass all gates deploy to the server.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  backend-tests:
+    name: Backend tests (auth & RBAC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - run: python -m pytest backend/tests -q
+
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build (hosted configuration)
+        run: npm run build
+        env:
+          VITE_BASE: /
+          VITE_API_BASE_URL: /api
+          VITE_BACKEND_ENABLED: 'true'
+
+  docker-integration:
+    name: Docker integration & smoke test
+    needs: [backend-tests, frontend-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create throwaway secrets
+        run: |
+          python3 deploy/generate_credentials.py
+          printf 'CRM_PORT=8080\nJWT_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+      - name: Build and start the stack
+        run: docker compose up -d --build
+      - name: Smoke test (including a real sign-in)
+        run: |
+          PW=$(python3 -c "import json; print(next(c['password'] for c in json.load(open('secrets/credentials.json')) if c['email'] == 'superadmin@company.com'))")
+          echo "::add-mask::$PW"
+          bash deploy/smoke_test.sh http://localhost:8080 superadmin@company.com "$PW"
+      - name: Container logs
+        if: failure()
+        run: docker compose logs
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  security-audit:
+    name: Dependency audit (report only)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Python dependencies
+        run: pip install pip-audit && pip-audit -r backend/requirements.txt
+      - name: npm dependencies (production)
+        if: always()
+        run: npm audit --omit=dev --audit-level=high
+
+  deploy:
+    name: Deploy to server
+    needs: [backend-tests, frontend-build, docker-integration]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: http://${{ secrets.DEPLOY_HOST }}:8080
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_DIR: srinivas-crm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host deploy-target\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' "$DEPLOY_HOST" "$DEPLOY_USER" > ~/.ssh/config
+      - name: Sync code (server secrets and data are never touched)
+        run: rsync -az --delete --exclude-from=deploy/rsync-exclude.txt ./ "deploy-target:$DEPLOY_DIR/"
+      - name: Build, verify, roll back on failure
+        run: ssh deploy-target "bash $DEPLOY_DIR/deploy/remote_deploy.sh $GITHUB_SHA"
+      - name: Public smoke test
+        run: bash deploy/smoke_test.sh "http://$DEPLOY_HOST:8080"

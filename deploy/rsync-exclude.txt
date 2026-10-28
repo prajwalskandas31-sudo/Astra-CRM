@@ -1,0 +1,13 @@
+# Never sent to (or deleted from) the server by the deploy sync.
+.git/
+node_modules/
+dist/
+.env
+secrets/
+backend/data/
+.deployed-sha
+scratch/
+Block/
+*.docx
+CRM_ACCOUNT_CREDENTIALS.txt
+__pycache__/
