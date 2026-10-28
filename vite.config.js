@@ -10,7 +10,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  base: '/Astra-CRM/',
+  base: process.env.VITE_BASE || '/Astra-CRM/',
   server: {
     port: 3000,
     open: false

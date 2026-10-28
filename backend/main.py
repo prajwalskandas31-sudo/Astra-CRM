@@ -1,27 +1,34 @@
+import os
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, Request, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 
 try:
     from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
-    from backend.auth import create_access_token, get_current_user, require_roles
+    from backend.auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
+                              set_user_password, validate_password_strength, public_user, is_admin, role_rank,
+                              check_not_locked, record_failure, clear_failures)
     from backend.leegality import router as leegality_router
 except ImportError:
     from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
-    from auth import create_access_token, get_current_user, require_roles
+    from auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
+                      set_user_password, validate_password_strength, public_user, is_admin, role_rank,
+                      check_not_locked, record_failure, clear_failures)
     from leegality import router as leegality_router
 
 
-app = FastAPI(title="Srinivas CRM API", version="1.0.0")
+app = FastAPI(title="Srinivas CRM API", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
+
+load_credentials()
 
 # Enable CORS for Node.JS Vite Frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[o for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -36,7 +43,7 @@ class LoginRequest(BaseModel):
 class UserCreate(BaseModel):
     name: str
     mobile: str
-    password: Optional[str] = "password123"
+    password: str
     role: str = "Executive"
     email: Optional[str] = ""
     reportingTo: Optional[str] = "Sreenivasulu"
@@ -63,6 +70,10 @@ class UserUpdate(BaseModel):
 
 class PasswordChange(BaseModel):
     newPassword: str
+
+class PasswordVerify(BaseModel):
+    password: str
+    scope: str = "self"  # "self" (caller's own), "admin" (any active Admin/Super Admin), or "self_or_admin"
 
 class LeadReassignDelete(BaseModel):
     targetUserId: str
@@ -128,16 +139,32 @@ def health_check():
     return {"status": "online", "system": "Srinivas CRM FastAPI Backend"}
 
 # Authentication Routes
+def _find_login_user(identifier: str):
+    ident = (identifier or "").strip().lower()
+    digits = "".join(ch for ch in ident if ch.isdigit())
+    for u in USERS_DB:
+        if ident and ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower()):
+            return u
+        if len(digits) >= 10 and digits == "".join(ch for ch in (u.get("mobile") or "") if ch.isdigit()):
+            return u
+    return None
+
 @app.post("/api/auth/login")
-def login(req: LoginRequest):
-    user = next((u for u in USERS_DB if u["email"].lower() == req.email.lower()), None)
-    if not user or user["password"] != req.password:
-        raise HTTPException(status_code=401, detail="Invalid email address or password")
+def login(req: LoginRequest, request: Request):
+    ip_key = f"ip:{request.headers.get('x-real-ip') or (request.client.host if request.client else 'unknown')}"
+    account_key = f"acct:{(req.email or '').strip().lower()}"
+    check_not_locked(ip_key, account_key)
+
+    user = _find_login_user(req.email)
+    if not user or not verify_password(req.password, user.get("passwordHash")):
+        record_failure(ip_key, account_key)
+        raise HTTPException(status_code=401, detail="Invalid credentials. Check your email/employee ID and password.")
 
     if user["status"] != "Active":
         raise HTTPException(status_code=403, detail="Account is disabled/inactive. Contact Super Admin.")
 
-    token = create_access_token({"sub": user["id"], "role": user["role"]})
+    clear_failures(account_key)
+    token = create_access_token(user)
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -154,7 +181,25 @@ def login(req: LoginRequest):
 
 @app.get("/api/auth/me")
 def get_me(current_user: dict = Depends(get_current_user)):
-    return current_user
+    return public_user(current_user)
+
+@app.post("/api/auth/verify-password")
+def verify_password_endpoint(req: PasswordVerify, current_user: dict = Depends(get_current_user)):
+    """Re-authentication for sensitive in-app actions (signature vault, IP guard, admin overrides)."""
+    key = f"verify:{current_user['id']}"
+    check_not_locked(key)
+    admins = [u for u in USERS_DB if is_admin(u) and u.get("status") == "Active"]
+    if req.scope == "admin":
+        candidates = admins
+    elif req.scope == "self_or_admin":
+        candidates = [current_user] + admins
+    else:
+        candidates = [current_user]
+    if not any(verify_password(req.password, u.get("passwordHash")) for u in candidates):
+        record_failure(key)
+        raise HTTPException(status_code=401, detail="Incorrect password.")
+    clear_failures(key)
+    return {"verified": True}
 
 # Users Directory Routes
 @app.get("/api/users")
@@ -162,7 +207,7 @@ def get_users(status_filter: Optional[str] = None, current_user: dict = Depends(
     users = USERS_DB
     if status_filter and status_filter != "All":
         users = [u for u in users if u["status"] == status_filter]
-    return users
+    return [public_user(u, current_user) for u in users]
 
 @app.post("/api/users")
 def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
@@ -171,14 +216,19 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         raise HTTPException(status_code=400, detail="Executive Team Selection Rule: Reporting TL/Manager required.")
     if req.role in ["Team Leader", "Team Lead"] and not req.reportingTo:
         raise HTTPException(status_code=400, detail="Team Leader Selection Rule: Reporting Manager required.")
+    validate_password_strength(req.password)
+    email = (req.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required.")
+    if any((u.get("email") or "").lower() == email for u in USERS_DB):
+        raise HTTPException(status_code=400, detail="A user with this email already exists.")
 
     new_user = {
-        "id": f"usr-{int(datetime.utcnow().timestamp())}",
+        "id": f"usr-{uuid.uuid4().hex[:12]}",
         "name": req.name,
         "mobile": req.mobile,
-        "password": req.password,
         "role": req.role,
-        "email": req.email,
+        "email": email,
         "reportingTo": req.reportingTo or "Sreenivasulu",
         "employeeId": req.employeeId or f"EMP-{len(USERS_DB) + 100}",
         "status": "Active",
@@ -190,14 +240,40 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "referredBy": req.referredBy or "",
         "documents": req.documents or []
     }
+    set_user_password(new_user, req.password)
     USERS_DB.insert(0, new_user)
-    return new_user
+    return public_user(new_user)
+
+_SELF_EDITABLE_FIELDS = {"name", "mobile", "bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "referredBy"}
 
 @app.put("/api/users/{user_id}")
 def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_current_user)):
     user = next((u for u in USERS_DB if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Only fields whose value actually changes count (the edit form resends unchanged role/email).
+    changed = {k for k, v in req.model_dump().items() if v is not None and v != user.get(k)}
+    is_self = user["id"] == current_user["id"]
+    if current_user["role"] == "Super Admin":
+        if is_self and req.role is not None and req.role != "Super Admin":
+            raise HTTPException(status_code=400, detail="Super Admin cannot remove their own Super Admin role.")
+    elif current_user["role"] == "Admin" and not is_self:
+        # Admins manage lower-ranked staff, but cannot touch identity/role fields.
+        if role_rank(user["role"]) >= role_rank("Admin"):
+            raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
+        if changed - _SELF_EDITABLE_FIELDS - {"reportingTo"}:
+            raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
+    elif is_self:
+        if changed - _SELF_EDITABLE_FIELDS:
+            raise HTTPException(status_code=403, detail="Access Denied: You can only edit your own contact and bank details.")
+    else:
+        raise HTTPException(status_code=403, detail="Access Denied: You can only edit your own profile.")
+    if req.email is not None:
+        email = req.email.strip().lower()
+        if any(u is not user and (u.get("email") or "").lower() == email for u in USERS_DB):
+            raise HTTPException(status_code=400, detail="A user with this email already exists.")
+        req.email = email
 
     if req.name is not None: user["name"] = req.name
     if req.mobile is not None: user["mobile"] = req.mobile
@@ -211,16 +287,21 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.documents is not None: user["documents"] = req.documents
 
-    return user
+    return public_user(user)
 
 @app.put("/api/users/{user_id}/toggle-status")
 def toggle_user_status(user_id: str, current_user: dict = Depends(require_roles(["Super Admin", "Admin"]))):
     user = next((u for u in USERS_DB if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user["id"] == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own account status.")
+    if current_user["role"] != "Super Admin" and role_rank(user["role"]) >= role_rank("Admin"):
+        raise HTTPException(status_code=403, detail="Access Denied: Admins cannot change Admin or Super Admin accounts.")
 
     user["status"] = "Inactive" if user["status"] == "Active" else "Active"
-    return user
+    user["tokenVersion"] = user.get("tokenVersion", 0) + 1
+    return public_user(user)
 
 @app.put("/api/users/{user_id}/password")
 def change_user_password(user_id: str, req: PasswordChange, current_user: dict = Depends(require_roles(["Super Admin"]))):
@@ -228,7 +309,8 @@ def change_user_password(user_id: str, req: PasswordChange, current_user: dict =
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user["password"] = req.newPassword
+    validate_password_strength(req.newPassword)
+    set_user_password(user, req.newPassword)
     return {"message": f"Password updated for user {user['name']}"}
 
 @app.post("/api/users/{user_id}/reassign-and-delete")
@@ -237,8 +319,10 @@ def delete_user_with_reassignment(user_id: str, req: LeadReassignDelete, current
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if user["id"] == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
     target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
-    if not target_user:
+    if not target_user or target_user is user:
         raise HTTPException(status_code=400, detail="Target user for lead reassignment not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
@@ -259,9 +343,21 @@ def delete_user_with_reassignment(user_id: str, req: LeadReassignDelete, current
     USERS_DB.remove(user)
     return {"message": f"Reassigned {reassigned_count} leads to {target_user['name']} and deleted user {user['name']}."}
 
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user["id"] == current_user["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+    if any(l.get("assignedToId") == user_id for l in LEADS_DB):
+        raise HTTPException(status_code=400, detail="User still holds leads. Reassign them before deleting.")
+    USERS_DB.remove(user)
+    return {"message": f"Deleted user {user['name']}."}
+
 # Dispositions & Pipeline Routes (Block 2)
 @app.get("/api/dispositions")
-def get_dispositions():
+def get_dispositions(current_user: dict = Depends(get_current_user)):
     return DISPOSITIONS_DB
 
 @app.post("/api/dispositions")
@@ -297,21 +393,23 @@ def delete_disposition(disp_id: str, current_user: dict = Depends(require_roles(
     return {"message": "Disposition deleted successfully"}
 
 # Leads & Post-Call Workflow Routes
+def _lead_visible_to(lead: dict, user: dict) -> bool:
+    if user["role"] == "Super Admin":
+        return True
+    return (
+        (lead.get("assignedToId") == user["id"] or lead.get("assigned_user_id") == user["id"] or (lead.get("assignedToName") or "").strip().lower() == user["name"].strip().lower())
+        and not lead.get("isUnassigned") and lead.get("assignedToId") != "unassigned" and lead.get("assignedToName") != "Unassigned"
+    )
+
 @app.get("/api/leads")
 def get_leads(current_user: dict = Depends(get_current_user)):
     # Scoped lead visibility based on role
-    if current_user["role"] in ["Executive", "Team Leader", "Manager", "Admin"]:
-        return [
-            l for l in LEADS_DB 
-            if (l.get("assignedToId") == current_user["id"] or l.get("assigned_user_id") == current_user["id"] or (l.get("assignedToName") or "").strip().lower() == current_user["name"].strip().lower())
-            and not l.get("isUnassigned") and l.get("assignedToId") != "unassigned" and l.get("assignedToName") != "Unassigned"
-        ]
-    return LEADS_DB
+    return [l for l in LEADS_DB if _lead_visible_to(l, current_user)]
 
 @app.post("/api/leads/{lead_id}/disposition")
 def update_lead_disposition(lead_id: str, req: LeadDispositionUpdate, current_user: dict = Depends(get_current_user)):
     lead = next((l for l in LEADS_DB if l["id"] == lead_id), None)
-    if not lead:
+    if not lead or not _lead_visible_to(lead, current_user):
         raise HTTPException(status_code=404, detail="Lead not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
@@ -461,12 +559,14 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
 # Sale Approval Workflow Routes
 @app.get("/api/sales")
 def get_sales(current_user: dict = Depends(get_current_user)):
-    return SALES_DB
+    if is_admin(current_user):
+        return SALES_DB
+    return [s for s in SALES_DB if s.get("employeeId") == current_user["id"]]
 
 @app.post("/api/sales")
 def submit_sale(req: SaleRegister, current_user: dict = Depends(get_current_user)):
     new_sale = {
-        "id": f"sale-{int(datetime.utcnow().timestamp())}",
+        "id": f"sale-{uuid.uuid4().hex[:12]}",
         "leadId": "ld-custom",
         "clientName": req.clientName,
         "amount": req.amount,
@@ -501,7 +601,7 @@ def reject_sale(sale_id: str, current_user: dict = Depends(require_roles(["Super
 
 # Custom Roles Routes
 @app.get("/api/custom-roles")
-def get_custom_roles():
+def get_custom_roles(current_user: dict = Depends(get_current_user)):
     return CUSTOM_ROLES_DB
 
 @app.post("/api/custom-roles")
@@ -517,8 +617,7 @@ def create_custom_role(req: CustomRoleCreate, current_user: dict = Depends(requi
 
 @app.delete("/api/custom-roles/{role_id}")
 def delete_custom_role(role_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    global CUSTOM_ROLES_DB
-    CUSTOM_ROLES_DB = [r for r in CUSTOM_ROLES_DB if r.get("id") != role_id]
+    CUSTOM_ROLES_DB[:] = [r for r in CUSTOM_ROLES_DB if r.get("id") != role_id]
     return {"success": True, "message": "Role deleted"}
 
 # Block 4: Lead Summary & Super Admin Operations Schemas & Routes
@@ -544,7 +643,8 @@ class GranularLeadDeleteRequest(BaseModel):
 @app.get("/api/lead-requests")
 def get_lead_requests(current_user: dict = Depends(get_current_user)):
     # Auto-disappear rule: Return active pending requests
-    return [r for r in LEAD_REQUESTS_DB if r.get("status") == "Pending"]
+    return [r for r in LEAD_REQUESTS_DB if r.get("status") == "Pending"
+            and (is_admin(current_user) or r.get("requestedByUserId") == current_user["id"])]
 
 @app.post("/api/lead-requests")
 def create_lead_request(req: LeadRequestCreate, current_user: dict = Depends(get_current_user)):
@@ -714,7 +814,7 @@ def delete_document_type(doctype_id: str, current_user: dict = Depends(require_r
 @app.get("/api/users/{user_id}/documents")
 def get_user_documents(user_id: str, current_user: dict = Depends(get_current_user)):
     user = next((u for u in USERS_DB if u["id"] == user_id), None)
-    if not user:
+    if not user or (user["id"] != current_user["id"] and not is_admin(current_user)):
         raise HTTPException(status_code=404, detail="User not found")
     return user.get("documents", [])
 

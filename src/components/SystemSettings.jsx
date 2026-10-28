@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getLeegalityBackendStatus, getLeegalityWallet } from '../services/leegalityService';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
+import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 
 export const SystemSettings = () => {
   const { 
@@ -116,12 +117,13 @@ export const SystemSettings = () => {
     }
 
     setIsAuthenticatingIPGuard(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      const serverVerified = isBackendAuthoritative() && await verifyPasswordWithServer(inputPass, 'admin');
       const superAdminUsers = (users || []).filter(u => u.role === 'Super Admin' || u.role === 'Admin');
       const superAdminPasswords = superAdminUsers.map(u => u.password).filter(Boolean);
       const userPass = currentUser?.password;
       
-      const acceptedPasswords = [
+      const acceptedPasswords = isBackendAuthoritative() ? [] : [
         'admin123',
         'superadmin123',
         '123456',
@@ -129,7 +131,7 @@ export const SystemSettings = () => {
         ...superAdminPasswords
       ].filter(Boolean);
 
-      if (acceptedPasswords.includes(inputPass)) {
+      if (serverVerified || acceptedPasswords.includes(inputPass)) {
         setIsIPGuardUnlocked(true);
         try {
           sessionStorage.setItem('crm_ip_guard_unlocked', 'true');
@@ -796,7 +798,7 @@ export const SystemSettings = () => {
             </span>
           </div>
 
-          <div className="form-group" style={{ margin: 0 }}>
+          {!isBackendAuthoritative() && <div className="form-group" style={{ margin: 0 }}>
             <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Admin Override Password</label>
             <input
               type="text"
@@ -809,7 +811,7 @@ export const SystemSettings = () => {
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
               Used to authorize gross sale override directly in Client Info form
             </span>
-          </div>
+          </div>}
 
           {canManageSettings && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -1521,7 +1523,7 @@ export const SystemSettings = () => {
                     {isAuthenticatingIPGuard ? 'Verifying...' : 'Unlock IP Guard'}
                   </button>
 
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {!isBackendAuthoritative() && <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <span>Default Admin Key:</span>
                     <code
                       style={{
@@ -1555,7 +1557,7 @@ export const SystemSettings = () => {
                     >
                       {showDefaultKey ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
-                  </div>
+                  </div>}
                 </div>
               </form>
             </div>

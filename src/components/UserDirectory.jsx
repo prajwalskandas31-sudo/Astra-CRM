@@ -84,10 +84,15 @@ export const UserDirectory = () => {
     setIsReassignModalOpen(true);
   };
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     if (!newPasswordInput) return;
-    changeUserPassword(passwordResetUser.id, newPasswordInput);
+    try {
+      await changeUserPassword(passwordResetUser.id, newPasswordInput);
+    } catch (err) {
+      showToast(err.message || 'Failed to change password.', 'error');
+      return;
+    }
     showToast(`Password updated for '${passwordResetUser.name}'.`, 'success');
     setPasswordResetUser(null);
     setNewPasswordInput('');
@@ -421,7 +426,7 @@ export const UserDirectory = () => {
                               <button
                                 className="btn-secondary"
                                 style={{ border: 'none', justifyContent: 'flex-start', padding: '6px 10px', fontSize: '0.8rem' }}
-                                onClick={() => { toggleUserStatus(u.id); showToast(`User status toggled for '${u.name}'`, 'info'); setActiveDropdownId(null); }}
+                                onClick={() => { setActiveDropdownId(null); toggleUserStatus(u.id).then(() => showToast(`User status toggled for '${u.name}'`, 'info'), err => showToast(err.message || 'Failed to change user status.', 'error')); }}
                               >
                                 {u.status === 'Active' ? 'Set Inactive' : 'Set Active'}
                               </button>

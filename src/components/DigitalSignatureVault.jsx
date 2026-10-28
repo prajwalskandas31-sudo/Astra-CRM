@@ -8,6 +8,7 @@ import {
   saveDigitalSignature,
   resetToDefaultSignature,
   verifySignerPassword,
+  primeSignerPassword,
   isVaultUnlockedInSession,
   setVaultSessionUnlocked,
   processSignatureFile,
@@ -17,6 +18,7 @@ import {
   DEFAULT_OFFICER_SIGNATURE,
   SIGNATORY_PRESETS
 } from '../services/digitalSignatureService';
+import { isBackendAuthoritative } from '../services/backendConfig';
 import {
   Lock,
   Unlock,
@@ -219,7 +221,8 @@ export const DigitalSignatureVault = ({
     }
 
     setIsVerifying(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      await primeSignerPassword(trimmed);
       const isValid = verifySignerPassword(trimmed, currentUser, users);
       setIsVerifying(false);
 
@@ -264,7 +267,8 @@ export const DigitalSignatureVault = ({
     }
 
     setIsSavingProfile(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      await primeSignerPassword(trimmedPassword);
       try {
         const updated = saveDigitalSignature({
           key: selectedSignerKey,
@@ -508,7 +512,8 @@ export const DigitalSignatureVault = ({
     }
 
     setIsSavingInline(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      await primeSignerPassword(trimmedPassword);
       try {
         const updated = saveDigitalSignature({
           key: selectedSignerKey,
@@ -561,7 +566,8 @@ export const DigitalSignatureVault = ({
     }
 
     setIsSaving(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      await primeSignerPassword(trimmedPassword);
       try {
         const payload = {
           signerName: stagedDetails.signerName.trim(),
@@ -617,7 +623,8 @@ export const DigitalSignatureVault = ({
     }
 
     setIsResetting(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      await primeSignerPassword(trimmedPassword);
       try {
         const res = resetToDefaultSignature({
           key: selectedSignerKey,
@@ -896,7 +903,7 @@ export const DigitalSignatureVault = ({
               </button>
 
               {/* Demo Helper Pill for instant testing convenience */}
-              <button
+              {!isBackendAuthoritative() && <button
                 type="button"
                 onClick={() => {
                   const pass = currentUser?.password || 'superadmin123';
@@ -918,7 +925,7 @@ export const DigitalSignatureVault = ({
                 title="Click to automatically fill user password"
               >
                 <span>Demo Key: <code>{currentUser?.password || 'admin123'}</code></span>
-              </button>
+              </button>}
             </div>
           </form>
         </div>

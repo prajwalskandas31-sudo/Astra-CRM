@@ -7,8 +7,7 @@ import {
   isRealLeegalityDispatch
 } from '../services/leegalityService';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
 
 // ─── IP Detection & Restriction Utilities ───────────────────────────────────
 // Fetches the user's current public IP from a free, no-auth API.
@@ -604,6 +603,7 @@ export const CRMProvider = ({ children }) => {
     return currentUser?.role || 'Super Admin';
   });
   const [loginError, setLoginError] = useState('');
+  const [authUser, setAuthUser] = useState(null);
 
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('crm_users');
@@ -797,7 +797,10 @@ export const CRMProvider = ({ children }) => {
     return { enabled, total };
   };
 
+  const canSwitchProfiles = () => !isBackendAuthoritative() || authUser?.role === 'Super Admin';
+
   const setSimulatedRole = (newRole, targetUserId = null) => {
+    if (!canSwitchProfiles()) return;
     setSimulatedRoleState(newRole);
     localStorage.setItem('crm_simulated_role', newRole);
     let matchedUser = null;
@@ -828,6 +831,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const switchUser = (userId) => {
+    if (!canSwitchProfiles()) return;
     const targetUser = (users || []).find(u => u.id === userId) || DEFAULT_USERS.find(u => u.id === userId);
     if (targetUser) {
       setCurrentUser(targetUser);
@@ -1068,7 +1072,7 @@ export const CRMProvider = ({ children }) => {
 
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isLocalhost = isBackendEnabled();
     if (!authToken || !isLocalhost) return;
     try {
       const [uRes, lRes, sRes, dRes, rRes, dtRes] = await Promise.all([
@@ -1109,6 +1113,37 @@ export const CRMProvider = ({ children }) => {
       console.log('Operating in standalone interactive mode (FastAPI backend offline).');
     }
   };
+
+  useEffect(() => {
+    if (!authToken || !isBackendAuthoritative()) {
+      setAuthUser(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, { headers: authHeaders() });
+        if (cancelled) return;
+        if (!res.ok) {
+          handleLogout();
+          return;
+        }
+        const me = await res.json();
+        setAuthUser(me);
+        // Anything other than a Super Admin "view as" session is pinned to the server identity.
+        const stored = JSON.parse(localStorage.getItem('crm_user') || 'null');
+        if (me.role !== 'Super Admin' || !stored || stored.id === me.id) {
+          setCurrentUser(me);
+          setSimulatedRoleState(me.role);
+          localStorage.setItem('crm_user', JSON.stringify(me));
+          localStorage.setItem('crm_simulated_role', me.role);
+        }
+      } catch {
+        // Network hiccup: keep the session; API calls will still be rejected server-side if invalid.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authToken]);
 
   useEffect(() => {
     if (authToken) {
@@ -1169,7 +1204,7 @@ export const CRMProvider = ({ children }) => {
       setIPDetecting(false);
     }
 
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const isLocalhost = isBackendEnabled();
     if (isLocalhost) {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -1178,19 +1213,41 @@ export const CRMProvider = ({ children }) => {
           body: JSON.stringify({ email: identifier, password })
         });
 
+        if (!res.ok && isBackendAuthoritative()) {
+          setLoginError(await readErrorDetail(res, 'Invalid credentials. Please verify and try again.'));
+          return false;
+        }
         if (res.ok) {
           const data = await res.json();
+          setAuthUser(data.user);
           setAuthToken(data.access_token);
           setCurrentUser(data.user);
           setSimulatedRoleState(data.user?.role || 'Executive');
           localStorage.setItem('crm_token', data.access_token);
           localStorage.setItem('crm_user', JSON.stringify(data.user));
           localStorage.setItem('crm_simulated_role', data.user?.role || 'Executive');
+          if (isBackendAuthoritative()) {
+            // Cached CRM data in this browser belongs to whoever signed in last; drop it when the account changes.
+            const lastUserId = localStorage.getItem('crm_last_user_id');
+            localStorage.setItem('crm_last_user_id', data.user.id);
+            if (lastUserId && lastUserId !== data.user.id) {
+              const keep = new Set(['crm_token', 'crm_user', 'crm_simulated_role', 'crm_last_user_id']);
+              Object.keys(localStorage)
+                .filter(k => k.startsWith('crm_') && !keep.has(k))
+                .forEach(k => localStorage.removeItem(k));
+              window.location.reload();
+            }
+          }
           return true;
         }
       } catch (err) {
         // Backend not running on live link - fall back to interactive mock mode
       }
+    }
+
+    if (isBackendAuthoritative()) {
+      setLoginError('Unable to reach the CRM server. Please try again in a moment.');
+      return false;
     }
 
     // Helper to test if a candidate user matches identifier (by Email, Name, Mobile, or Employee ID)
@@ -1291,6 +1348,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const handleLogout = () => {
+    setAuthUser(null);
     setAuthToken('');
     setCurrentUser(null);
     setSimulatedRoleState('Executive');
@@ -1308,7 +1366,10 @@ export const CRMProvider = ({ children }) => {
         body: JSON.stringify(userData)
       });
       if (res.ok) { refreshData(); return; }
-    } catch (err) {}
+      if (isBackendAuthoritative()) throw new Error(await readErrorDetail(res, 'Failed to create user.'));
+    } catch (err) {
+      if (isBackendAuthoritative()) throw err;
+    }
 
     // Standalone fallback action - ensure unique ID and clean credentials
     const cleanName = (userData.name || 'User').trim();
@@ -1339,7 +1400,10 @@ export const CRMProvider = ({ children }) => {
         body: JSON.stringify(updatedFields)
       });
       if (res.ok) { refreshData(); return; }
-    } catch (err) {}
+      if (isBackendAuthoritative()) throw new Error(await readErrorDetail(res, 'Failed to update user.'));
+    } catch (err) {
+      if (isBackendAuthoritative()) throw err;
+    }
 
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updatedFields } : u));
   };
@@ -1351,7 +1415,10 @@ export const CRMProvider = ({ children }) => {
         headers: authHeaders()
       });
       if (res.ok) { refreshData(); return; }
-    } catch (err) {}
+      if (isBackendAuthoritative()) throw new Error(await readErrorDetail(res, 'Failed to change user status.'));
+    } catch (err) {
+      if (isBackendAuthoritative()) throw err;
+    }
 
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: u.status === 'Active' ? 'Inactive' : 'Active' } : u));
   };
@@ -1364,7 +1431,10 @@ export const CRMProvider = ({ children }) => {
         body: JSON.stringify({ newPassword })
       });
       if (res.ok) { refreshData(); return; }
-    } catch (err) {}
+      if (isBackendAuthoritative()) throw new Error(await readErrorDetail(res, 'Failed to change password.'));
+    } catch (err) {
+      if (isBackendAuthoritative()) throw err;
+    }
 
     setUsers(prev => (prev || []).map(u => u.id === userId ? { ...u, password: newPassword } : u));
     if (currentUser?.id === userId) {
@@ -1396,6 +1466,21 @@ export const CRMProvider = ({ children }) => {
       targetUser = (users || []).find(u => u.id === targetUserId) || DEFAULT_USERS.find(u => u.id === targetUserId);
       if (!targetUser) {
         return { success: false, error: 'Target user not found' };
+      }
+    }
+
+    if (isBackendAuthoritative()) {
+      try {
+        const res = targetUserId
+          ? await fetch(`${API_BASE_URL}/users/${userId}/reassign-and-delete`, {
+              method: 'POST',
+              headers: authHeaders(),
+              body: JSON.stringify({ targetUserId })
+            })
+          : await fetch(`${API_BASE_URL}/users/${userId}`, { method: 'DELETE', headers: authHeaders() });
+        if (!res.ok) return { success: false, error: await readErrorDetail(res, 'Failed to delete user.') };
+      } catch {
+        return { success: false, error: 'Unable to reach the CRM server.' };
       }
     }
 
@@ -1471,8 +1556,8 @@ export const CRMProvider = ({ children }) => {
       localStorage.setItem('crm_simulated_role', fallbackUser.role || 'Super Admin');
     }
 
-    // 5. Backend sync attempt if running
-    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    // 5. Backend sync attempt if running (already done up front when the backend is authoritative)
+    const isLocalhost = isBackendEnabled() && !isBackendAuthoritative();
     if (isLocalhost) {
       try {
         if (targetUserId) {
@@ -2831,6 +2916,8 @@ export const CRMProvider = ({ children }) => {
   return (
     <CRMContext.Provider value={{
       authToken,
+      authUser,
+      canSwitchProfiles,
       currentUser,
       simulatedRole,
       setSimulatedRole,

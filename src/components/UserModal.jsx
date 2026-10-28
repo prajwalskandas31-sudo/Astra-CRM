@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
+import { isBackendAuthoritative } from '../services/backendConfig';
 import { 
   X, 
   UserPlus, 
@@ -535,7 +536,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
     showToast('Sample user records loaded into CSV format.', 'info');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (mode === 'single') {
       if (!formData.name || !formData.mobile) {
@@ -554,27 +555,37 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
       }
 
       if (userToEdit) {
-        updateUser(userToEdit.id, {
-          ...formData,
-          documents: attachedDocs,
-          customFieldValues
-        });
+        try {
+          await updateUser(userToEdit.id, {
+            ...formData,
+            documents: attachedDocs,
+            customFieldValues
+          });
+        } catch (err) {
+          showToast(err.message || 'Failed to update user.', 'error');
+          return;
+        }
         showToast(`User '${formData.name}' details updated.`, 'success');
       } else {
         const cleanName = (formData.name || 'User').trim();
         const autoEmail = formData.email && formData.email.trim() 
           ? formData.email.trim() 
           : `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@company.com`;
-        const autoPass = formData.password || '123456';
+        const autoPass = formData.password || (isBackendAuthoritative() ? '' : '123456');
         
-        addUser({
-          ...formData,
-          name: cleanName,
-          email: autoEmail,
-          password: autoPass,
-          documents: attachedDocs,
-          customFieldValues
-        });
+        try {
+          await addUser({
+            ...formData,
+            name: cleanName,
+            email: autoEmail,
+            password: autoPass,
+            documents: attachedDocs,
+            customFieldValues
+          });
+        } catch (err) {
+          showToast(err.message || 'Failed to create user.', 'error');
+          return;
+        }
         showToast(`User '${cleanName}' created successfully. Login with Name (${cleanName}), Email (${autoEmail}), or Mobile!`, 'success');
       }
     } else {
@@ -583,11 +594,13 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         return;
       }
 
-      parsedRecords.forEach(userRecord => {
-        addUser(userRecord);
-      });
-
-      showToast(`Successfully imported ${parsedRecords.length} users.`, 'success');
+      const results = await Promise.allSettled(parsedRecords.map(userRecord => addUser(userRecord)));
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        showToast(`${failed.length} of ${parsedRecords.length} users were rejected: ${failed[0].reason?.message || 'server error'}`, 'error');
+      } else {
+        showToast(`Successfully imported ${parsedRecords.length} users.`, 'success');
+      }
       setBulkText('');
       setUploadedFileName('');
       setUploadedFileSize('');

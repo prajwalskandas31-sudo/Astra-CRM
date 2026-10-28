@@ -35,3 +35,8 @@ scratch/
 # Backend secrets & local Leegality records
 backend/.env
 backend/data/
+
+# Deployment secrets
+secrets/
+CRM_ACCOUNT_CREDENTIALS.txt
+.env
