@@ -1,0 +1,530 @@
+/*
+ * Astra "Orbit" theme: carries the login page's look (glass panels over ambient indigo/violet glows,
+ * the indigo→violet gradient button, mouse-follow spotlights, orbit rings and reveal motion) across the app.
+ * Dark theme only; the light theme keeps the base design in index.css.
+ * Pointer position for spotlights comes from src/lib/spotlight.js as --spot-x / --spot-y.
+ */
+
+[data-theme="dark"] {
+  --bg-surface: rgba(20, 20, 25, 0.62);
+  --bg-card: rgba(20, 20, 25, 0.62);
+  --bg-card-hover: rgba(30, 30, 38, 0.7);
+  /* Popovers reuse these two, so they stay nearly opaque for legibility. */
+  --bg-input: rgba(17, 17, 21, 0.94);
+  --bg-modal: rgba(15, 15, 20, 0.95);
+  --bg-sidebar: rgba(9, 10, 15, 0.72);
+  --bg-header: rgba(9, 10, 15, 0.55);
+  --bg-table-head: rgba(255, 255, 255, 0.025);
+  --bg-table-row-hover: rgba(110, 86, 207, 0.07);
+
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-color: rgba(255, 255, 255, 0.1);
+
+  --glass-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 140px);
+  --grad-brand: linear-gradient(90deg, #4f46e5 0%, #9333ea 55%, #4338ca 100%);
+  --grad-brand-hover: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+  --brand-glow: rgba(99, 102, 241, 0.35);
+  --spot-color: rgba(110, 86, 207, 0.14);
+  --spot-ring: #6e56cf;
+}
+
+/* Leegality integration panels use --lg-* with their light-portal colors as fallbacks (light theme unchanged). */
+[data-theme="dark"] {
+  --lg-panel: var(--bg-card);
+  --lg-surface: rgba(255, 255, 255, 0.02);
+  --lg-surface-2: rgba(255, 255, 255, 0.04);
+  --lg-border: rgba(255, 255, 255, 0.07);
+  --lg-border-strong: rgba(255, 255, 255, 0.14);
+  --lg-text-strong: #f4f4f5;
+  --lg-text: #d4d4d8;
+  --lg-text-muted: #a1a1aa;
+  --lg-violet-bg: rgba(139, 92, 246, 0.14);
+  --lg-violet-text: #c4b5fd;
+  --lg-violet-border: rgba(167, 139, 250, 0.3);
+  --lg-indigo-bg: rgba(99, 102, 241, 0.14);
+  --lg-indigo-text: #a5b4fc;
+  --lg-indigo-border: rgba(129, 140, 248, 0.3);
+  --lg-orange-bg: rgba(249, 115, 22, 0.1);
+  --lg-orange-text: #fdba74;
+  --lg-orange-border: rgba(251, 146, 60, 0.3);
+  --lg-red-bg: rgba(244, 63, 94, 0.1);
+  --lg-red-text: #fda4af;
+  --lg-red-border: rgba(251, 113, 133, 0.3);
+  --lg-green-bg: rgba(16, 185, 129, 0.1);
+  --lg-green-text: #6ee7b7;
+  --lg-green-border: rgba(52, 211, 153, 0.3);
+  --lg-sky-bg: rgba(14, 165, 233, 0.14);
+  --lg-sky-text: #7dd3fc;
+}
+
+/* Non-default accents (System & UI Settings) recolor the brand gradient and spotlights. */
+[data-theme="dark"][data-accent]:not([data-accent="purple"]) {
+  --grad-brand: linear-gradient(90deg, var(--accent-secondary) 0%, var(--accent) 55%, var(--accent-secondary) 100%);
+  --grad-brand-hover: linear-gradient(90deg, var(--accent) 0%, var(--accent-hover) 100%);
+  --brand-glow: var(--accent-border);
+  --spot-color: var(--accent-soft);
+  --spot-ring: var(--accent);
+}
+
+/* ============================================
+   AMBIENT BACKDROP: glows + ripple rings (login left panel)
+   ============================================ */
+[data-theme="dark"] .main-content {
+  background-color: transparent;
+  background-image: none;
+}
+
+[data-theme="dark"] .app-container::before,
+[data-theme="dark"] .app-container::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Two drifting glows, like the login page's indigo and purple orbs. */
+[data-theme="dark"] .app-container::before {
+  inset: -20vmax;
+  background:
+    radial-gradient(32vmax 32vmax at 30% 28%, rgba(79, 70, 229, 0.22), transparent 70%),
+    radial-gradient(30vmax 30vmax at 76% 78%, rgba(147, 51, 234, 0.18), transparent 70%),
+    radial-gradient(22vmax 22vmax at 88% 18%, rgba(56, 189, 248, 0.07), transparent 70%);
+  animation: astra-drift 28s ease-in-out infinite alternate;
+}
+
+/* Concentric rings fading out from the top-right corner, echoing the login ripple. */
+[data-theme="dark"] .app-container::after {
+  top: -38vmax;
+  right: -38vmax;
+  width: 76vmax;
+  height: 76vmax;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle at center,
+    transparent 0 58px,
+    rgba(255, 255, 255, 0.06) 59px,
+    transparent 60px 92px);
+  -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 68%);
+  mask-image: radial-gradient(circle at center, #000 0%, transparent 68%);
+  animation: astra-ripple 9s ease-in-out infinite;
+}
+
+@keyframes astra-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-3vmax, 2vmax, 0) scale(1.06); }
+}
+
+@keyframes astra-ripple {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(0.94); opacity: 0.6; }
+}
+
+/* ============================================
+   SHELL: sidebar, brand orbit, header
+   ============================================ */
+[data-theme="dark"] .sidebar {
+  background-color: var(--bg-sidebar);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-right: 1px solid var(--border-subtle);
+}
+
+[data-theme="dark"] .sidebar-header,
+[data-theme="dark"] .sidebar-footer {
+  border-color: var(--border-subtle);
+}
+
+/* Brand mark: gradient tile with an orbiting ring and satellite, like the login orbit display. */
+[data-theme="dark"] .brand-logo {
+  position: relative;
+  background: var(--grad-brand);
+  box-shadow: 0 0 18px var(--brand-glow);
+  border-radius: 9px;
+}
+
+[data-theme="dark"] .brand-logo::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px dashed rgba(165, 180, 252, 0.35);
+  animation: astra-spin 14s linear infinite;
+}
+
+[data-theme="dark"] .brand-logo::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: #a5b4fc;
+  box-shadow: 0 0 8px #818cf8;
+  animation: astra-orbit 6s linear infinite;
+}
+
+@keyframes astra-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes astra-orbit {
+  from { transform: rotate(0deg) translateX(22px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(22px) rotate(-360deg); }
+}
+
+[data-theme="dark"] .brand-info h1,
+[data-theme="dark"] .header-title-section h2 {
+  background: linear-gradient(180deg, #ffffff 0%, #e5e5e5 45%, #8f8f9a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme="dark"] .header-title-section h2 {
+  position: relative;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* Box-reveal over the page title on every tab change, like the login heading (title is keyed in Navbar). */
+[data-theme="dark"] .header-title-section h2::after {
+  content: '';
+  position: absolute;
+  inset: 2px -4px;
+  border-radius: 4px;
+  background: var(--spot-ring);
+  transform-origin: right;
+  animation: astra-box-reveal 0.5s cubic-bezier(0.65, 0, 0.35, 1) 0.05s both;
+  pointer-events: none;
+}
+
+@keyframes astra-box-reveal {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+[data-theme="dark"] .top-header {
+  background-color: var(--bg-header);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom-color: var(--border-subtle);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+}
+
+/* Nav items: soft glass hover, glowing active state with a gradient rail. */
+[data-theme="dark"] .nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .nav-item.active {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, rgba(147, 51, 234, 0.06) 70%, transparent 100%);
+  border: 1px solid rgba(129, 140, 248, 0.28);
+  box-shadow: inset 3px 0 0 #818cf8, 0 0 22px -4px rgba(99, 102, 241, 0.35);
+}
+
+[data-theme="dark"] .nav-item.active svg {
+  color: #a5b4fc;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.6));
+}
+
+[data-theme="dark"] .nav-badge {
+  background: var(--grad-brand);
+  box-shadow: 0 0 10px var(--brand-glow);
+}
+
+/* ============================================
+   GLASS SURFACES with mouse-follow spotlight
+   ============================================ */
+[data-theme="dark"] .directory-card,
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .eod-metric-box {
+  background-color: var(--bg-card);
+  background-image: var(--glass-sheen);
+  border-color: var(--border-default);
+  box-shadow: var(--glass-shadow);
+}
+
+[data-theme="dark"] .directory-card:hover,
+[data-theme="dark"] .metric-card:hover,
+[data-theme="dark"] .eod-metric-box:hover {
+  background-image:
+    radial-gradient(520px circle at var(--spot-x, -999px) var(--spot-y, -999px), var(--spot-color), transparent 42%),
+    var(--glass-sheen);
+}
+
+[data-theme="dark"] .metric-card:hover {
+  border-color: rgba(129, 140, 248, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 0 24px -6px var(--brand-glow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .metric-icon {
+  background: radial-gradient(circle at 30% 25%, rgba(129, 140, 248, 0.28), rgba(99, 102, 241, 0.08) 70%);
+  border-color: rgba(129, 140, 248, 0.3);
+  color: #a5b4fc;
+  box-shadow: 0 0 16px -2px rgba(99, 102, 241, 0.35);
+}
+
+[data-theme="dark"] .metric-info .value {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-shadow: 0 0 22px rgba(129, 140, 248, 0.25);
+}
+
+[data-theme="dark"] .eod-metric-box::before {
+  background: linear-gradient(180deg, #818cf8, #a855f7);
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.6);
+}
+
+[data-theme="dark"] .directory-toolbar {
+  border-bottom-color: var(--border-subtle);
+}
+
+/* ============================================
+   BUTTONS: login's gradient button with the cyan underline glow on hover
+   ============================================ */
+[data-theme="dark"] .btn-primary {
+  background: var(--grad-brand);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px var(--brand-glow), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(34, 211, 238, 0);
+  transition: background 0.25s ease, box-shadow 0.35s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+  background: var(--grad-brand-hover);
+  filter: none;
+  transform: translateY(-1px);
+  box-shadow: 0 0 28px var(--brand-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1.5px 0 rgba(34, 211, 238, 0.85);
+}
+
+[data-theme="dark"] .btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+[data-theme="dark"] .btn-primary:disabled,
+[data-theme="dark"] .btn-primary[disabled] {
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .btn-outline {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-default);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+[data-theme="dark"] .btn-secondary:hover,
+[data-theme="dark"] .btn-outline:hover {
+  background-color: rgba(99, 102, 241, 0.08);
+  border-color: rgba(129, 140, 248, 0.4);
+  box-shadow: 0 0 16px -4px var(--brand-glow);
+}
+
+[data-theme="dark"] .btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .btn-danger:hover {
+  box-shadow: 0 0 18px -4px rgba(244, 63, 94, 0.6);
+}
+
+[data-theme="dark"] .btn-success:hover {
+  box-shadow: 0 0 18px -4px rgba(16, 185, 129, 0.6);
+}
+
+/* ============================================
+   FORM FIELDS: login inputs (neutral glass, indigo focus ring, spotlight on hover).
+   Scoped to .app-container so the login page keeps its own field effects.
+   ============================================ */
+[data-theme="dark"] .app-container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+[data-theme="dark"] .app-container textarea {
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+[data-theme="dark"] .app-container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):hover,
+[data-theme="dark"] .app-container textarea:hover {
+  border-color: rgba(110, 86, 207, 0.55) !important;
+  background-image: radial-gradient(140px circle at var(--spot-x, -999px) var(--spot-y, -999px), rgba(110, 86, 207, 0.16), transparent 80%) !important;
+}
+
+[data-theme="dark"] .app-container select:hover {
+  border-color: rgba(110, 86, 207, 0.55) !important;
+}
+
+[data-theme="dark"] .app-container input:focus,
+[data-theme="dark"] .app-container select:focus,
+[data-theme="dark"] .app-container textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.45), 0 0 18px -4px rgba(99, 102, 241, 0.5) !important;
+}
+
+[data-theme="dark"] .app-container .form-group label {
+  color: #d4d4d8;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+[data-theme="dark"] .crm-table th {
+  background-color: var(--bg-table-head);
+  color: #a1a1aa;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .crm-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .crm-table tbody tr:hover {
+  background-color: var(--bg-table-row-hover);
+  box-shadow: inset 2px 0 0 rgba(129, 140, 248, 0.7);
+}
+
+/* ============================================
+   BADGES & ALERTS: the login's tinted-glass pills
+   ============================================ */
+[data-theme="dark"] .badge {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .badge-disposition {
+  background-color: rgba(110, 86, 207, 0.12);
+  border-color: rgba(129, 140, 248, 0.3);
+  color: #c4b5fd;
+}
+
+[data-theme="dark"] .alert-box {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .alert-info {
+  background-color: rgba(99, 102, 241, 0.08);
+  border-color: rgba(129, 140, 248, 0.25);
+  color: #c7d2fe;
+}
+
+/* ============================================
+   MODALS & TOASTS: the login card
+   ============================================ */
+[data-theme="dark"] .modal-overlay,
+[data-theme="dark"] .modal-backdrop {
+  background-color: rgba(5, 5, 9, 0.72);
+  background-image:
+    radial-gradient(40vmax 40vmax at 25% 20%, rgba(79, 70, 229, 0.12), transparent 70%),
+    radial-gradient(36vmax 36vmax at 80% 85%, rgba(147, 51, 234, 0.1), transparent 70%);
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: var(--bg-modal);
+  background-image: var(--glass-sheen);
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 30px 70px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(129, 140, 248, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: astra-rise 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  border-color: var(--border-subtle);
+}
+
+[data-theme="dark"] .modal-header h3 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+[data-theme="dark"] .toast-item {
+  background-color: rgba(18, 18, 23, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================
+   SMALL CONTROLS
+   ============================================ */
+[data-theme="dark"] .role-sim-btn.active,
+[data-theme="dark"] .eod-date-pill.active {
+  background: var(--grad-brand);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  box-shadow: 0 0 14px var(--brand-glow);
+}
+
+[data-theme="dark"] .avatar-circle {
+  background: radial-gradient(circle at 30% 25%, rgba(129, 140, 248, 0.35), rgba(99, 102, 241, 0.1) 70%);
+  border-color: rgba(129, 140, 248, 0.35);
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .status-dot.active {
+  box-shadow: 0 0 0 2px var(--status-success-bg), 0 0 8px var(--status-success);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(129, 140, 248, 0.22);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.5);
+}
+
+/* ============================================
+   PAGE ENTRANCE: staggered rise when a tab opens (the login's reveal motion)
+   Ends at transform: none so it never traps position: fixed modals inside a page.
+   ============================================ */
+[data-theme="dark"] .page-body > * > * {
+  animation: astra-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-theme="dark"] .page-body > * > *:nth-child(2) { animation-delay: 0.05s; }
+[data-theme="dark"] .page-body > * > *:nth-child(3) { animation-delay: 0.1s; }
+[data-theme="dark"] .page-body > * > *:nth-child(4) { animation-delay: 0.15s; }
+[data-theme="dark"] .page-body > * > *:nth-child(5) { animation-delay: 0.2s; }
+[data-theme="dark"] .page-body > * > *:nth-child(n+6) { animation-delay: 0.25s; }
+
+/* Modals rendered inside a page must not inherit the rise animation's transform. */
+[data-theme="dark"] .page-body > * > .modal-overlay,
+[data-theme="dark"] .page-body > * > .modal-backdrop {
+  animation: fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes astra-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="dark"] .app-container::before,
+  [data-theme="dark"] .app-container::after,
+  [data-theme="dark"] .brand-logo::before,
+  [data-theme="dark"] .brand-logo::after,
+  [data-theme="dark"] .header-title-section h2,
+  [data-theme="dark"] .header-title-section h2::after,
+  [data-theme="dark"] .modal-content,
+  [data-theme="dark"] .page-body > * > * {
+    animation: none !important;
+  }
+  [data-theme="dark"] .header-title-section h2::after {
+    display: none;
+  }
+}
+
+@media print {
+  .app-container::before,
+  .app-container::after {
+    display: none !important;
+  }
+}

@@ -628,8 +628,8 @@ export const ESignManagementBlock = () => {
                       <div style={{ fontWeight: 600 }}>{rec.serviceName}</div>
                       <span style={{
                         fontSize: '0.68rem',
-                        backgroundColor: '#e0f2fe',
-                        color: '#0369a1',
+                        backgroundColor: 'var(--lg-sky-bg, #e0f2fe)',
+                        color: 'var(--lg-sky-text, #0369a1)',
                         padding: '1px 6px',
                         borderRadius: '3px',
                         fontWeight: 700

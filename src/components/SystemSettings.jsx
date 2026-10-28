@@ -879,15 +879,15 @@ export const SystemSettings = () => {
       </div>
 
       {/* ── Leegality E-Sign Gateway & API Integration Dashboard (Exact Match to User Portal) ────── */}
-      <div className="directory-card" style={{ padding: 0, marginBottom: '24px', overflow: 'hidden', border: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#1e293b' }}>
+      <div className="directory-card" style={{ padding: 0, marginBottom: '24px', overflow: 'hidden', border: '1px solid var(--lg-border, #e2e8f0)', backgroundColor: 'var(--lg-panel, var(--lg-surface, #ffffff))', color: 'var(--lg-text-strong, #1e293b)' }}>
         {/* Leegality Portal Top Navigation Bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 24px',
-          borderBottom: '1px solid #f1f5f9',
-          backgroundColor: '#ffffff'
+          borderBottom: '1px solid var(--lg-border, #f1f5f9)',
+          backgroundColor: 'var(--lg-surface, #ffffff)'
         }}>
           {/* Brand & Left Links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
@@ -904,14 +904,14 @@ export const SystemSettings = () => {
                   </linearGradient>
                 </defs>
               </svg>
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', letterSpacing: '-0.5px', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--lg-text-strong, #1e293b)', letterSpacing: '-0.5px', fontFamily: "'Outfit', 'Inter', sans-serif" }}>
                 Leegality
               </span>
             </div>
 
             <nav style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '0.86rem', fontWeight: 500 }}>
-              <span style={{ color: '#475569', cursor: 'pointer', padding: '4px 0' }}>Dashboard</span>
-              <span style={{ color: '#475569', cursor: 'pointer', padding: '4px 0' }}>Documents</span>
+              <span style={{ color: 'var(--lg-text, #475569)', cursor: 'pointer', padding: '4px 0' }}>Dashboard</span>
+              <span style={{ color: 'var(--lg-text, #475569)', cursor: 'pointer', padding: '4px 0' }}>Documents</span>
             </nav>
           </div>
 
@@ -945,11 +945,11 @@ export const SystemSettings = () => {
               alignItems: 'center',
               gap: '6px',
               padding: '4px 10px',
-              backgroundColor: '#fff7ed',
-              border: '1px solid #fed7aa',
+              backgroundColor: 'var(--lg-orange-bg, #fff7ed)',
+              border: '1px solid var(--lg-orange-border, #fed7aa)',
               borderRadius: '20px',
               fontSize: '0.78rem',
-              color: '#c2410c',
+              color: 'var(--lg-orange-text, #c2410c)',
               fontWeight: 700
             }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -959,24 +959,24 @@ export const SystemSettings = () => {
             </div>
 
             {/* Sub-icons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--lg-text-muted, #64748b)' }}>
               <button
                 type="button"
-                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--lg-text-muted, #64748b)' }}
                 title="API Network Status"
               >
                 <Globe size={16} />
               </button>
               <button
                 type="button"
-                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: '#7c3aed' }}
+                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--lg-violet-text, #7c3aed)' }}
                 title="Account Settings"
               >
                 <SettingsIcon size={16} />
               </button>
               <button
                 type="button"
-                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: '#64748b' }}
+                style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--lg-text-muted, #64748b)' }}
                 title="Smart Automations"
               >
                 <Sparkles size={16} />
@@ -986,14 +986,14 @@ export const SystemSettings = () => {
                 width: '28px',
                 height: '28px',
                 borderRadius: '50%',
-                backgroundColor: '#f1f5f9',
-                border: '1px solid #cbd5e1',
+                backgroundColor: 'var(--lg-surface-2, #f1f5f9)',
+                border: '1px solid var(--lg-border-strong, #cbd5e1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '0.78rem',
                 fontWeight: 700,
-                color: '#475569',
+                color: 'var(--lg-text, #475569)',
                 cursor: 'pointer'
               }} title="InvestEQ Research Account">
                 I
@@ -1003,16 +1003,16 @@ export const SystemSettings = () => {
         </div>
 
         {/* Leegality Body: Left Sidebar + Right Content Area */}
-        <div style={{ display: 'flex', minHeight: '440px', backgroundColor: '#ffffff' }}>
+        <div style={{ display: 'flex', minHeight: '440px', backgroundColor: 'var(--lg-surface, #ffffff)' }}>
           {/* Left Sidebar */}
           <div style={{
             width: '200px',
-            borderRight: '1px solid #f1f5f9',
+            borderRight: '1px solid var(--lg-border, #f1f5f9)',
             padding: '16px 12px',
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--lg-surface, #ffffff)',
             flexShrink: 0
           }}>
             {/* Settings (Expanded) */}
@@ -1028,7 +1028,7 @@ export const SystemSettings = () => {
                   cursor: 'pointer',
                   fontWeight: 600,
                   fontSize: '0.84rem',
-                  color: '#1e293b'
+                  color: 'var(--lg-text-strong, #1e293b)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1047,8 +1047,8 @@ export const SystemSettings = () => {
                       borderRadius: '6px',
                       fontSize: '0.8rem',
                       cursor: 'pointer',
-                      color: leegalityActiveSubTab === 'Profile' ? '#7c3aed' : '#64748b',
-                      backgroundColor: leegalityActiveSubTab === 'Profile' ? '#f5f3ff' : 'transparent',
+                      color: leegalityActiveSubTab === 'Profile' ? 'var(--lg-violet-text, #7c3aed)' : 'var(--lg-text-muted, #64748b)',
+                      backgroundColor: leegalityActiveSubTab === 'Profile' ? 'var(--lg-violet-bg, #f5f3ff)' : 'transparent',
                       fontWeight: leegalityActiveSubTab === 'Profile' ? 600 : 400
                     }}
                   >
@@ -1061,8 +1061,8 @@ export const SystemSettings = () => {
                       borderRadius: '6px',
                       fontSize: '0.8rem',
                       cursor: 'pointer',
-                      color: leegalityActiveSubTab === 'API' ? '#7c3aed' : '#64748b',
-                      backgroundColor: leegalityActiveSubTab === 'API' ? '#f5f3ff' : 'transparent',
+                      color: leegalityActiveSubTab === 'API' ? 'var(--lg-violet-text, #7c3aed)' : 'var(--lg-text-muted, #64748b)',
+                      backgroundColor: leegalityActiveSubTab === 'API' ? 'var(--lg-violet-bg, #f5f3ff)' : 'transparent',
                       fontWeight: leegalityActiveSubTab === 'API' ? 600 : 400
                     }}
                   >
@@ -1075,8 +1075,8 @@ export const SystemSettings = () => {
                       borderRadius: '6px',
                       fontSize: '0.8rem',
                       cursor: 'pointer',
-                      color: leegalityActiveSubTab === 'eSignature' ? '#7c3aed' : '#64748b',
-                      backgroundColor: leegalityActiveSubTab === 'eSignature' ? '#f5f3ff' : 'transparent',
+                      color: leegalityActiveSubTab === 'eSignature' ? 'var(--lg-violet-text, #7c3aed)' : 'var(--lg-text-muted, #64748b)',
+                      backgroundColor: leegalityActiveSubTab === 'eSignature' ? 'var(--lg-violet-bg, #f5f3ff)' : 'transparent',
                       fontWeight: leegalityActiveSubTab === 'eSignature' ? 600 : 400
                     }}
                   >
@@ -1089,8 +1089,8 @@ export const SystemSettings = () => {
                       borderRadius: '6px',
                       fontSize: '0.8rem',
                       cursor: 'pointer',
-                      color: leegalityActiveSubTab === 'Documents' ? '#7c3aed' : '#64748b',
-                      backgroundColor: leegalityActiveSubTab === 'Documents' ? '#f5f3ff' : 'transparent',
+                      color: leegalityActiveSubTab === 'Documents' ? 'var(--lg-violet-text, #7c3aed)' : 'var(--lg-text-muted, #64748b)',
+                      backgroundColor: leegalityActiveSubTab === 'Documents' ? 'var(--lg-violet-bg, #f5f3ff)' : 'transparent',
                       fontWeight: leegalityActiveSubTab === 'Documents' ? 600 : 400
                     }}
                   >
@@ -1110,7 +1110,7 @@ export const SystemSettings = () => {
               cursor: 'pointer',
               fontWeight: 500,
               fontSize: '0.84rem',
-              color: '#475569'
+              color: 'var(--lg-text, #475569)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <CreditCard size={15} color="#64748b" />
@@ -1129,7 +1129,7 @@ export const SystemSettings = () => {
               cursor: 'pointer',
               fontWeight: 500,
               fontSize: '0.84rem',
-              color: '#475569'
+              color: 'var(--lg-text, #475569)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Building2 size={15} color="#64748b" />
@@ -1145,7 +1145,7 @@ export const SystemSettings = () => {
               <DigitalSignatureVault embedded={true} initialSignerKey="master_officer" />
             </div>
           ) : (
-            <div style={{ flex: 1, padding: '24px 32px', backgroundColor: '#ffffff' }}>
+            <div style={{ flex: 1, padding: '24px 32px', backgroundColor: 'var(--lg-surface, #ffffff)' }}>
               {/* Panel Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1155,7 +1155,7 @@ export const SystemSettings = () => {
                     background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    color: '#64748b',
+                    color: 'var(--lg-text-muted, #64748b)',
                     padding: '2px',
                     display: 'flex',
                     alignItems: 'center'
@@ -1164,7 +1164,7 @@ export const SystemSettings = () => {
                 >
                   <ArrowLeft size={18} />
                 </button>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0f172a' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--lg-text-strong, #0f172a)' }}>
                   API
                 </h3>
               </div>
@@ -1178,12 +1178,12 @@ export const SystemSettings = () => {
                     alignItems: 'center',
                     gap: '6px',
                     padding: '7px 14px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #cbd5e1',
+                    backgroundColor: 'var(--lg-surface, #ffffff)',
+                    border: '1px solid var(--lg-border-strong, #cbd5e1)',
                     borderRadius: '6px',
                     fontSize: '0.82rem',
                     fontWeight: 600,
-                    color: '#334155',
+                    color: 'var(--lg-text, #334155)',
                     cursor: 'pointer'
                   }}
                   onClick={() => {
@@ -1222,14 +1222,14 @@ export const SystemSettings = () => {
               {/* Credentials: held only by the CRM backend */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--lg-text-strong, #1e293b)', marginBottom: '2px' }}>
                     Auth Token & Private Salt
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--lg-text-muted, #64748b)', lineHeight: 1.4 }}>
                     From Leegality Dashboard &gt; API Settings.
                   </div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--lg-text, #334155)', lineHeight: 1.5 }}>
                   Stored in <code>backend/.env</code> on the CRM server (<code>LEEGALITY_AUTH_TOKEN</code>, <code>LEEGALITY_PRIVATE_SALT</code>).
                   They are never sent to the browser. Use the check below to confirm Leegality accepts them.
                 </div>
@@ -1238,25 +1238,25 @@ export const SystemSettings = () => {
               {/* Field: eSign Credits (live Leegality wallet) */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--lg-text-strong, #1e293b)', marginBottom: '2px' }}>
                     eSign Credits
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--lg-text-muted, #64748b)', lineHeight: 1.4 }}>
                     Live balance from Leegality's wallet API.
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.82rem', color: '#334155' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '0.82rem', color: 'var(--lg-text, #334155)' }}>
                   {leegalityWallet ? (
                     <>
-                      <span><strong style={{ color: '#0f172a', fontSize: '1rem' }}>{leegalityWallet.unused}</strong> unused</span>
+                      <span><strong style={{ color: 'var(--lg-text-strong, #0f172a)', fontSize: '1rem' }}>{leegalityWallet.unused}</strong> unused</span>
                       <span><strong>{leegalityWallet.reserved}</strong> reserved</span>
                       <span><strong>{leegalityWallet.consumed}</strong> consumed</span>
                       <span><strong>{leegalityWallet.expired}</strong> expired</span>
-                      <span style={{ color: '#64748b' }}>({leegalityWallet.total} total)</span>
+                      <span style={{ color: 'var(--lg-text-muted, #64748b)' }}>({leegalityWallet.total} total)</span>
                     </>
                   ) : (
-                    <span style={{ color: walletError ? '#b91c1c' : '#64748b' }}>{walletError || 'Loading balance…'}</span>
+                    <span style={{ color: walletError ? 'var(--lg-red-text, #b91c1c)' : 'var(--lg-text-muted, #64748b)' }}>{walletError || 'Loading balance…'}</span>
                   )}
                   <button type="button" className="btn-secondary" onClick={loadLeegalityWallet} disabled={isLoadingWallet} style={{ padding: '4px 10px', fontSize: '0.76rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                     <RefreshCw size={12} /> {isLoadingWallet ? 'Refreshing…' : 'Refresh'}
@@ -1267,14 +1267,14 @@ export const SystemSettings = () => {
               {/* Field: Whitelisted IPs (managed in Leegality) */}
               <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: '#1e293b', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', color: 'var(--lg-text-strong, #1e293b)', marginBottom: '2px' }}>
                     Whitelisted IPs
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--lg-text-muted, #64748b)', lineHeight: 1.4 }}>
                     Leegality only accepts API calls from these IPs.
                   </div>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--lg-text, #334155)', lineHeight: 1.5 }}>
                   Managed in Leegality Dashboard &gt; API Settings. The CRM backend's outbound IP is shown by the check below; it must be on that list.
                 </div>
               </div>
@@ -1284,8 +1284,8 @@ export const SystemSettings = () => {
                 marginTop: '12px',
                 padding: '16px 20px',
                 borderRadius: '8px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                backgroundColor: 'var(--lg-surface-2, #f8fafc)',
+                border: '1px solid var(--lg-border, #e2e8f0)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px'
@@ -1293,10 +1293,10 @@ export const SystemSettings = () => {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: leegalityConfig?.status === 'Disabled' ? '#ef4444' : '#10b981' }} />
-                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--lg-text-strong, #1e293b)' }}>
                       Leegality API Handshake & Reality Sync
                     </span>
-                    <span style={{ fontSize: '0.72rem', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.72rem', backgroundColor: 'var(--lg-indigo-bg, #e0e7ff)', color: 'var(--lg-indigo-text, #4338ca)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
                       Read-only check via CRM backend
                     </span>
                   </div>
@@ -1342,10 +1342,10 @@ export const SystemSettings = () => {
                   <div style={{
                     padding: '10px 14px',
                     borderRadius: '6px',
-                    backgroundColor: handshakeResult.tokenAccepted ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${handshakeResult.tokenAccepted ? '#bbf7d0' : '#fecaca'}`,
+                    backgroundColor: handshakeResult.tokenAccepted ? 'var(--lg-green-bg, #f0fdf4)' : 'var(--lg-red-bg, #fef2f2)',
+                    border: `1px solid ${handshakeResult.tokenAccepted ? 'var(--lg-green-border, #bbf7d0)' : 'var(--lg-red-border, #fecaca)'}`,
                     fontSize: '0.76rem',
-                    color: handshakeResult.tokenAccepted ? '#166534' : '#991b1b',
+                    color: handshakeResult.tokenAccepted ? 'var(--lg-green-text, #166534)' : 'var(--lg-red-text, #991b1b)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '4px'

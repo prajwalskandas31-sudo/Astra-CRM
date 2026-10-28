@@ -24,7 +24,8 @@ export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignM
   return (
     <header className="top-header" style={{ position: 'relative' }}>
       <div className="header-title-section">
-        <h2>{currentTabTitle}</h2>
+        {/* Keyed so the title's reveal animation replays on every tab change. */}
+        <h2 key={currentTabTitle}>{currentTabTitle}</h2>
       </div>
 
       <div className="header-controls">
