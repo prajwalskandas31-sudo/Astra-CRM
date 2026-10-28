@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
+import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { 
   X, 
   Lock, 
@@ -306,10 +307,13 @@ export const ClientInformationModal = ({
   };
 
   // Password Override for Gross Sales Max Limit
-  const handleVerifyOverridePassword = (e) => {
+  const handleVerifyOverridePassword = async (e) => {
     e.preventDefault();
     const correctPassword = financialSettings?.adminOverridePassword || 'admin123';
-    if (overridePasswordInput.trim() === correctPassword) {
+    const authorized = isBackendAuthoritative()
+      ? await verifyPasswordWithServer(overridePasswordInput.trim(), 'admin')
+      : overridePasswordInput.trim() === correctPassword;
+    if (authorized) {
       setIsLimitOverridden(true);
       setShowOverrideModal(false);
       setOverridePasswordInput('');
@@ -1306,7 +1310,7 @@ export const ClientInformationModal = ({
                       setOverridePasswordInput(e.target.value);
                       setOverridePasswordError('');
                     }}
-                    placeholder="Enter Admin Password (e.g. admin123)"
+                    placeholder={isBackendAuthoritative() ? 'Enter an Admin or Super Admin account password' : 'Enter Admin Password (e.g. admin123)'}
                     autoFocus
                     style={{
                       width: '100%',

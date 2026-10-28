@@ -6,6 +6,8 @@
  * and transparent background processing for digital signatures across the CRM.
  */
 
+import { isBackendAuthoritative, verifyPasswordWithServer } from './backendConfig';
+
 const STORAGE_KEY = 'astra_crm_digital_signatures';
 const VAULT_SESSION_KEY = 'astra_crm_sig_vault_unlocked';
 
@@ -174,10 +176,24 @@ export const getMyUserSignature = (currentUser = null) => {
 /**
  * Verify if password matches the current user or standard administrator override passwords
  */
+// Passwords confirmed by the backend during this page session (hosted builds only).
+const serverVerifiedPasswords = new Set();
+
+/**
+ * Confirm a password with the backend so the synchronous checks below accept it.
+ * No-op outside hosted builds, where the local demo checks apply.
+ */
+export const primeSignerPassword = async (inputPassword) => {
+  const trimmed = (inputPassword || '').trim();
+  if (!isBackendAuthoritative() || !trimmed || serverVerifiedPasswords.has(trimmed)) return;
+  if (await verifyPasswordWithServer(trimmed, 'self_or_admin')) serverVerifiedPasswords.add(trimmed);
+};
+
 export const verifySignerPassword = (inputPassword, currentUser, allUsers = []) => {
   if (!inputPassword || typeof inputPassword !== 'string') return false;
   const trimmed = inputPassword.trim();
   if (!trimmed) return false;
+  if (isBackendAuthoritative()) return serverVerifiedPasswords.has(trimmed);
 
   const validPasswords = new Set([
     'admin123',

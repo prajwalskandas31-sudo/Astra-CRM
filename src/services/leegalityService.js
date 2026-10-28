@@ -8,9 +8,9 @@
  */
 
 import { getPrimarySignatory } from './digitalSignatureService';
+import { API_BASE_URL } from './backendConfig';
 
 const STORAGE_KEY = 'astra_leegality_api_config';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 // UI-only preferences. Credentials live in backend/.env, never here.
 export const DEFAULT_LEEGALITY_CONFIG = {
