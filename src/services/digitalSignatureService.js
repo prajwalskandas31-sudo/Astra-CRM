@@ -6,10 +6,71 @@
  * and transparent background processing for digital signatures across the CRM.
  */
 
-import { isBackendAuthoritative, verifyPasswordWithServer } from './backendConfig';
+import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail, verifyPasswordWithServer } from './backendConfig';
 
 const STORAGE_KEY = 'astra_crm_digital_signatures';
 const VAULT_SESSION_KEY = 'astra_crm_sig_vault_unlocked';
+
+// ─── Server copy (backend/signatures.py) ──────────────────────────────────────
+// The server holds the shared signatures; localStorage is only this browser's cache of them.
+const signatureApiHeaders = () => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${localStorage.getItem('crm_token') || ''}`
+});
+
+const writeSignatureCache = (map) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  window.dispatchEvent(new CustomEvent('astra:digital_signature_updated', {
+    detail: { key: 'master_officer', signature: map.master_officer || null }
+  }));
+};
+
+/** Refresh this browser's cache from the server. Returns the server map, or null if unavailable. */
+export const pullSignaturesFromServer = async () => {
+  if (!isBackendEnabled()) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/signatures`, { headers: signatureApiHeaders() });
+    if (!res.ok) return null;
+    const map = await res.json();
+    if (map && Object.keys(map).length) writeSignatureCache(map);
+    return map;
+  } catch {
+    return null;
+  }
+};
+
+/** Save this browser's signatures to the server. The password is re-checked by the server. */
+export const pushSignaturesToServer = async (password) => {
+  if (!isBackendEnabled()) return;
+  let res;
+  try {
+    res = await fetch(`${API_BASE_URL}/signatures`, {
+      method: 'PUT',
+      headers: signatureApiHeaders(),
+      body: JSON.stringify({ signatures: getAllSignatures(), password })
+    });
+  } catch {
+    throw new Error('Could not reach the CRM server to store the signature.');
+  }
+  if (!res.ok) throw new Error(await readErrorDetail(res, 'The server did not accept the signature.'));
+};
+
+/**
+ * After the vault is unlocked: the server copy wins; a signature that so far exists only in
+ * this browser is uploaded so every admin browser (and Leegality dispatch) uses it.
+ * Returns 'pulled', 'uploaded' or 'none'.
+ */
+export const syncSignaturesOnUnlock = async (password) => {
+  const server = await pullSignaturesFromServer();
+  if (server && Object.keys(server).length) return 'pulled';
+  if (server === null) return 'none';
+  const local = getAllSignatures();
+  if (Object.values(local).some(sig => sig?.isCustomUploaded && sig?.signatureDataUrl)) {
+    await pushSignaturesToServer(password);
+    return 'uploaded';
+  }
+  return 'none';
+};
 
 export const SIGNATORY_PRESETS = [
   {
@@ -498,160 +559,155 @@ export const generateSampleStampPNG = (name = 'Srinivas R', designation = 'Manag
 };
 
 /**
- * Advanced Computer Vision Preprocessor for Signatures & Stamps
- * Implements Otsu's optimal global binarization, auto-cropping of ink bounding box,
- * and 2x super-sampling resolution upscale for maximum Tesseract OCR precision.
+ * OCR preprocessing for signatures & stamps (runs entirely in the browser).
+ * Flattens transparency onto white paper, binarizes with Otsu's threshold, crops to the ink,
+ * and rescales so printed text lands in Tesseract's preferred size range.
  */
-export const preprocessImageForOCR = (dataUrl, { sensitivity = 0, upscale = true, autoCrop = true } = {}) => {
+const OCR_MAX_SIDE = 2400; // larger photos are scaled down: faster, and no accuracy gain for stamp text
+
+export const preprocessImageForOCR = (dataUrl, { sensitivity = 0, upscale = true, autoCrop = true, despeckle = false } = {}) => {
   return new Promise((resolve) => {
+    const fallback = { ocrDataUrl: dataUrl, threshold: null, otsuThreshold: null, upscaleFactor: 1 };
     if (!dataUrl) {
-      resolve({ ocrDataUrl: dataUrl, threshold: 128, otsuThreshold: 128, upscaleFactor: 1 });
+      resolve(fallback);
       return;
     }
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onerror = () => resolve({ ocrDataUrl: dataUrl, threshold: 128, otsuThreshold: 128, upscaleFactor: 1 });
+    img.onerror = () => resolve(fallback);
     img.onload = () => {
       try {
         const origWidth = img.naturalWidth || img.width || 400;
         const origHeight = img.naturalHeight || img.height || 200;
+        const downscale = Math.min(1, OCR_MAX_SIDE / Math.max(origWidth, origHeight));
+        const width = Math.max(1, Math.round(origWidth * downscale));
+        const height = Math.max(1, Math.round(origHeight * downscale));
 
-        // Step 1: Render onto temporary canvas to inspect pixel luminance
+        // Step 1: flatten onto white so transparent backgrounds count as paper, not as missing pixels
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = origWidth;
-        tempCanvas.height = origHeight;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(img, 0, 0);
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        tempCtx.fillStyle = '#ffffff';
+        tempCtx.fillRect(0, 0, width, height);
+        tempCtx.drawImage(img, 0, 0, width, height);
 
-        const imgData = tempCtx.getImageData(0, 0, origWidth, origHeight);
+        const imgData = tempCtx.getImageData(0, 0, width, height);
         const data = imgData.data;
-        const totalPixels = origWidth * origHeight;
-
-        // Calculate luminance array and histogram for Otsu thresholding
-        const luminance = new Uint8Array(totalPixels);
+        const luminance = new Uint8Array(width * height);
         const histogram = new Uint32Array(256);
 
-        let minX = origWidth, minY = origHeight, maxX = 0, maxY = 0;
-
         for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const a = data[i + 3];
-
-          // Standard ITU-R BT.601 perceptual luminance
-          const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+          // ITU-R BT.601 perceptual luminance
+          const lum = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
           luminance[p] = lum;
-          if (a > 30) {
-            histogram[lum]++;
-          }
+          histogram[lum]++;
         }
 
-        // Otsu's Threshold Calculation
+        // Step 2: Otsu's optimal global threshold over the whole page (ink + paper)
+        const total = width * height;
         let sum = 0;
-        let validPixels = 0;
-        for (let t = 0; t < 256; t++) {
-          sum += t * histogram[t];
-          validPixels += histogram[t];
-        }
-
+        for (let t = 0; t < 256; t++) sum += t * histogram[t];
         let sumB = 0;
         let wB = 0;
         let varMax = 0;
         let otsuThreshold = 140;
-
-        if (validPixels > 0) {
-          for (let t = 0; t < 256; t++) {
-            wB += histogram[t];
-            if (wB === 0) continue;
-            const wF = validPixels - wB;
-            if (wF === 0) break;
-
-            sumB += t * histogram[t];
-            const mB = sumB / wB;
-            const mF = (sum - sumB) / wF;
-
-            const varBetween = wB * wF * (mB - mF) * (mB - mF);
-            if (varBetween > varMax) {
-              varMax = varBetween;
-              otsuThreshold = t;
-            }
+        for (let t = 0; t < 256; t++) {
+          wB += histogram[t];
+          if (wB === 0) continue;
+          const wF = total - wB;
+          if (wF === 0) break;
+          sumB += t * histogram[t];
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+          const varBetween = wB * wF * (mB - mF) * (mB - mF);
+          if (varBetween > varMax) {
+            varMax = varBetween;
+            otsuThreshold = t;
           }
         }
 
-        // Apply sensitivity offset (-40 to +40)
+        // Sensitivity slider (-40..+40) nudges the threshold for faint or heavy ink
         const finalThreshold = Math.max(40, Math.min(235, otsuThreshold + sensitivity));
 
-        // Step 2: Binarize pixels & compute ink bounding box
-        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-          const lum = luminance[p];
-          const a = data[i + 3];
+        // Step 3: binarize and find the ink bounding box.
+        // Light text on a dark stamp would make the background look like ink, so invert when most pixels are dark.
+        let darkPixels = 0;
+        for (let p = 0; p < luminance.length; p++) if (luminance[p] <= finalThreshold) darkPixels++;
+        const inverted = darkPixels > luminance.length * 0.5;
+        const inkMask = new Uint8Array(luminance.length);
+        for (let p = 0; p < luminance.length; p++) {
+          inkMask[p] = (inverted ? luminance[p] > finalThreshold : luminance[p] <= finalThreshold) ? 1 : 0;
+        }
 
-          // Dark ink pixel
-          if (a > 30 && lum <= finalThreshold) {
-            data[i] = 0;     // R
-            data[i + 1] = 0; // G
-            data[i + 2] = 0; // B
-            data[i + 3] = 255;
+        // Optional speckle removal for noisy photos: drop ink pixels with fewer than 4 inked neighbours
+        if (despeckle) {
+          const cleaned = inkMask.slice();
+          for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+              const p = y * width + x;
+              if (!inkMask[p]) continue;
+              const neighbours = inkMask[p - width - 1] + inkMask[p - width] + inkMask[p - width + 1]
+                + inkMask[p - 1] + inkMask[p + 1]
+                + inkMask[p + width - 1] + inkMask[p + width] + inkMask[p + width + 1];
+              if (neighbours < 4) cleaned[p] = 0;
+            }
+          }
+          inkMask.set(cleaned);
+        }
 
-            const x = p % origWidth;
-            const y = Math.floor(p / origWidth);
+        let minX = width, minY = height, maxX = 0, maxY = 0;
+        for (let p = 0, i = 0; p < luminance.length; p++, i += 4) {
+          const ink = inkMask[p] === 1;
+          const v = ink ? 0 : 255;
+          data[i] = v;
+          data[i + 1] = v;
+          data[i + 2] = v;
+          data[i + 3] = 255;
+          if (ink) {
+            const x = p % width;
+            const y = (p / width) | 0;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
-          } else {
-            // Background paper (pure white)
-            data[i] = 255;   // R
-            data[i + 1] = 255; // G
-            data[i + 2] = 255; // B
-            data[i + 3] = 255;
           }
         }
-
         tempCtx.putImageData(imgData, 0, 0);
 
-        // Step 3: Auto-Crop bounding box with clean white margin
+        // Step 4: crop to the ink with a white margin (Tesseract needs some border)
         const hasContent = maxX > minX && maxY > minY;
-        const padding = 35;
+        const padding = 30;
         const cropX = hasContent && autoCrop ? Math.max(0, minX - padding) : 0;
         const cropY = hasContent && autoCrop ? Math.max(0, minY - padding) : 0;
-        const cropW = hasContent && autoCrop ? Math.min(origWidth - cropX, (maxX - minX) + padding * 2) : origWidth;
-        const cropH = hasContent && autoCrop ? Math.min(origHeight - cropY, (maxY - minY) + padding * 2) : origHeight;
+        const cropW = hasContent && autoCrop ? Math.min(width - cropX, (maxX - minX) + padding * 2) : width;
+        const cropH = hasContent && autoCrop ? Math.min(height - cropY, (maxY - minY) + padding * 2) : height;
 
-        // Step 4: Resolution Upscale (Tesseract performs best with text height > 35px)
-        const scaleFactor = upscale && cropW < 1400 ? (cropW < 600 ? 2.5 : 1.8) : 1;
+        // Step 5: upscale small crops (Tesseract reads best with ~30px+ letter height)
+        const scaleFactor = upscale ? (cropW < 600 ? 2.5 : cropW < 1200 ? 1.6 : 1) : 1;
         const finalCanvas = document.createElement('canvas');
         finalCanvas.width = Math.round(cropW * scaleFactor);
         finalCanvas.height = Math.round(cropH * scaleFactor);
         const finalCtx = finalCanvas.getContext('2d');
-
-        // Fill background with clean white
         finalCtx.fillStyle = '#ffffff';
         finalCtx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-
-        // Image smoothing for upscale
         finalCtx.imageSmoothingEnabled = true;
         finalCtx.imageSmoothingQuality = 'high';
+        finalCtx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, 0, 0, finalCanvas.width, finalCanvas.height);
 
-        finalCtx.drawImage(
-          tempCanvas,
-          cropX, cropY, cropW, cropH,
-          0, 0, finalCanvas.width, finalCanvas.height
-        );
-
-        const ocrOptimizedDataUrl = finalCanvas.toDataURL('image/png');
         resolve({
-          ocrDataUrl: ocrOptimizedDataUrl,
+          ocrDataUrl: finalCanvas.toDataURL('image/png'),
           threshold: finalThreshold,
           otsuThreshold,
           cropBox: { x: cropX, y: cropY, width: cropW, height: cropH },
-          upscaleFactor: scaleFactor
+          upscaleFactor: scaleFactor,
+          hasInk: hasContent,
+          inverted
         });
       } catch (err) {
-        console.warn('Preprocessing error, fallback to original:', err);
-        resolve({ ocrDataUrl: dataUrl, threshold: 128, otsuThreshold: 128, upscaleFactor: 1 });
+        console.warn('OCR preprocessing failed, using the original image:', err);
+        resolve(fallback);
       }
     };
     img.src = dataUrl;
@@ -659,307 +715,387 @@ export const preprocessImageForOCR = (dataUrl, { sensitivity = 0, upscale = true
 };
 
 /**
- * Intelligent OCR Token Cleaner & Fuzzy Matcher
- * Normalizes common OCR misreadings (e.g. 1/I, 0/O, typographical noise)
- * and fuzzy-matches against standard Indian designations and profile keywords.
+ * Conservative OCR clean-up: fixes only well-known confusions inside ID patterns
+ * (O/0, I/1, stray spaces) and leaves ordinary words untouched.
  */
 export const cleanAndFuzzyCorrectText = (rawText) => {
   if (!rawText) return { cleanedText: '', corrections: [] };
-
   const corrections = [];
-  let text = rawText;
 
-  // 1. Regulatory IDs & Code normalization (e.g. INH000..., EMP-001)
-  text = text.replace(/([1iI]NH\s*[\w\d]{6,12})/gi, (match) => {
-    const fixed = match.toUpperCase().replace(/\s+/g, '').replace(/^1/, 'I').replace(/O/g, '0');
-    corrections.push(`Cleaned ID: ${fixed}`);
+  const lines = rawText
+    .replace(/\r/g, '')
+    .split('\n')
+    .map(l => l.replace(/[|_~`^]+/g, ' ').replace(/\s{2,}/g, ' ').trim())
+    // Drop OCR noise lines (stray marks from signature strokes)
+    .filter(l => (l.match(/[A-Za-z0-9]/g) || []).length >= 2);
+
+  let text = lines.join('\n');
+
+  // SEBI Research Analyst / Investment Adviser numbers: INH/INA + 9 digits
+  text = text.replace(/\b([I1l][Nn][HhAa])\s*[-:]?\s*([0-9OoQDIl]{9,10})\b/g, (match, prefix, rawDigits) => {
+    // Valid numbers have exactly 9 digits; a single letter O making a 10th character is an OCR artifact
+    const letterOs = (rawDigits.match(/[Oo]/g) || []).length;
+    const digits = rawDigits.length === 10 && letterOs === 1 ? rawDigits.replace(/[Oo]/, '') : rawDigits;
+    if (digits.length !== 9) return match;
+    const fixed = `IN${prefix[2].toUpperCase()}${digits.replace(/[OoQD]/g, '0').replace(/[Il]/g, '1')}`;
+    if (fixed !== match) corrections.push(`Normalized ID ${fixed}`);
     return fixed;
   });
 
-  text = text.replace(/(EMP\s*[-—_.]?\s*[\w\d]{3,6})/gi, (match) => {
-    const fixed = match.toUpperCase().replace(/[\s—_.]/g, '-').replace(/O/g, '0');
-    corrections.push(`Cleaned Emp Code: ${fixed}`);
-    return fixed;
+  // "Pvt Ltd" is often read as "Put Ltd" / "Pvt Lid"
+  text = text.replace(/\bP[uvy]t\.?\s*L[t1il]d\b\.?/gi, (match) => {
+    if (match !== 'Pvt Ltd') corrections.push('Normalized Pvt Ltd');
+    return 'Pvt Ltd';
   });
 
-  // 2. Common Designation Corrections
-  const designationPatterns = [
-    { regex: /\b(manag[1i]ng\s+d[1il]rect[o0]r|m\.?d\.?|mg\s+dir)\b/gi, label: 'Managing Director', replacement: 'Managing Director & Authorized Signatory' },
-    { regex: /\b(pr[1i]nc[1i]pal\s+[o0]ff[1i]cer|p\.?o\.?|prin\s+officer)\b/gi, label: 'Principal Officer', replacement: 'Principal Officer' },
-    { regex: /\b(rese?a?rch\s+anal[yv]st|r\.?a\.?|res\s+analyst)\b/gi, label: 'Research Analyst', replacement: 'Research Analyst' },
-    { regex: /\b(execut[1i]ve\s+d[1il]rect[o0]r)\b/gi, label: 'Executive Director', replacement: 'Executive Director (Admin)' },
-    { regex: /\b(auth[o0]r[1i]z?ed?\s+s[1il]gnat[o0]ry|auth\s+sig)\b/gi, label: 'Authorized Signatory', replacement: 'Authorized Signatory' },
-    { regex: /\b(partne?r|proprie?t[o0]r)\b/gi, label: 'Partner / Proprietor', replacement: 'Proprietor / Partner' }
-  ];
-
-  for (const { regex, label, replacement } of designationPatterns) {
-    if (regex.test(text)) {
-      corrections.push(`Standardized: ${label}`);
-      text = text.replace(regex, replacement);
-    }
-  }
-
-  // 3. Common Entity Corrections
-  if (/\b(astra\s*crm|astra\s*enterpr[1i]se)\b/gi.test(text)) {
-    corrections.push('Identified Entity: Astra CRM Enterprise');
-    text = text.replace(/\b(astra\s*crm|astra\s*enterpr[1i]se)\b/gi, 'Astra CRM Enterprise');
-  } else if (/\b(investeq\s*rese?a?rch|investeq)\b/gi.test(text)) {
-    corrections.push('Identified Entity: InvestEQ Research');
-    text = text.replace(/\b(investeq\s*rese?a?rch|investeq)\b/gi, 'InvestEQ Research');
-  }
-
-  // 4. Common Signatory Name Fuzzy Matching
-  if (/\b(sr[1i]n[1i]va[sz]|sriniwas)\b/gi.test(text)) {
-    corrections.push('Matched Name: Srinivas R');
-    text = text.replace(/\b(sr[1i]n[1i]va[sz]\s*r?|sriniwas\s*r?)\b/gi, 'Srinivas R');
-  } else if (/\b(raje[sz]h\s*kumar|rajesh)\b/gi.test(text)) {
-    corrections.push('Matched Name: Rajesh Kumar');
-    text = text.replace(/\b(raje[sz]h\s*kumar|rajesh)\b/gi, 'Rajesh Kumar');
-  } else if (/\b(harsha[1l]\s*parmar|harshal)\b/gi.test(text)) {
-    corrections.push('Matched Name: Harshal Parmar');
-    text = text.replace(/\b(harsha[1l]\s*parmar|harshal)\b/gi, 'Mr. Harshal Parmar');
-  }
+  // Employee codes: EMP-001 style
+  text = text.replace(/\bEMP\s*[-–—_.]?\s*([0-9OoIl]{2,6})\b/gi, (match, digits) => {
+    const fixed = `EMP-${digits.replace(/[Oo]/g, '0').replace(/[Il]/g, '1')}`;
+    if (fixed !== match) corrections.push(`Normalized code ${fixed}`);
+    return fixed;
+  });
 
   return { cleanedText: text, corrections };
 };
 
+const DESIGNATIONS = [
+  { regex: /managing\s+director/i, label: 'Managing Director' },
+  { regex: /executive\s+director/i, label: 'Executive Director' },
+  { regex: /whole[\s-]*time\s+director/i, label: 'Whole-time Director' },
+  { regex: /principal\s+officer/i, label: 'Principal Officer' },
+  { regex: /compliance\s+officer/i, label: 'Compliance Officer' },
+  { regex: /chief\s+executive\s+officer|\bC\.?E\.?O\b/, label: 'Chief Executive Officer' },
+  { regex: /research\s+analyst/i, label: 'Research Analyst' },
+  { regex: /investment\s+advis[eo]r/i, label: 'Investment Adviser' },
+  { regex: /\bdirector\b/i, label: 'Director' },
+  { regex: /\bproprietor\b/i, label: 'Proprietor' },
+  { regex: /\bpartner\b/i, label: 'Partner' },
+  { regex: /\bmanager\b/i, label: 'Manager' }
+];
+const AUTH_SIGNATORY = /auth[o0]ri[sz]ed\s+signator(y|ies)/i;
+const ENTITY_SUFFIX = /\b(pvt\.?\s*ltd\.?|private\s+limited|limited|ltd\.?|llp|inc\.?|corporation|corp\.?|& co\.?)/i;
+const ENTITY_HINT = /\b(securities|capital|advisors|advisory|wealth|finserv|investments?|enterprises?|consultants?|associates)\b/i;
+const ADDRESS_HINT = /\b(road|rd\.|street|st\.|floor|nagar|layout|cross|main|sector|plot|building|bldg|tower|complex|lane|marg|colony|phase|block|near|opp\.?)\b|\b[1-9]\d{5}\b/i;
+const ID_LINE = /\b(IN[HA]\d{9}|ARN\b|CIN\b|EMP-\d|Reg(d|n|istration)?\.?\s*No|SEBI\b|GSTIN|PAN\b)/i;
+const NOT_A_NAME = /\b(for|pvt|private|ltd|limited|llp|inc|corp|director|officer|analyst|adviser|advisor|signator|reg(d|n|istration)?|sebi|emp|cin|gst|pan|tel|ph|phone|mobile|email|www|address|date|seal|stamp|proprietor|partner|manager|research|securities|capital)\b/i;
+const FILE_NOISE = /\b(signature|sign|sig|stamp|seal|img|image|photo|scan|scanned|screenshot|dsc|final|copy|new|whatsapp|official)\b/gi;
+
+const titleCase = (s) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+
 /**
- * Parses raw OCR text and metadata into structured signatory details
+ * Turns OCR text into signatory fields. Only values actually found are returned;
+ * anything not detected is left empty so the form keeps what the user already has.
  */
 export const parseOcrResults = (rawText = '', fileName = '', ocrUsed = false, corrections = [], diagnostics = {}) => {
-  const cleanTokens = (fileName || '').replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ').trim();
-  const rawTextClean = (rawText || '').replace(/\r/g, '').trim();
-  const lines = rawTextClean.split('\n').map(l => l.trim()).filter(Boolean);
-  const combined = (rawTextClean + ' ' + cleanTokens).trim();
-  const lowerCombined = combined.toLowerCase();
-
-  let detectedName = '';
-  let detectedDesignation = '';
-  let detectedEntity = '';
-  let detectedRegId = '';
+  const text = (rawText || '').trim();
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const tags = [];
+  const found = { name: '', designation: '', entity: '', regId: '', address: '' };
 
-  if (ocrUsed && rawTextClean.length > 0) {
-    tags.push('✓ OCR Pixel Read Success');
-    if (diagnostics.upscaleFactor > 1) {
-      tags.push(`✓ ${diagnostics.upscaleFactor}x Super-Res`);
-    }
-    if (diagnostics.threshold) {
-      tags.push(`✓ Otsu T=${diagnostics.threshold}`);
-    }
-  } else if (ocrUsed && rawTextClean.length === 0) {
-    tags.push('ℹ Cursive/Handwritten (No printed text)');
-  }
-
-  // Append any automated corrections made
-  corrections.forEach(c => tags.push(`✓ ${c}`));
-
-  // 1. Registration / SEBI ID
-  const idMatch = combined.match(/(?:INH\d{7,10}|EMP[-\s]?\d{3,6}|REG[-\s]?\d{4,8}|ARN[-\s]?\d{4,8}|SEBI[\s\w\d-]{4,15})/i);
-  if (idMatch) {
-    detectedRegId = idMatch[0].toUpperCase().replace(/\s+/g, '');
-    tags.push(`Reg ID: ${detectedRegId}`);
-  }
-
-  // 2. Designation
-  if (/managing\s+director|director|\bmd\b/i.test(lowerCombined)) {
-    detectedDesignation = 'Managing Director & Authorized Signatory';
-    tags.push('Title: Managing Director');
-  } else if (/principal\s+officer|\bpo\b/i.test(lowerCombined)) {
-    detectedDesignation = 'Principal Officer';
-    tags.push('Title: Principal Officer');
-  } else if (/research\s+analyst|analyst/i.test(lowerCombined)) {
-    detectedDesignation = 'Research Analyst';
-    tags.push('Title: Research Analyst');
-  } else if (/authorized\s+signatory|auth\.?\s+signatory/i.test(lowerCombined)) {
-    detectedDesignation = 'Authorized Signatory';
-    tags.push('Title: Authorized Signatory');
-  } else if (/executive\s+director/i.test(lowerCombined)) {
-    detectedDesignation = 'Executive Director (Admin)';
-    tags.push('Title: Executive Director');
-  } else if (/partner|proprietor/i.test(lowerCombined)) {
-    detectedDesignation = 'Proprietor / Authorized Officer';
-    tags.push('Title: Partner / Officer');
-  }
-
-  // 3. Entity
-  if (/astra/i.test(lowerCombined)) {
-    detectedEntity = 'Astra CRM Enterprise';
-    tags.push('Entity: Astra CRM');
-  } else if (/investeq/i.test(lowerCombined)) {
-    detectedEntity = 'InvestEQ Research';
-    tags.push('Entity: InvestEQ');
-  } else {
-    const entityLine = lines.find(l => /(?:pvt\.?\s*ltd|ltd|llp|inc|corp|enterprise|securities|capital|research|wealth)/i.test(l));
-    if (entityLine) {
-      detectedEntity = entityLine.replace(/[^a-zA-Z0-9\s.,&-]/g, '').trim();
-      tags.push(`Entity: ${detectedEntity}`);
+  // 1. Registration IDs (most specific first)
+  const idPatterns = [
+    { regex: /\bIN[HA]\d{9}\b/, label: 'SEBI Reg' },
+    { regex: /\bARN\s*[-:]?\s*\d{4,8}\b/i, label: 'ARN' },
+    { regex: /\b[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}\b/, label: 'CIN' },
+    { regex: /\bEMP-\d{2,6}\b/, label: 'Employee Code' },
+    { regex: /\bReg(?:d|n|istration)?\.?\s*No\.?\s*[:\-]?\s*([A-Z0-9][A-Z0-9/-]{3,20})/i, label: 'Reg No', group: 1 }
+  ];
+  for (const { regex, label, group } of idPatterns) {
+    const m = text.match(regex);
+    if (m) {
+      found.regId = (group ? m[group] : m[0]).toUpperCase().replace(/\s+/g, '').replace(/^ARN[-:]?/, 'ARN-');
+      tags.push(`${label}: ${found.regId}`);
+      break;
     }
   }
 
-  // 4. Name extraction
-  if (/srinivas/i.test(lowerCombined)) {
-    detectedName = 'Srinivas R';
-    if (!detectedDesignation) detectedDesignation = 'Managing Director & Super Admin';
-    if (!detectedEntity) detectedEntity = 'Astra CRM Enterprise';
-    if (!detectedRegId) detectedRegId = 'EMP-001';
-    tags.push('Matched: Srinivas R');
-  } else if (/rajesh/i.test(lowerCombined)) {
-    detectedName = 'Rajesh Kumar';
-    if (!detectedDesignation) detectedDesignation = 'Executive Director (Admin)';
-    if (!detectedEntity) detectedEntity = 'Astra CRM Enterprise';
-    if (!detectedRegId) detectedRegId = 'EMP-002';
-    tags.push('Matched: Rajesh Kumar');
-  } else if (/harshal|parmar/i.test(lowerCombined)) {
-    detectedName = 'Mr. Harshal Parmar';
-    if (!detectedDesignation) detectedDesignation = 'Principal Officer (Research Analyst)';
-    if (!detectedEntity) detectedEntity = 'InvestEQ Research (Demo Partner)';
-    if (!detectedRegId) detectedRegId = 'INH000002099';
-    tags.push('Matched: Harshal Parmar');
-  } else {
-    // Scan OCR lines for a line that looks like a person's name
-    const candidate = lines.find(l => {
-      const isHeaderOrFooter = /(?:pvt|ltd|llp|inc|corp|enterprise|director|officer|analyst|signatory|reg|emp|sebi|tel|email|address|date)/i.test(l);
-      const words = l.split(/\s+/).filter(w => w.length > 1);
-      return !isHeaderOrFooter && words.length >= 1 && words.length <= 4 && /^[a-zA-Z\s.'-]+$/.test(l);
-    });
+  // 2. Designation (specific titles before generic ones), keeping "Authorised Signatory" when printed
+  let designationLine = -1;
+  for (const { regex, label } of DESIGNATIONS) {
+    const idx = lines.findIndex(l => regex.test(l));
+    if (idx !== -1) {
+      found.designation = label;
+      designationLine = idx;
+      break;
+    }
+  }
+  const authIdx = lines.findIndex(l => AUTH_SIGNATORY.test(l));
+  if (authIdx !== -1) {
+    found.designation = found.designation ? `${found.designation} & Authorised Signatory` : 'Authorised Signatory';
+    if (designationLine === -1) designationLine = authIdx;
+  }
+  if (found.designation) tags.push(`Title: ${found.designation}`);
 
-    if (candidate) {
-      detectedName = candidate.trim()
-        .split(/\s+/)
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-      tags.push(`Extracted Name: ${detectedName}`);
-    } else if (cleanTokens.length > 2 && !cleanTokens.match(/^(signature|sig|img|photo|scan|screenshot|dsc|image|\d+)$/i)) {
-      detectedName = cleanTokens
-        .split(' ')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(' ');
-      tags.push(`Extracted Name: ${detectedName}`);
+  // 3. Entity: a line with a legal suffix (else an industry word), never a designation, ID or address line
+  const isDesignationLine = (l) => DESIGNATIONS.some(d => d.regex.test(l)) || AUTH_SIGNATORY.test(l);
+  const entityCandidates = lines.filter(l => !isDesignationLine(l) && !ID_LINE.test(l) && !ADDRESS_HINT.test(l));
+  const entityLine = entityCandidates.find(l => ENTITY_SUFFIX.test(l)) || entityCandidates.find(l => ENTITY_HINT.test(l));
+  if (entityLine) {
+    // Drop leading OCR debris first, then the stamp's "For" (also when the space was lost: "ForInvestEQ")
+    let entity = entityLine.replace(/^[^A-Za-z]+/, '').replace(/^for(\s+|(?=[A-Z]))/i, '');
+    const suffix = entity.match(new RegExp(`^(.*?${ENTITY_SUFFIX.source})`, 'i'));
+    if (suffix) entity = suffix[1];
+    found.entity = entity.replace(/[^A-Za-z0-9\s.,&()'-]/g, '').replace(/\s{2,}/g, ' ').trim();
+    if (found.entity === found.entity.toUpperCase() && found.entity.length > 3) found.entity = titleCase(found.entity);
+    found.entity = found.entity.charAt(0).toUpperCase() + found.entity.slice(1);
+    tags.push(`Entity: ${found.entity}`);
+  }
+
+  // 4. Name: a 2-5 word alphabetic line, preferring the one just above the designation (typical stamp layout).
+  // OCR debris at either end ("Agarwal . oc To") is trimmed; single-letter initials ("Srinivas R") are kept.
+  const isDebris = (t) => !/[A-Za-z]/.test(t) || (/^[A-Za-z]{1,2}\.?$/.test(t) && !/^[A-Z]\.?$/.test(t));
+  const trimNameDebris = (l) => {
+    const tokens = l.split(/\s+/).filter(Boolean);
+    while (tokens.length && isDebris(tokens[0]) && !/^(mr|ms|dr)\.?$/i.test(tokens[0])) tokens.shift();
+    while (tokens.length && isDebris(tokens[tokens.length - 1])) tokens.pop();
+    return tokens.join(' ');
+  };
+  const isNameLine = (raw) => {
+    const l = trimNameDebris(raw);
+    if (NOT_A_NAME.test(l) || !/^[A-Za-z][A-Za-z\s.'-]+$/.test(l)) return false;
+    const words = l.replace(/\./g, ' ').split(/\s+/).filter(w => w.length > 0);
+    // Printed names are capitalised word by word (or all caps); lowercase fragments are OCR debris
+    return words.length >= 2 && words.length <= 5 && words.some(w => w.length >= 3) && words.every(w => /^[A-Z]/.test(w));
+  };
+  const above = designationLine > 0 ? lines[designationLine - 1] : null;
+  const rawNameLine = (above && isNameLine(above)) ? above : lines.find(isNameLine);
+  // A hyphen OCR inserted between two capitalised words ("Narottam-Agarwal") is a lost space
+  const nameLine = rawNameLine ? trimNameDebris(rawNameLine).replace(/([a-z])-(?=[A-Z][a-z])/g, '$1 ') : null;
+  if (nameLine) {
+    found.name = nameLine === nameLine.toUpperCase() ? titleCase(nameLine) : nameLine;
+    found.name = found.name.replace(/^(mr|mrs|ms|dr|shri|smt)\.?\s+/i, (m) => titleCase(m.trim().replace(/\.$/, '')) + '. ');
+    tags.push(`Name: ${found.name}`);
+  } else if (fileName) {
+    // Last resort: a person-like file name such as "nishant_agarwal.png"
+    const fromFile = fileName.replace(/\.[^/.]+$/, '').replace(/[-_.]+/g, ' ').replace(FILE_NOISE, ' ').replace(/\d+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    if (fromFile.split(' ').length >= 2 && /^[A-Za-z\s]+$/.test(fromFile)) {
+      found.name = titleCase(fromFile);
+      tags.push(`Name (from file name): ${found.name}`);
     }
   }
 
-  const hasSpecifics = !!(detectedName || detectedDesignation || detectedRegId);
-  const confidence = hasSpecifics ? (ocrUsed && rawTextClean.length > 0 ? 98 : 92) : 80;
+  // 5. Office address: consecutive address-looking lines
+  const addressLines = lines.filter(l => ADDRESS_HINT.test(l) && l !== entityLine && !ID_LINE.test(l));
+  if (addressLines.length) {
+    found.address = addressLines.join(', ').replace(/\s{2,}/g, ' ').trim();
+    tags.push('Address detected');
+  }
 
-  // Deduplicate tags
-  const uniqueTags = Array.from(new Set(tags));
+  const hasPrintedText = text.length > 0 && (diagnostics.wordCount || 0) > 0;
+  if (ocrUsed && !hasPrintedText) tags.unshift('No printed text found (handwritten signature)');
+  if (diagnostics.upscaleFactor > 1) tags.push(`${diagnostics.upscaleFactor}x upscaled`);
+  if (diagnostics.threshold) tags.push(`Otsu threshold ${diagnostics.threshold}`);
+  corrections.forEach(c => tags.push(c));
 
   return {
-    success: true,
-    detectedName: detectedName || 'Srinivas R',
-    detectedDesignation: detectedDesignation || 'Managing Director / Authorized Signatory',
-    detectedEntity: detectedEntity || 'Astra CRM Enterprise',
-    detectedRegId: detectedRegId || 'EMP-001',
-    confidence,
-    tags: uniqueTags.length ? uniqueTags : ['Contour Verified'],
-    rawText: rawTextClean || cleanTokens,
+    success: ocrUsed,
+    detectedName: found.name,
+    detectedDesignation: found.designation,
+    detectedEntity: found.entity,
+    detectedRegId: found.regId,
+    detectedAddress: found.address,
+    confidence: Math.round(diagnostics.confidence || 0),
+    tags: Array.from(new Set(tags)),
+    rawText: text,
     ocrUsed,
-    hasPrintedText: rawTextClean.length > 0,
+    hasPrintedText,
     corrections
   };
 };
 
+// ─── Tesseract worker: one per tab, created on first use, released when idle ───
+// Engine and English model load from the jsDelivr CDN into the browser, so the CRM server does no OCR work.
+const OCR_FIRST_LOAD_TIMEOUT_MS = 120000;
+const OCR_RECOGNIZE_TIMEOUT_MS = 45000;
+const OCR_IDLE_RELEASE_MS = 120000;
+let ocrWorkerPromise = null;
+let ocrIdleTimer = null;
+let ocrProgressListener = null;
+
+const withTimeout = (promise, ms, message) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+]);
+
+const releaseOcrWorker = async () => {
+  const pending = ocrWorkerPromise;
+  ocrWorkerPromise = null;
+  if (pending) {
+    try { (await pending).terminate(); } catch {}
+  }
+};
+
+const getOcrWorker = () => {
+  clearTimeout(ocrIdleTimer);
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = (async () => {
+      const { createWorker } = await import('tesseract.js');
+      return createWorker('eng', 1, {
+        logger: (m) => ocrProgressListener?.(m)
+      });
+    })();
+    ocrWorkerPromise.catch(() => { ocrWorkerPromise = null; });
+  }
+  return ocrWorkerPromise;
+};
+
+const scheduleOcrRelease = () => {
+  clearTimeout(ocrIdleTimer);
+  ocrIdleTimer = setTimeout(releaseOcrWorker, OCR_IDLE_RELEASE_MS);
+};
+
+const OCR_MIN_WORD_CONFIDENCE = 45;
+
+const summarize = (data) => {
+  const lines = (data?.blocks || []).flatMap(b => (b.paragraphs || []).flatMap(p => p.lines || []));
+  const keptLines = [];
+  let wordCount = 0;
+  let confidenceSum = 0;
+  for (const line of lines) {
+    // Confident words only; joining symbols such as "&", "-" and "/" are kept so names like "Babu Securities & Co" survive
+    const words = (line.words || []).filter(w => (w.confidence || 0) >= OCR_MIN_WORD_CONFIDENCE
+      && (/[A-Za-z0-9]/.test(w.text || '') || /^[&/,.-]$/.test(w.text || '')));
+    if (!words.some(w => /[A-Za-z0-9]/.test(w.text))) continue;
+    keptLines.push(words.map(w => w.text).join(' '));
+    for (const w of words) {
+      if (/[A-Za-z0-9]{2,}/.test(w.text)) {
+        wordCount += 1;
+        confidenceSum += w.confidence;
+      }
+    }
+  }
+  return {
+    text: keptLines.length ? keptLines.join('\n') : (data?.text || '').trim(),
+    fullText: (data?.text || '').trim(),
+    confidence: wordCount ? confidenceSum / wordCount : 0,
+    wordCount
+  };
+};
+const ocrScore = (r) => r.wordCount * r.confidence;
+const OCR_FIELDS = ['detectedName', 'detectedDesignation', 'detectedEntity', 'detectedRegId', 'detectedAddress'];
+
 /**
- * Smart OCR & Signature Stamp Analyzer
- * Runs Otsu binarization and resolution upscaling before feeding pixels to Tesseract,
- * executes multi-pass OCR if needed, and applies fuzzy token normalization.
+ * Picks a field value across OCR reads. Values are given in priority order (best read first).
+ * A value also earns the votes of shorter values it contains ("Managing Director" ⊃ "Director");
+ * ties go to the earlier, better-scoring read.
+ */
+const voteOnField = (values) => {
+  const present = values.filter(Boolean);
+  if (!present.length) return '';
+  const unique = [...new Set(present)];
+  const scored = unique.map(value => {
+    const lower = value.toLowerCase();
+    const votes = present.filter(other => other === value || lower.includes(other.toLowerCase())).length;
+    return { value, votes, order: present.indexOf(value) };
+  });
+  scored.sort((a, b) => b.votes - a.votes || a.order - b.order);
+  return scored[0].value;
+};
+const OCR_RETRY_BELOW_CONFIDENCE = 88;
+const OCR_OUTPUT = { text: true, blocks: true };
+
+/**
+ * Smart OCR for signature stamps: preprocess → recognize (block + sparse-text pass) → clean → parse.
+ * Everything runs client-side; returns empty fields for anything it could not read.
  */
 export const extractDetailsFromSignatureImage = async (file, dataUrl, onProgress, options = {}) => {
-  let rawText = '';
-  let ocrUsed = false;
+  const { sensitivity = 0, upscale = true, autoCrop = true, multiPass = true } = options;
+  const report = (stage, percent, message) => onProgress?.({ stage, percent, message });
+
+  report('preprocess', 10, 'Cleaning the image (white background, ink threshold, crop)...');
   let preprocessed = null;
-
-  const {
-    sensitivity = 0,
-    upscale = true,
-    autoCrop = true,
-    multiPass = true
-  } = options;
-
-  if (onProgress) onProgress({ stage: 'preprocess', percent: 15, message: 'Applying Otsu shadow removal & 2x super-sampling...' });
-
-  // 1. High-Precision Computer Vision Preprocessing
   if (dataUrl) {
-    try {
-      preprocessed = await preprocessImageForOCR(dataUrl, { sensitivity, upscale, autoCrop });
-    } catch (prepErr) {
-      console.warn('Preprocessing skipped:', prepErr);
-    }
+    preprocessed = await preprocessImageForOCR(dataUrl, { sensitivity, upscale, autoCrop });
   }
+  const target = preprocessed?.ocrDataUrl || dataUrl;
 
-  const targetDataUrl = preprocessed?.ocrDataUrl || dataUrl;
+  let best = { text: '', confidence: 0, wordCount: 0 };
+  const reads = [];
+  let ocrUsed = false;
+  let ocrError = null;
 
-  // 2. Optical Character Recognition using Tesseract.js
-  if (targetDataUrl) {
+  if (target && preprocessed?.hasInk !== false) {
     try {
-      if (onProgress) onProgress({ stage: 'loading_engine', percent: 35, message: 'Loading neural OCR text recognition...' });
-
-      const Tesseract = await import('tesseract.js');
-
-      // Pass 1: Standard / Single Block recognition
-      const ocrTask = Tesseract.recognize(targetDataUrl, 'eng', {
-        logger: (m) => {
-          if (m?.status === 'recognizing text' && onProgress) {
-            const p = Math.min(85, Math.round((m.progress || 0) * 50) + 35);
-            onProgress({
-              stage: 'recognizing',
-              percent: p,
-              message: `Reading pixel text (Pass 1): ${Math.round((m.progress || 0) * 100)}%`
-            });
-          }
+      const firstLoad = !ocrWorkerPromise;
+      report('loading_engine', 20, firstLoad
+        ? 'Downloading the OCR engine (first use only, ~15 MB)...'
+        : 'Starting OCR engine...');
+      ocrProgressListener = (m) => {
+        if (m?.status === 'recognizing text') {
+          report('recognizing', 35 + Math.round((m.progress || 0) * 45), `Reading text: ${Math.round((m.progress || 0) * 100)}%`);
+        } else if (m?.status && firstLoad) {
+          report('loading_engine', 20 + Math.round((m.progress || 0) * 15), `${m.status.replace(/^\w/, c => c.toUpperCase())}...`);
         }
-      });
+      };
+      const worker = await withTimeout(getOcrWorker(), OCR_FIRST_LOAD_TIMEOUT_MS,
+        'The OCR engine could not be downloaded. Check the internet connection and try again.');
 
-      const timeoutGuard = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('OCR engine timed out.')), 10000)
-      );
-
-      const result = await Promise.race([ocrTask, timeoutGuard]);
-      rawText = (result?.data?.text || '').trim();
+      // Pass 1: uniform block of text (typical stamps)
+      await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+      const pass1 = await withTimeout(worker.recognize(target, {}, OCR_OUTPUT), OCR_RECOGNIZE_TIMEOUT_MS, 'OCR took too long on this image.');
+      best = summarize(pass1.data);
+      reads.push(best);
       ocrUsed = true;
 
-      // Pass 2: If Pass 1 yielded very sparse or no text, re-try with original image or sparse mode
-      if (multiPass && rawText.length < 5 && targetDataUrl !== dataUrl) {
-        if (onProgress) onProgress({ stage: 'pass2', percent: 88, message: 'Running secondary deep pass for faint ink marks...' });
-        try {
-          const pass2Task = Tesseract.recognize(dataUrl, 'eng');
-          const pass2Result = await Promise.race([
-            pass2Task,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Pass 2 timeout')), 5000))
-          ]);
-          const pass2Text = (pass2Result?.data?.text || '').trim();
-          if (pass2Text.length > rawText.length) {
-            rawText = pass2Text;
-          }
-        } catch {}
+      // Pass 2: sparse text (scattered words around a signature)
+      if (multiPass) {
+        report('pass2', 82, 'Second pass for scattered text...');
+        await worker.setParameters({ tessedit_pageseg_mode: '11' });
+        const pass2 = await withTimeout(worker.recognize(target, {}, OCR_OUTPUT), OCR_RECOGNIZE_TIMEOUT_MS, 'OCR took too long on this image.');
+        const second = summarize(pass2.data);
+        reads.push(second);
+        if (ocrScore(second) > ocrScore(best)) best = second;
       }
-    } catch (ocrErr) {
-      console.warn('Real OCR notice (falling back to geometric/token heuristics):', ocrErr.message);
+
+      // Pass 3 (poor images only): remove speckle noise and read again
+      if (multiPass && best.confidence < OCR_RETRY_BELOW_CONFIDENCE) {
+        report('pass3', 88, 'Low-quality image: removing noise and re-reading...');
+        const cleanedImage = await preprocessImageForOCR(dataUrl, { sensitivity, upscale, autoCrop, despeckle: true });
+        await worker.setParameters({ tessedit_pageseg_mode: '6' });
+        const pass3 = await withTimeout(worker.recognize(cleanedImage.ocrDataUrl, {}, OCR_OUTPUT), OCR_RECOGNIZE_TIMEOUT_MS, 'OCR took too long on this image.');
+        const third = summarize(pass3.data);
+        reads.push(third);
+        if (ocrScore(third) > ocrScore(best)) {
+          best = third;
+          preprocessed = cleanedImage;
+        }
+      }
+    } catch (err) {
+      ocrError = err.message || 'OCR failed.';
+      console.warn('OCR error:', err);
+      // A stuck or broken worker is discarded so the next attempt starts clean
+      await releaseOcrWorker();
+    } finally {
+      ocrProgressListener = null;
+      scheduleOcrRelease();
     }
   }
 
-  if (onProgress) onProgress({ stage: 'cleaning', percent: 92, message: 'Normalizing OCR tokens & fuzzy-matching titles...' });
+  report('parsing', 92, 'Extracting name, designation, entity and IDs...');
+  const diagnostics = { ...(preprocessed || {}), confidence: best.confidence, wordCount: best.wordCount };
+  const { cleanedText, corrections } = cleanAndFuzzyCorrectText(best.text);
+  const parsed = parseOcrResults(cleanedText, file?.name || '', ocrUsed, corrections, diagnostics);
 
-  // 3. Token Cleaning & Fuzzy Correction
-  const { cleanedText, corrections } = cleanAndFuzzyCorrectText(rawText);
+  // Each field is voted on across every read, best-scoring read first, so one noisy pass cannot
+  // overwrite what the others agree on. Tesseract's unfiltered text only adds pattern-based fields
+  // (title, entity, IDs, address) — never names — and only when real words were read at all.
+  const parseText = (text) => parseOcrResults(cleanAndFuzzyCorrectText(text).cleanedText, '', ocrUsed, [], diagnostics);
+  const candidates = [...reads].filter(r => r.wordCount > 0).sort((a, b) => ocrScore(b) - ocrScore(a)).flatMap(read => {
+    const confident = parseText(read.text);
+    if (!read.fullText || read.fullText === read.text) return [confident];
+    return [confident, { ...parseText(read.fullText), detectedName: '' }];
+  });
+  if (candidates.length) {
+    for (const key of OCR_FIELDS) {
+      parsed[key] = voteOnField(candidates.map(c => c[key])) || (key === 'detectedName' ? parsed[key] : '');
+    }
+  }
 
-  if (onProgress) onProgress({ stage: 'parsing', percent: 98, message: 'Mapping regulatory fields & signatories...' });
-
-  const fileName = file?.name || '';
-  const parsed = parseOcrResults(
-    cleanedText || rawText,
-    fileName,
-    ocrUsed,
-    corrections,
-    preprocessed || {}
-  );
-
+  parsed.ocrError = ocrError;
   parsed.ocrOptimizedDataUrl = preprocessed?.ocrDataUrl || null;
   parsed.threshold = preprocessed?.threshold;
   parsed.otsuThreshold = preprocessed?.otsuThreshold;
 
-  if (onProgress) onProgress({ stage: 'complete', percent: 100, message: 'High-precision OCR analysis complete!' });
-
+  report('complete', 100, ocrError ? 'OCR could not finish.' : 'OCR analysis complete.');
   return parsed;
 };

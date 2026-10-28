@@ -6,7 +6,7 @@ import {
   getLeegalityDocumentStatus,
   isRealLeegalityDispatch
 } from '../services/leegalityService';
-import { getPrimarySignatory } from '../services/digitalSignatureService';
+import { getPrimarySignatory, pullSignaturesFromServer } from '../services/digitalSignatureService';
 import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
 
 // ─── IP Detection & Restriction Utilities ───────────────────────────────────
@@ -1130,6 +1130,8 @@ export const CRMProvider = ({ children }) => {
         }
         const me = await res.json();
         setAuthUser(me);
+        // Admins work with the shared signatory signatures; refresh this browser's cached copy
+        if (me.role === 'Super Admin' || me.role === 'Admin') pullSignaturesFromServer();
         // Anything other than a Super Admin "view as" session is pinned to the server identity.
         const stored = JSON.parse(localStorage.getItem('crm_user') || 'null');
         if (me.role !== 'Super Admin' || !stored || stored.id === me.id) {

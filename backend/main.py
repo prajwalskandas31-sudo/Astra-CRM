@@ -12,12 +12,14 @@ try:
                               set_user_password, validate_password_strength, public_user, is_admin, role_rank,
                               check_not_locked, record_failure, clear_failures)
     from backend.leegality import router as leegality_router
+    from backend.signatures import router as signatures_router
 except ImportError:
     from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
                       set_user_password, validate_password_strength, public_user, is_admin, role_rank,
                       check_not_locked, record_failure, clear_failures)
     from leegality import router as leegality_router
+    from signatures import router as signatures_router
 
 
 app = FastAPI(title="Srinivas CRM API", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
@@ -34,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(leegality_router)
+app.include_router(signatures_router)
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):

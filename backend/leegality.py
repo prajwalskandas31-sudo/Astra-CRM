@@ -23,8 +23,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 try:
     from backend.auth import require_roles
+    from backend.signatures import stored_primary_signature
 except ImportError:
     from auth import require_roles
+    from signatures import stored_primary_signature
 
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -298,7 +300,8 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
     fields = [_field(tmap["dateField"], type=tmap["dateField"].get("type", "text"), value=executed_at.strftime(tmap["dateField"]["format"]))]
     for idx, opt in enumerate(tmap["tenureCheckbox"]["options"]):
         fields.append(_field(opt, type="checkbox", value=opt["label"], checked=idx == option_idx))
-    sig_fields, stamps = _signature_fields(tmap, req.signatureDataUrl)
+    # The server-stored Primary Signatory wins; the browser's copy is only a fallback until one is stored
+    sig_fields, stamps = _signature_fields(tmap, stored_primary_signature() or req.signatureDataUrl)
     fields += sig_fields
 
     invitee = {"name": req.clientName.strip()}
