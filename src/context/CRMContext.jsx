@@ -2559,12 +2559,16 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
-  // Sales registered by hand carry no leadId, so fall back to matching the lead by client name or phone
-  const findLeadForSale = (sale) => (leads || []).find(l =>
-    (sale?.leadId && l.id === sale.leadId) ||
-    (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
-    (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
-  );
+  // The sale's own leadId always wins. Sales registered by hand carry no leadId, so fall back to
+  // client name or phone, but only when exactly one lead matches; never guess between two leads.
+  const findLeadForSale = (sale) => {
+    if (sale?.leadId) return (leads || []).find(l => l.id === sale.leadId);
+    const candidates = (leads || []).filter(l =>
+      (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
+      (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
+    );
+    return candidates.length === 1 ? candidates[0] : undefined;
+  };
 
   // ─── e-KYC & E-Sign Trigger via Leegality (Workflow LzfDhWc, through the CRM backend) ───
   const triggerEKycAndESign = async (saleId) => {
