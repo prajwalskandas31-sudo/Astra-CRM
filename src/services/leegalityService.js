@@ -152,6 +152,19 @@ export const isRealLeegalityDispatch = (sale) =>
   !!(sale?.eSignDetails?.dispatchedAt || sale?.eSignDetails?.verifiedByLeegality);
 
 /**
+ * Traffic-light state of a sale's e-KYC & E-Sign:
+ *   red    - not sent to Leegality yet (or the client declined / the invitation expired, so it can be re-sent)
+ *   yellow - sent; waiting for the client to complete e-KYC & E-Sign
+ *   green  - Leegality reports the document COMPLETED
+ * Old simulated "E-Signed" records were never verified by Leegality, so they stay red.
+ */
+export const getEKycLight = (sale) => {
+  if (sale?.eSignStatus === 'Completed' && sale?.eSignDetails?.verifiedByLeegality) return 'green';
+  if (isRealLeegalityDispatch(sale) && !['Rejected by Client', 'Invitation Expired'].includes(sale.eSignStatus)) return 'yellow';
+  return 'red';
+};
+
+/**
  * eSign credit balance from Leegality: { unused, reserved, consumed, expired, total }.
  */
 export const getLeegalityWallet = async () => (await backendFetch('/leegality/wallet')).json();

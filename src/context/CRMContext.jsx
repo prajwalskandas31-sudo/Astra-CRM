@@ -4,9 +4,11 @@ import {
   saveLeegalityConfig, 
   dispatchLeegalitySignRequest,
   getLeegalityDocumentStatus,
-  isRealLeegalityDispatch
+  isRealLeegalityDispatch,
+  getEKycLight
 } from '../services/leegalityService';
 import { getPrimarySignatory, pullSignaturesFromServer } from '../services/digitalSignatureService';
+import { buildPaidClient, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
 import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
 
 // ─── IP Detection & Restriction Utilities ───────────────────────────────────
@@ -544,6 +546,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
   },
   {
+    id: 'paid-block',
+    name: 'Paid Block (Service Tenure Tracking)',
+    category: 'Sales & Approvals',
+    description: 'Clients who completed e-KYC & E-Sign, grouped by service name and tenure, with service expiry tracking.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
     id: 'register-sale',
     name: 'Register New Customer Sale',
     category: 'Sales & Approvals',
@@ -1049,6 +1058,34 @@ export const CRMProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('crm_esign_records', JSON.stringify(eSignRecords));
   }, [eSignRecords]);
+
+  // ─── Paid Block: clients who completed e-KYC & E-Sign, tracked by service tenure ──
+  const [paidClients, setPaidClients] = useState(() => {
+    const saved = localStorage.getItem('crm_paid_clients');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    // First load: clients who e-signed before the Paid block existed come from the E-Sign registry
+    try {
+      const records = JSON.parse(localStorage.getItem('crm_esign_records') || '[]');
+      const sales = JSON.parse(localStorage.getItem('crm_sales') || '[]');
+      return (Array.isArray(records) ? records : [])
+        .filter(r => r.verifiedByLeegality)
+        .map(r => {
+          const sale = (Array.isArray(sales) ? sales : []).find(s => s.id === r.saleId) || { id: r.saleId, leadId: r.leadId };
+          return buildPaidClient({ sale, clientInfo: sale.fullClientInfo || sale.clientInfo || {}, eSignRecord: r, signedAt: r.confirmedAt });
+        });
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crm_paid_clients', JSON.stringify(paidClients));
+  }, [paidClients]);
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -2522,6 +2559,13 @@ export const CRMProvider = ({ children }) => {
     }
   };
 
+  // Sales registered by hand carry no leadId, so fall back to matching the lead by client name or phone
+  const findLeadForSale = (sale) => (leads || []).find(l =>
+    (sale?.leadId && l.id === sale.leadId) ||
+    (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
+    (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
+  );
+
   // ─── e-KYC & E-Sign Trigger via Leegality (Workflow LzfDhWc, through the CRM backend) ───
   const triggerEKycAndESign = async (saleId) => {
     const sale = sales.find(s => s.id === saleId);
@@ -2532,11 +2576,7 @@ export const CRMProvider = ({ children }) => {
       throw new Error(`Already sent to Leegality (Doc ID: ${sale.eSignDocumentId}). Open its Leegality status instead.`);
     }
 
-    const matchingLead = (leads || []).find(l => 
-      (sale?.leadId && l.id === sale.leadId) ||
-      (sale?.clientName && (l.clientName === sale.clientName || l.contactPerson === sale.clientName || l.clientInfo?.clientName === sale.clientName)) ||
-      (sale?.phone1 && (l.phone === sale.phone1 || l.clientInfo?.phone1 === sale.phone1))
-    );
+    const matchingLead = findLeadForSale(sale);
 
     // Name, email, phone and tenure come from the Client Information Page
     const clientInfo = sale?.fullClientInfo || sale?.clientInfo || matchingLead?.clientInfo || {};
@@ -2618,6 +2658,31 @@ export const CRMProvider = ({ children }) => {
     return details;
   };
 
+  // ─── Yellow → Green without anyone opening the status modal ─────────────
+  // Leegality's webhook needs a public HTTPS URL, so poll the sales that are waiting on the client instead.
+  // The interval reads the latest sales and refresh function through refs, since both change every render.
+  const salesRef = useRef(sales);
+  const refreshESignStatusRef = useRef(refreshESignStatus);
+  salesRef.current = sales;
+  refreshESignStatusRef.current = refreshESignStatus;
+
+  useEffect(() => {
+    // The Leegality status endpoint is Super Admin-only on the backend
+    if (!authToken || currentUser?.role !== 'Super Admin') return;
+    const pollAwaitingClient = async () => {
+      for (const s of salesRef.current.filter(x => getEKycLight(x) === 'yellow' && x.eSignDocumentId)) {
+        try {
+          await refreshESignStatusRef.current(s.id);
+        } catch (err) {
+          console.warn(`Leegality status check failed for sale ${s.id}:`, err.message);
+        }
+      }
+    };
+    pollAwaitingClient();
+    const timer = setInterval(pollAwaitingClient, 60000);
+    return () => clearInterval(timer);
+  }, [authToken, currentUser?.role]);
+
   // ─── Automated Voice Call Completion ────────────────────────────────────
   const completeVoiceCallVerification = (saleId) => {
     const sale = sales.find(s => s.id === saleId);
@@ -2671,8 +2736,10 @@ export const CRMProvider = ({ children }) => {
       eSignDetails: { ...eSignDetails, verifiedByLeegality: true }
     } : s));
 
-    if (sale.leadId) {
-      setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+    // Green light: the lead moves into the Paid / Converted block
+    const paidLead = findLeadForSale(sale);
+    if (paidLead) {
+      setLeads(prev => prev.map(l => l.id === paidLead.id ? {
         ...l,
         disposition: 'Paid / Converted',
         eSignCompleted: true,
@@ -2682,7 +2749,7 @@ export const CRMProvider = ({ children }) => {
 
     // Build the completed E-Sign registry record to fill the dedicated E-Sign block
     const clientInfo = sale.fullClientInfo || sale.clientInfo || {};
-    const matchingLead = (leads || []).find(l => l.id === sale.leadId);
+    const matchingLead = paidLead;
     const tenure = eSignDetails.serviceTenure || sale.serviceTenure || clientInfo.serviceTenure || matchingLead?.clientInfo?.serviceTenure || '';
     const clientName = clientInfo.clientName || sale.clientName || '';
     const panNumber = sale.panNumber || clientInfo.panNumber || '';
@@ -2738,6 +2805,10 @@ export const CRMProvider = ({ children }) => {
       return [newRecord, ...filtered];
     });
 
+    // Store the client in the Paid block; their service tenure starts on the e-sign date
+    const paidClient = buildPaidClient({ sale, clientInfo, lead: matchingLead, eSignRecord: newRecord, signedAt: eSignDetails.signedAt });
+    setPaidClients(prev => [paidClient, ...prev.filter(p => p.saleId !== sale.id && p.documentId !== docId)]);
+
     addNotification({
       title: 'E-Sign Completed',
       message: `Agreement digitally signed via Leegality for '${sale.clientName}'. Deal successfully converted!`,
@@ -2749,6 +2820,46 @@ export const CRMProvider = ({ children }) => {
 
   const deleteESignRecord = (recordId) => {
     setESignRecords(prev => prev.filter(r => r.id !== recordId));
+  };
+
+  // ─── Paid Block: service tenure expiry ──────────────────────────────────
+  // Checked on load and hourly, so a record flips to "Service Expired" the day its tenure ends.
+  // The interval calls the latest check through a ref, since paidClients and leads change every render.
+  const expireServicesRef = useRef(null);
+  expireServicesRef.current = () => {
+    const today = todayKey();
+    const ending = paidClients.filter(p => p.status !== PAID_STATUS_EXPIRED && isTenureOver(p, today));
+    if (ending.length === 0) return;
+
+    const endingIds = new Set(ending.map(p => p.id));
+    setPaidClients(prev => prev.map(p => endingIds.has(p.id) ? { ...p, status: PAID_STATUS_EXPIRED, expiredAt: today } : p));
+
+    const leadIds = new Set(ending.map(p => p.leadId).filter(Boolean));
+    if (leadIds.size) {
+      setLeads(prev => prev.map(l => {
+        if (!leadIds.has(l.id)) return l;
+        const p = ending.find(x => x.leadId === l.id);
+        return { ...l, history: [...(l.history || []), { date: today, text: `Service Expired: ${p.serviceName} (${p.serviceTenure}) ended on ${p.serviceEndDate}.` }] };
+      }));
+    }
+
+    ending.forEach(p => addNotification({
+      title: 'Service Expired',
+      message: `${p.clientName}'s ${p.serviceName} service (${p.serviceTenure}) ended on ${p.serviceEndDate}.`,
+      type: 'warning',
+      targetUserId: p.submittedByUserId,
+      actionPayload: { saleId: p.saleId, leadId: p.leadId }
+    }));
+  };
+
+  useEffect(() => {
+    expireServicesRef.current();
+    const timer = setInterval(() => expireServicesRef.current(), 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const deletePaidClient = (paidId) => {
+    setPaidClients(prev => prev.filter(p => p.id !== paidId));
   };
 
 
@@ -3029,6 +3140,8 @@ export const CRMProvider = ({ children }) => {
       // ─── Dedicated E-Sign Block Records (Filled After Confirmation) ────────
       eSignRecords,
       deleteESignRecord,
+      paidClients,
+      deletePaidClient,
       // ─── Leegality API Integration Config & Credentials ────────
       leegalityConfig,
       updateLeegalityConfig
