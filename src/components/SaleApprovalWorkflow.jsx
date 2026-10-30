@@ -8,7 +8,6 @@ import {
   FileCheck, 
   ShieldCheck, 
   ArrowRight, 
-  PlusCircle, 
   Mail, 
   PhoneCall, 
   FileSignature, 
@@ -20,46 +19,81 @@ import {
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
-import { isRealLeegalityDispatch } from '../services/leegalityService';
+import { isRealLeegalityDispatch, getEKycLight } from '../services/leegalityService';
+
+const LIGHTS = ['red', 'yellow', 'green'];
+
+// Red: not sent (click sends e-KYC & E-Sign). Yellow: sent, waiting on the client. Green: completed and moved to Paid.
+const EKycTrafficLight = ({ sale, canTrigger, isDispatching, onTrigger, onViewStatus }) => {
+  const light = getEKycLight(sale);
+  const isRejectedSale = sale.stage === 'Rejected' || !!sale.status?.includes('Rejected by Super Admin');
+
+  let title;
+  let label;
+  let onClick = null;
+  if (light === 'green') {
+    title = 'e-KYC completed';
+    label = 'Client signed · moved to Paid';
+    onClick = onViewStatus;
+  } else if (light === 'yellow') {
+    title = 'Awaiting client';
+    label = 'Request sent · client yet to complete e-KYC';
+    onClick = onViewStatus;
+  } else if (isRejectedSale) {
+    title = 'Not triggered';
+    label = 'Sale rejected by Super Admin';
+  } else {
+    title = sale.eSignStatus === 'Rejected by Client' ? 'Client declined'
+      : sale.eSignStatus === 'Invitation Expired' ? 'Invitation expired'
+      : 'e-KYC not triggered';
+    label = canTrigger
+      ? (sale.eSignStatus === 'Rejected by Client' || sale.eSignStatus === 'Invitation Expired' ? 'Click to re-send e-KYC & E-Sign' : 'Click to send e-KYC & E-Sign')
+      : 'Awaiting Super Admin';
+    if (canTrigger) onClick = onTrigger;
+  }
+
+  const content = (
+    <>
+      <span className="ekyc-light-housing" aria-hidden="true">
+        {LIGHTS.map(l => <span key={l} className={`ekyc-lamp ${l}${l === light ? ' lit' : ''}`} />)}
+      </span>
+      <span className="ekyc-light-text">
+        <span className="ekyc-light-title">{title}</span>
+        <span className="ekyc-light-label">{label}</span>
+      </span>
+    </>
+  );
+
+  return onClick ? (
+    <button
+      type="button"
+      className={`ekyc-light ${light}`}
+      onClick={onClick}
+      disabled={light === 'red' && isDispatching}
+      title={light === 'red' ? 'Create the real Leegality signing request (Workflow LzfDhWc)' : 'Live status from Leegality'}
+    >
+      {content}
+    </button>
+  ) : (
+    <span className={`ekyc-light ${light}`}>{content}</span>
+  );
+};
 
 export const SaleApprovalWorkflow = () => {
   const { 
     sales, 
-    simulatedRole, 
-    registerSale, 
-    rejectSale, 
-    users, 
+    simulatedRole,
+    rejectSale,
     hasPermission,
     voiceAgentSettings,
     triggerEKycAndESign
   } = useCRM();
   const { showToast } = useToast();
 
-  const [isSubmitOpen, setIsSubmitOpen] = useState(false);
   const [selectedReviewSale, setSelectedReviewSale] = useState(null);
   const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
   const [liveDispatchData, setLiveDispatchData] = useState(null); // { sale, result }
   const [isDispatchingDirect, setIsDispatchingDirect] = useState(false);
-
-  const [newSale, setNewSale] = useState({
-    clientName: '',
-    amount: '',
-    employeeName: 'AKSHATA',
-    mitcStatus: 'Verified',
-    complianceStatus: 'Compliant'
-  });
-
-  const handleSubmitSale = (e) => {
-    e.preventDefault();
-    if (!newSale.clientName || !newSale.amount) {
-      showToast('Please fill in Client Name and Sale Amount.', 'warning');
-      return;
-    }
-    registerSale(newSale);
-    showToast(`Sale submitted! Notification sent to Super Admin for approval.`, 'success');
-    setIsSubmitOpen(false);
-    setNewSale({ clientName: '', amount: '', employeeName: 'AKSHATA', mitcStatus: 'Verified', complianceStatus: 'Compliant' });
-  };
 
   const handleReject = (id, name) => {
     rejectSale(id, 'Super Admin declined sale details.');
@@ -80,11 +114,10 @@ export const SaleApprovalWorkflow = () => {
     }
   };
 
-  const pendingSales = sales.filter(s => 
-    s.status.includes('Pending') || 
-    s.status.includes('Voice Call Pending') ||
-    s.status.includes('Dispatched') ||
-    s.stage?.includes('Awaiting Client E-Sign')
+  // Sales already sent to Leegality move down to the pipeline, where the traffic light tracks them
+  const pendingSales = sales.filter(s =>
+    s.status.includes('Pending') ||
+    s.status.includes('Voice Call Pending')
   );
   const processedSales = sales.filter(s => !pendingSales.some(p => p.id === s.id));
 
@@ -105,7 +138,7 @@ export const SaleApprovalWorkflow = () => {
           <div className="metric-info">
             <h4>E-Signed & Finalized</h4>
             <div className="value" style={{ color: 'var(--status-success)' }}>
-              {sales.filter(s => s.status.includes('E-Signed') || s.eSignStatus === 'Completed').length}
+              {sales.filter(s => getEKycLight(s) === 'green').length}
             </div>
           </div>
           <div className="metric-icon" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success)', borderColor: 'var(--status-success-border)' }}>
@@ -130,10 +163,6 @@ export const SaleApprovalWorkflow = () => {
             <h3>Sale Approval & Automated Verification Queue</h3>
             <p>Super Admin reviews submissions, manages Voice Agent verification, and monitors Leegality digital E-Sign.</p>
           </div>
-
-          <button className="btn-primary" onClick={() => setIsSubmitOpen(true)}>
-            <PlusCircle size={15} /> Register New Employee Sale
-          </button>
         </div>
 
         {/* Pending Approvals Table */}
@@ -283,23 +312,18 @@ export const SaleApprovalWorkflow = () => {
                 <th>Amount</th>
                 <th>Submitted By</th>
                 <th>Current Stage</th>
-                <th>E-Sign Status</th>
-                <th>Action</th>
+                <th>e-KYC & E-Sign</th>
               </tr>
             </thead>
             <tbody>
               {processedSales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No finalized sales yet.
                   </td>
                 </tr>
               ) : (
                 processedSales.map(s => {
-                  const isReadyForESign = s.stage?.includes('Ready for E-Sign') || s.status?.includes('Ready for E-Sign');
-                  const isESigned = s.status?.includes('E-Signed') || s.eSignStatus === 'Completed';
-                  const isVerifiedESign = isESigned && !!s.eSignDetails?.verifiedByLeegality;
-
                   return (
                     <tr key={s.id}>
                       <td>{s.date}</td>
@@ -312,44 +336,13 @@ export const SaleApprovalWorkflow = () => {
                         </span>
                       </td>
                       <td>
-                        {isESigned ? (
-                          <div className="status-indicator">
-                            <span className="status-dot active" />
-                            <span style={{ color: isVerifiedESign ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                              {isVerifiedESign ? 'Leegality E-Signed' : 'Unverified (old simulated record)'}
-                            </span>
-                          </div>
-                        ) : isReadyForESign ? (
-                          <span className="badge" style={{ background: '#3b82f615', color: '#60a5fa', border: '1px solid #3b82f630' }}>
-                            Awaiting E-Sign
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{s.status}</span>
-                        )}
-                      </td>
-                      <td>
-                        {isReadyForESign ? (
-                          <button
-                            className="btn-primary"
-                            style={{ padding: '4px 10px', fontSize: '0.74rem', background: '#10b981', gap: '5px', fontWeight: 700 }}
-                            onClick={() => handleDirectTriggerEKycAndESign(s)}
-                            disabled={isDispatchingDirect}
-                            title="Create the real Leegality signing request (Workflow LzfDhWc)"
-                          >
-                            <Sparkles size={12} /> Trigger e-KYC & E-Sign
-                          </button>
-                        ) : isESigned && s.eSignDocumentId ? (
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px' }}
-                            onClick={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
-                            title="Live status and signed copy from Leegality"
-                          >
-                            <ShieldCheck size={12} color="#10b981" /> View Agreement
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Approved</span>
-                        )}
+                        <EKycTrafficLight
+                          sale={s}
+                          canTrigger={hasPermission('sale-approvals')}
+                          isDispatching={isDispatchingDirect}
+                          onTrigger={() => handleDirectTriggerEKycAndESign(s)}
+                          onViewStatus={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
+                        />
                       </td>
                     </tr>
                   );
@@ -359,57 +352,6 @@ export const SaleApprovalWorkflow = () => {
           </table>
         </div>
       </div>
-
-      {/* Register Sale Modal */}
-      {isSubmitOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '440px' }}>
-            <div className="modal-header">
-              <h3>Register New Employee Sale</h3>
-              <button className="modal-close-btn" onClick={() => setIsSubmitOpen(false)}>×</button>
-            </div>
-            <form onSubmit={handleSubmitSale}>
-              <div className="modal-body">
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label>Client / Lead Name *</label>
-                  <input
-                    type="text"
-                    value={newSale.clientName}
-                    onChange={(e) => setNewSale({ ...newSale, clientName: e.target.value })}
-                    placeholder="e.g. Apex Tech Solutions"
-                    required
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label>Sale Amount *</label>
-                  <input
-                    type="text"
-                    value={newSale.amount}
-                    onChange={(e) => setNewSale({ ...newSale, amount: e.target.value })}
-                    placeholder="e.g. ₹5,00,000"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Submitting Employee</label>
-                  <select
-                    value={newSale.employeeName}
-                    onChange={(e) => setNewSale({ ...newSale, employeeName: e.target.value })}
-                  >
-                    {users.filter(u => u.role === 'Executive').map(u => (
-                      <option key={u.id} value={u.name}>{u.name} ({u.employeeId})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setIsSubmitOpen(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Submit for Approval</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Super Admin Email Review Modal */}
       <SuperAdminEmailReviewModal
