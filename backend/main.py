@@ -13,6 +13,7 @@ try:
                               check_not_locked, record_failure, clear_failures)
     from backend.leegality import router as leegality_router
     from backend.signatures import router as signatures_router
+    from backend import broadcasts
 except ImportError:
     from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
     from auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
@@ -20,6 +21,7 @@ except ImportError:
                       check_not_locked, record_failure, clear_failures)
     from leegality import router as leegality_router
     from signatures import router as signatures_router
+    import broadcasts
 
 
 app = FastAPI(title="Srinivas CRM API", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
@@ -37,6 +39,19 @@ app.add_middleware(
 
 app.include_router(leegality_router)
 app.include_router(signatures_router)
+app.include_router(broadcasts.router)
+
+
+# Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
+@app.on_event("startup")
+def start_broadcast_pollers():
+    if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1":
+        broadcasts.start_pollers()
+
+
+@app.on_event("shutdown")
+def stop_broadcast_pollers():
+    broadcasts.stop_pollers()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):

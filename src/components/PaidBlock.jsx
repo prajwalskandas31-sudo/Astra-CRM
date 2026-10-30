@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { SERVICE_TENURES } from './ClientInformationModal';
+import { TradeCallBroadcasts } from './TradeCallBroadcasts';
 import {
   getTenureProgress,
   isTenureOver,
@@ -317,6 +318,8 @@ export const PaidBlock = () => {
           </section>
         ))}
       </div>
+
+      {seesAll && <TradeCallBroadcasts />}
     </div>
   );
 };
