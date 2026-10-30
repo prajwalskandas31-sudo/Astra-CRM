@@ -161,8 +161,53 @@ def active_recipients(service_name: str) -> List[dict]:
 # ==========================================
 # SMS gateway
 # ==========================================
-def compose_sms(cfg: dict, service_name: str, call_text: str) -> str:
-    return cfg["message_format"].replace("\\n", "\n").replace("{service}", service_name).replace("{call}", call_text.strip())
+DLT_VAR = re.compile(r"\{\{(\d+)\}\}")
+# DLT operators cap each {{n}} value at 30 characters
+MAX_VAR_CHARS = 30
+
+
+def call_pattern(message_format: str) -> Optional[re.Pattern]:
+    """For a DLT format with {{n}} slots, a pattern that reads the slot values from a posted call.
+
+    The call is the format's text up to the last slot, e.g. "NIFTY 24500 CE Buy 120 SL 100 Tgt 150"
+    for "FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} <footer>". The words before the first slot are
+    optional, words are case-insensitive, and spaces and line breaks are interchangeable.
+    """
+    slots = list(DLT_VAR.finditer(message_format))
+    if not slots:
+        return None
+    lead = r"\s+".join(re.escape(w) for w in message_format[:slots[0].start()].split())
+    parts = [rf"(?:{lead}\s*)?" if lead else ""]
+    for i, slot in enumerate(slots):
+        last = i == len(slots) - 1
+        parts.append(rf"(?P<v{slot.group(1)}>.+)" if last else rf"(?P<v{slot.group(1)}>.+?)")
+        if not last:
+            words = message_format[slot.end():slots[i + 1].start()].split()
+            parts.append(r"\s+" + r"\s+".join(re.escape(w) for w in words) + r"\s+" if words else r"\s+")
+    return re.compile(r"^\s*" + "".join(parts) + r"\s*$", re.I | re.S)
+
+
+def call_example(message_format: str) -> str:
+    slots = list(DLT_VAR.finditer(message_format))
+    body = message_format[slots[0].start():slots[-1].end()] if slots else "{call}"
+    samples = iter(["NIFTY 24500 CE", "120", "100", "150", "x", "y", "z", "w"])
+    return " ".join(DLT_VAR.sub(lambda m: next(samples), body).split())
+
+
+def compose_sms(cfg: dict, service_name: str, call_text: str) -> tuple:
+    """The SMS text for a call, and an error when the call does not fit the approved template."""
+    fmt = cfg["message_format"].replace("\\n", "\n").replace("{service}", service_name)
+    pattern = call_pattern(fmt)
+    if not pattern:
+        return fmt.replace("{call}", call_text.strip()), None
+    match = pattern.match(call_text)
+    if not match:
+        return "", f"The call does not match the approved SMS template. Post it as: {call_example(fmt)}"
+    values = {k[1:]: " ".join(v.split()) for k, v in match.groupdict().items()}
+    bad = [v for v in values.values() if not v or len(v) > MAX_VAR_CHARS]
+    if bad:
+        return "", f"Each value must be 1-{MAX_VAR_CHARS} characters; too long: {bad[0]}"
+    return DLT_VAR.sub(lambda m: values[m.group(1)], fmt), None
 
 
 def send_sms(cfg: dict, phone: str, message: str) -> dict:
@@ -221,8 +266,10 @@ def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: boo
     problems = config_problems(cfg) if not cfg["dry_run"] else []
     if test_only and not cfg["test_recipients"]:
         problems.append("SMS_TEST_RECIPIENT is not set in backend/.env.")
-    message = compose_sms(cfg, service_name, call_text)
-    if len(message) > cfg["max_chars"]:
+    message, template_error = compose_sms(cfg, service_name, call_text)
+    if template_error:
+        problems.append(template_error)
+    elif len(message) > cfg["max_chars"]:
         problems.append(f"Message is {len(message)} characters; the limit is {cfg['max_chars']}.")
     clients = active_recipients(service_name)
     record.update({"message": message, "activeClients": len(clients)})

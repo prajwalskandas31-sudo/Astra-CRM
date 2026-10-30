@@ -203,3 +203,23 @@ def test_crm_test_send_is_super_admin_only_and_reaches_only_test_numbers(crm, bc
     res = crm.client.post("/api/broadcasts/test", json=body, headers=sa).json()
     assert res["status"] == "Sent" and res["testMode"] is True
     assert [p["to"] for p in bc.sms] == ["9811122233"]
+
+
+DLT_FORMAT = ("FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} Unite Technologies Financial Service "
+              "(SEBI Reg: INH000020350) - https://investeq.in/")
+
+
+def test_calls_fill_the_dlt_template_slots(bc):
+    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    bc.write_env(SMS_MESSAGE_FORMAT=DLT_FORMAT)
+    authorize(bc)
+
+    message(bc, text="fno alert: BANKNIFTY 52000 PE\nbuy 300\nsl 250\ntgt 350/400")
+    assert bc.sms[-1]["message"] == ("FNO ALERT: BANKNIFTY 52000 PE Buy 300 SL 250 Tgt 350/400 Unite Technologies "
+                                     "Financial Service (SEBI Reg: INH000020350) - https://investeq.in/")
+
+    count = len(bc.sms)
+    reply = message(bc, text="BUY NIFTY 120")
+    assert "NOT SENT" in reply and "Post it as: NIFTY 24500 CE Buy 120 SL 100 Tgt 150" in reply
+    assert "too long" in message(bc, text="N" * 31 + " Buy 1 SL 2 Tgt 3")
+    assert len(bc.sms) == count

@@ -124,7 +124,7 @@ export const TradeCallBroadcasts = () => {
               onChange={e => setTestCall(e.target.value)}
               required
               rows={2}
-              placeholder="Trade call text, exactly as it will be posted"
+              placeholder="e.g. NIFTY 24500 CE Buy 120 SL 100 Tgt 150"
               aria-label="Trade call text for the test SMS"
               style={{ flex: '1 1 260px', minWidth: 0, fontSize: '0.82rem', padding: '6px 10px' }}
             />
