@@ -29,7 +29,8 @@ def bc(crm, monkeypatch):
     """The broadcasts module with a test .env, empty data files and the network stubbed out."""
     b = crm.broadcasts
     env = {"TELEGRAM_BOTS": json.dumps({SERVICE: "123:abc"}), "TELEGRAM_ALLOWED_PHONES": f"+91 {SENDER_PHONE}",
-           "SMS_ACCESS_TOKEN": "test-token", "SMS_SENDER": "INVSTQ", "SMS_SERVICE": "SI"}
+           "SMS_ACCESS_TOKEN": "test-token", "SMS_SENDER": "INVSTQ", "SMS_SERVICE": "SI",
+           "SMS_BLOCKED_HOURS": "off"}
 
     def write_env(**overrides):
         with open(b.ENV_PATH, "w", encoding="utf-8") as f:
@@ -223,3 +224,23 @@ def test_calls_fill_the_dlt_template_slots(bc):
     assert "NOT SENT" in reply and "Post it as: NIFTY 24500 CE Buy 120 SL 100 Tgt 150" in reply
     assert "too long" in message(bc, text="N" * 31 + " Buy 1 SL 2 Tgt 3")
     assert len(bc.sms) == count
+
+
+def test_se_route_is_not_sent_in_the_carrier_blocked_hours(bc, monkeypatch):
+    from datetime import datetime as real_datetime
+    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    bc.write_env(SMS_SERVICE="SE", SMS_BLOCKED_HOURS="")
+    cfg = bc.settings()
+    assert cfg["blocked_hours"] == (21, 10)
+    assert bc.in_blocked_hours(cfg, real_datetime(2026, 10, 30, 23, 41))
+    assert bc.in_blocked_hours(cfg, real_datetime(2026, 10, 31, 9, 59))
+    assert not bc.in_blocked_hours(cfg, real_datetime(2026, 10, 31, 10, 0))
+    assert not bc.in_blocked_hours(cfg, real_datetime(2026, 10, 31, 20, 59))
+    bc.write_env(SMS_SERVICE="SI", SMS_BLOCKED_HOURS="")
+    assert bc.settings()["blocked_hours"] is None
+
+    bc.write_env(SMS_SERVICE="SE", SMS_BLOCKED_HOURS="21-10")
+    monkeypatch.setattr(bc, "in_blocked_hours", lambda cfg, now=None: True)
+    authorize(bc)
+    reply = message(bc, text="BUY NIFTY")
+    assert "NOT SENT" in reply and "after 10:00" in reply and bc.sms == []

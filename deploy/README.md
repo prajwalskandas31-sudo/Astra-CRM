@@ -43,6 +43,7 @@ Settings in `backend/.env` (restart the backend after changing bots):
 | `SMS_MAX_CHARS` | longest SMS allowed, default 480 |
 | `SMS_TEST_RECIPIENT` | comma-separated; while set, every call goes only to these numbers (bot reply says how many clients it would have reached). Super Admins can also send a test from the Trade Call Broadcasts panel |
 | `SMS_DRY_RUN` | `1` = log only, send nothing |
+| `SMS_BLOCKED_HOURS` | IST hours when carriers drop the route's SMS; calls then are refused, not sent. Default `21-10` for `SE`/`PR`, `off` otherwise |
 | `TELEGRAM_BOTS` | JSON: `{"<service name exactly as in the CRM>": "<BotFather token>"}` |
 | `TELEGRAM_ALLOWED_PHONES` | comma-separated numbers allowed to post calls |
 

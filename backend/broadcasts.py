@@ -39,7 +39,7 @@ SENDERS_PATH = os.path.join(DATA_DIR, "telegram_senders.json")
 OFFSETS_PATH = os.path.join(DATA_DIR, "telegram_offsets.json")
 
 ENV_KEYS = ("TELEGRAM_BOTS", "TELEGRAM_ALLOWED_PHONES", "SMS_ACCESS_TOKEN", "SMS_SENDER", "SMS_SERVICE",
-            "SMS_COUNTRY_CODE", "SMS_API_URL", "SMS_MESSAGE_FORMAT", "SMS_MAX_CHARS", "SMS_TEST_RECIPIENT", "SMS_DRY_RUN")
+            "SMS_COUNTRY_CODE", "SMS_API_URL", "SMS_MESSAGE_FORMAT", "SMS_MAX_CHARS", "SMS_TEST_RECIPIENT", "SMS_DRY_RUN", "SMS_BLOCKED_HOURS")
 DEFAULT_SMS_API_URL = "https://apis.wappie.shop/v1/sms/messages"
 TELEGRAM_API = "https://api.telegram.org"
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -102,7 +102,23 @@ def settings() -> dict:
         # Comma-separated; while set, every call goes only to these numbers
         "test_recipients": [p for p in dict.fromkeys(normalize_phone(x) for x in env.get("SMS_TEST_RECIPIENT", "").split(",")) if p],
         "dry_run": env.get("SMS_DRY_RUN", "").lower() in ("1", "true", "yes"),
+        # Carriers drop Promotional and Service Explicit SMS from 9 PM to 10 AM IST; "21-10", or "off"
+        "blocked_hours": _parse_hours(env.get("SMS_BLOCKED_HOURS")
+                                      or ("21-10" if env.get("SMS_SERVICE", "").upper() in ("SE", "PR") else "off")),
     }
+
+
+def _parse_hours(value: str) -> Optional[tuple]:
+    match = re.fullmatch(r"\s*(\d{1,2})\s*-\s*(\d{1,2})\s*", value or "")
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+def in_blocked_hours(cfg: dict, now: Optional[datetime] = None) -> bool:
+    if not cfg["blocked_hours"]:
+        return False
+    start, end = cfg["blocked_hours"]
+    hour = (now or datetime.now(IST)).hour
+    return start <= hour < end if start < end else hour >= start or hour < end
 
 
 def _read(path: str, default):
@@ -264,6 +280,10 @@ def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: boo
         "dryRun": cfg["dry_run"],
     }
     problems = config_problems(cfg) if not cfg["dry_run"] else []
+    if not cfg["dry_run"] and in_blocked_hours(cfg):
+        start, end = cfg["blocked_hours"]
+        problems.append(f"Carriers do not deliver {cfg['service']} SMS between {start}:00 and {end}:00 IST, so nothing was sent "
+                        f"(it would be charged and never arrive). Post the call again after {end}:00.")
     if test_only and not cfg["test_recipients"]:
         problems.append("SMS_TEST_RECIPIENT is not set in backend/.env.")
     message, template_error = compose_sms(cfg, service_name, call_text)
@@ -504,6 +524,7 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "messageFormat": cfg["message_format"],
             "testRecipients": [mask_phone(p) for p in cfg["test_recipients"]],
             "dryRun": cfg["dry_run"],
+            "blockedHours": f"{cfg['blocked_hours'][0]}:00-{cfg['blocked_hours'][1]}:00 IST" if cfg["blocked_hours"] else None,
             "allowedPhones": [mask_phone(p) for p in sorted(cfg["allowed_phones"])],
         },
         "services": services,

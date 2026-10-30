@@ -109,6 +109,7 @@ export const TradeCallBroadcasts = () => {
             {config.sender && <span>Sender <strong>{config.sender}</strong> · route <strong>{config.service}</strong></span>}
             {config.testRecipients.length > 0 && <Tone tone="warning">Test mode: only {config.testRecipients.join(', ')} receive SMS</Tone>}
             {config.dryRun && <Tone tone="warning">Dry run: no SMS is sent</Tone>}
+            {config.blockedHours && <span style={{ color: 'var(--text-muted)' }}>No SMS {config.blockedHours} (carrier rule for route {config.service})</span>}
             {config.problems.map(p => <span key={p} style={{ color: 'var(--status-danger)' }}>{p}</span>)}
           </div>
         )}
