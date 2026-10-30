@@ -8,6 +8,7 @@ Only Telegram accounts whose phone number is listed in TELEGRAM_ALLOWED_PHONES c
 sender proves the number once by tapping "Share my number", and their Telegram user id is stored.
 """
 import json
+import logging
 import os
 import re
 import threading
@@ -53,6 +54,9 @@ PAID_FIELDS = ("id", "saleId", "leadId", "clientName", "phone", "serviceName", "
                "serviceStartDate", "serviceEndDate", "status")
 
 router = APIRouter(tags=["broadcasts"])
+# The wappie gateway (GET only) and Telegram both carry their tokens in the URL, and httpx logs full
+# request URLs at INFO, so keep its logger quiet; our own errors record only the exception type.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 _lock = threading.Lock()
 _stop = threading.Event()
 _pollers: dict = {}  # service name -> {"username", "error", "thread"}
