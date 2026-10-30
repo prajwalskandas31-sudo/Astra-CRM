@@ -41,7 +41,7 @@ Settings in `backend/.env` (restart the backend after changing bots):
 | `SMS_COUNTRY_CODE` | default `+91` |
 | `SMS_MESSAGE_FORMAT` | SMS text; must match the approved DLT template. `{call}` = Telegram message, `{service}` = service name. Default `{call}` |
 | `SMS_MAX_CHARS` | longest SMS allowed, default 480 |
-| `SMS_TEST_RECIPIENT` | while set, every call goes only to this number (bot reply says how many clients it would have reached) |
+| `SMS_TEST_RECIPIENT` | comma-separated; while set, every call goes only to these numbers (bot reply says how many clients it would have reached). Super Admins can also send a test from the Trade Call Broadcasts panel |
 | `SMS_DRY_RUN` | `1` = log only, send nothing |
 | `TELEGRAM_BOTS` | JSON: `{"<service name exactly as in the CRM>": "<BotFather token>"}` |
 | `TELEGRAM_ALLOWED_PHONES` | comma-separated numbers allowed to post calls |

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useCRM } from '../context/CRMContext';
+import { useToast } from './ToastNotification';
 import { API_BASE_URL, isBackendEnabled, readErrorDetail } from '../services/backendConfig';
 import { Send, RefreshCw, Bot, ShieldCheck, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -23,8 +24,13 @@ const formatTime = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: 
  * service's active Paid clients. The sending happens on the server; this panel shows its state.
  */
 export const TradeCallBroadcasts = () => {
-  const { authToken } = useCRM();
+  const { authToken, services: crmServices = [], currentUser, simulatedRole } = useCRM();
+  const { showToast } = useToast();
+  const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
   const [data, setData] = useState(null);
+  const [testService, setTestService] = useState('');
+  const [testCall, setTestCall] = useState('');
+  const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [openId, setOpenId] = useState(null);
@@ -49,6 +55,29 @@ export const TradeCallBroadcasts = () => {
     const timer = setInterval(load, REFRESH_MS);
     return () => clearInterval(timer);
   }, [load]);
+
+  // Sends from the CRM to the SMS_TEST_RECIPIENT numbers only; clients never receive a test
+  const sendTest = async (e) => {
+    e.preventDefault();
+    setTesting(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/broadcasts/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ service: testService, call: testCall })
+      });
+      if (!res.ok) throw new Error(await readErrorDetail(res, `Server returned ${res.status}`));
+      const record = await res.json();
+      if (record.status === 'Sent') showToast(`Test SMS accepted by the gateway for ${record.sent} number(s).`, 'success');
+      else showToast(`Test SMS ${record.status.toLowerCase()}: ${record.error || `${record.failed} failed`}`, 'error');
+      setOpenId(record.id);
+      load();
+    } catch (err) {
+      showToast(err.message || 'Test SMS failed.', 'error');
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const config = data?.config;
   const services = data?.services || [];
@@ -78,10 +107,31 @@ export const TradeCallBroadcasts = () => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.82rem' }}>
             {config.smsReady ? <Tone tone="success">SMS gateway ready</Tone> : <Tone tone="danger">SMS gateway not configured</Tone>}
             {config.sender && <span>Sender <strong>{config.sender}</strong> · route <strong>{config.service}</strong></span>}
-            {config.testRecipient && <Tone tone="warning">Test mode: only {config.testRecipient} receives SMS</Tone>}
+            {config.testRecipients.length > 0 && <Tone tone="warning">Test mode: only {config.testRecipients.join(', ')} receive SMS</Tone>}
             {config.dryRun && <Tone tone="warning">Dry run: no SMS is sent</Tone>}
             {config.problems.map(p => <span key={p} style={{ color: 'var(--status-danger)' }}>{p}</span>)}
           </div>
+        )}
+
+        {isSuperAdmin && (
+          <form onSubmit={sendTest} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-start' }}>
+            <select value={testService} onChange={e => setTestService(e.target.value)} required aria-label="Service for the test SMS" style={{ fontSize: '0.82rem', padding: '6px 10px', height: '36px' }}>
+              <option value="">Service…</option>
+              {crmServices.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            </select>
+            <textarea
+              value={testCall}
+              onChange={e => setTestCall(e.target.value)}
+              required
+              rows={2}
+              placeholder="Trade call text, exactly as it will be posted"
+              aria-label="Trade call text for the test SMS"
+              style={{ flex: '1 1 260px', minWidth: 0, fontSize: '0.82rem', padding: '6px 10px' }}
+            />
+            <button type="submit" className="btn-primary" disabled={testing || !config?.testRecipients?.length} title={config?.testRecipients?.length ? '' : 'Set SMS_TEST_RECIPIENT in backend/.env first'}>
+              {testing ? 'Sending…' : 'Send test SMS'}
+            </button>
+          </form>
         )}
 
         <div className="table-responsive">

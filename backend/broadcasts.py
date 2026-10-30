@@ -99,7 +99,8 @@ def settings() -> dict:
         # {call} is the text posted in Telegram, {service} the service name; must match the DLT template
         "message_format": env.get("SMS_MESSAGE_FORMAT", "{call}"),
         "max_chars": int(env.get("SMS_MAX_CHARS") or 480),
-        "test_recipient": normalize_phone(env.get("SMS_TEST_RECIPIENT", "")),
+        # Comma-separated; while set, every call goes only to these numbers
+        "test_recipients": [p for p in dict.fromkeys(normalize_phone(x) for x in env.get("SMS_TEST_RECIPIENT", "").split(",")) if p],
         "dry_run": env.get("SMS_DRY_RUN", "").lower() in ("1", "true", "yes"),
     }
 
@@ -204,8 +205,9 @@ def config_problems(cfg: dict) -> List[str]:
     return [f"{name} is not set in backend/.env" for name in missing]
 
 
-def broadcast(service_name: str, call_text: str, posted_by: dict) -> dict:
-    """Send one trade call to every active client on the service and log the result."""
+def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: bool = False) -> dict:
+    """Send one trade call to every active client on the service and log the result.
+    test_only sends it to the SMS_TEST_RECIPIENT numbers alone, whatever the mode."""
     cfg = settings()
     record = {
         "id": "bc-" + uuid.uuid4().hex[:12],
@@ -213,10 +215,12 @@ def broadcast(service_name: str, call_text: str, posted_by: dict) -> dict:
         "call": call_text,
         "postedBy": posted_by,
         "createdAt": datetime.now(timezone.utc).isoformat(),
-        "testMode": bool(cfg["test_recipient"]),
+        "testMode": bool(cfg["test_recipients"]) or test_only,
         "dryRun": cfg["dry_run"],
     }
     problems = config_problems(cfg) if not cfg["dry_run"] else []
+    if test_only and not cfg["test_recipients"]:
+        problems.append("SMS_TEST_RECIPIENT is not set in backend/.env.")
     message = compose_sms(cfg, service_name, call_text)
     if len(message) > cfg["max_chars"]:
         problems.append(f"Message is {len(message)} characters; the limit is {cfg['max_chars']}.")
@@ -227,7 +231,8 @@ def broadcast(service_name: str, call_text: str, posted_by: dict) -> dict:
         record.update({"status": "Not sent", "error": " ".join(problems), "sent": 0, "failed": 0, "results": []})
     else:
         # Test mode sends the call once, to the test number, so the real wording can be checked safely
-        targets = [{"clientName": "Test recipient", "phone": cfg["test_recipient"]}] if cfg["test_recipient"] else clients
+        targets = ([{"clientName": "Test recipient", "phone": p} for p in cfg["test_recipients"]]
+                   if record["testMode"] else clients)
         with ThreadPoolExecutor(max_workers=SEND_WORKERS) as pool:
             outcomes = list(pool.map(lambda r: send_sms(cfg, r["phone"], message), targets))
         results = [{"clientName": r["clientName"], "phone": mask_phone(r["phone"]), **o} for r, o in zip(targets, outcomes)]
@@ -275,7 +280,7 @@ def _summary(record: dict) -> str:
         return f"NOT SENT. {record['error']}"
     head = f"{record['status']}: {record['sent']} of {record['sent'] + record['failed']} SMS delivered to the gateway."
     if record["testMode"]:
-        head = f"TEST MODE: sent only to the test number. It would have gone to {record['activeClients']} active client(s).\n" + head
+        head = f"TEST MODE: sent only to the test number(s). It would have gone to {record['activeClients']} active client(s).\n" + head
     if record["dryRun"]:
         head = "DRY RUN: no SMS was sent.\n" + head
     failures = [r for r in record["results"] if not r["ok"]][:5]
@@ -450,7 +455,7 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "sender": cfg["sender"],
             "service": cfg["service"],
             "messageFormat": cfg["message_format"],
-            "testRecipient": mask_phone(cfg["test_recipient"]) if cfg["test_recipient"] else None,
+            "testRecipients": [mask_phone(p) for p in cfg["test_recipients"]],
             "dryRun": cfg["dry_run"],
             "allowedPhones": [mask_phone(p) for p in sorted(cfg["allowed_phones"])],
         },
@@ -460,3 +465,16 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
                     for uid, s in senders.items()],
         "broadcasts": _read(BROADCASTS_PATH, []),
     }
+
+
+class TestCall(BaseModel):
+    service: str
+    call: str
+
+
+@router.post("/api/broadcasts/test")
+def send_test_call(req: TestCall, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    """Send a call from the CRM to the test numbers only, to check the SMS wording before going live."""
+    if not req.call.strip() or not req.service.strip():
+        raise HTTPException(status_code=400, detail="Enter a service and the call text.")
+    return broadcast(req.service.strip(), req.call, {"name": f"{current_user['name']} (CRM test)", "phone": ""}, test_only=True)

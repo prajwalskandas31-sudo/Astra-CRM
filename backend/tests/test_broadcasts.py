@@ -158,10 +158,10 @@ def test_message_format_and_length_limit(bc):
 
 def test_test_mode_sends_only_to_the_test_number(bc):
     bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001"), client("b", "9876500002")])
-    bc.write_env(SMS_TEST_RECIPIENT="9811122233")
+    bc.write_env(SMS_TEST_RECIPIENT="9811122233, +91 98111 22234")
     authorize(bc)
     reply = message(bc, text="BUY NIFTY")
-    assert [p["to"] for p in bc.sms] == ["9811122233"]
+    assert sorted(p["to"] for p in bc.sms) == ["9811122233", "9811122234"]
     assert "TEST MODE" in reply and "2 active" in reply
 
 
@@ -188,3 +188,18 @@ def test_broadcast_status_endpoint(crm, bc):
     assert body["config"]["smsReady"] is True
     assert body["services"][0]["service"] == SERVICE and body["services"][0]["activeClients"] == 1
     assert "test-token" not in json.dumps(body)
+
+
+def test_crm_test_send_is_super_admin_only_and_reaches_only_test_numbers(crm, bc):
+    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    body = {"service": SERVICE, "call": "BUY NIFTY"}
+    assert crm.client.post("/api/broadcasts/test", json=body, headers=bearer(crm.token(ADMIN))).status_code == 403
+
+    sa = bearer(crm.token(SA))
+    res = crm.client.post("/api/broadcasts/test", json=body, headers=sa).json()
+    assert res["status"] == "Not sent" and "SMS_TEST_RECIPIENT" in res["error"] and bc.sms == []
+
+    bc.write_env(SMS_TEST_RECIPIENT="9811122233")
+    res = crm.client.post("/api/broadcasts/test", json=body, headers=sa).json()
+    assert res["status"] == "Sent" and res["testMode"] is True
+    assert [p["to"] for p in bc.sms] == ["9811122233"]
