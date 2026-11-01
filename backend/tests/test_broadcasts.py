@@ -10,7 +10,7 @@ from backend.tests.conftest import bearer
 SA = "superadmin@company.com"
 ADMIN = "admin@company.com"
 EXEC = "tajayvarma76@gmail.com"
-SERVICE = "Equity Cash & Intraday Pro"
+SERVICE = "Stock Cash"
 SENDER_PHONE = "8884321002"
 SENDER_ID = 5551001
 
@@ -104,11 +104,11 @@ def test_only_active_clients_on_the_service_receive_the_call(bc):
     bc._write(bc.PAID_CLIENTS_PATH, [
         client("a", "9876500001"),
         client("dup", "+91 98765 00001"),                       # same phone: one SMS
-        client("other", "9876500002", service="Commodity Gold & Silver Super"),
+        client("other", "9876500002", service="Bullions"),
         client("expired", "9876500003", status="Service Expired"),
         client("ended", "9876500004", end=day(0)),              # tenure ends today
         client("bad", "12345"),
-        client("b", "9876500005", service=" equity cash & intraday pro "),
+        client("b", "9876500005", service=" stock cash "),
     ])
     assert sorted(r["phone"] for r in bc.active_recipients(SERVICE)) == ["9876500001", "9876500005"]
 

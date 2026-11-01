@@ -125,13 +125,23 @@ const DEFAULT_DISPOSITIONS = [
   { id: 'disp-8', name: 'Paid / Converted', requiresDateTimePicker: false, color: 'emerald', isDefault: false }
 ];
 
+// The official service tiers. Telegram bots (TELEGRAM_BOTS) and SMS routing match clients by these exact names.
 export const DEFAULT_SERVICES = [
-  { id: 'srv-1', name: 'Equity Cash & Intraday Pro', description: 'Real-time NSE cash market intraday calls with strict risk-reward' },
-  { id: 'srv-2', name: 'Nifty & BankNifty Options Alpha', description: 'Index weekly & monthly option strategies under SEBI RA guidelines' },
-  { id: 'srv-3', name: 'Commodity Gold & Silver Super', description: 'Precious metals and base metals breakout research' },
-  { id: 'srv-4', name: 'HNI Momentum Wealth Portfolio', description: 'High net-worth delivery & positional momentum stocks' },
-  { id: 'srv-5', name: 'Index Special Delivery Advise', description: 'Positional index holding strategies with structured hedging' }
+  { id: 'srv-stock-cash', name: 'Stock Cash', description: 'Equity cash segment research calls' },
+  { id: 'srv-stock-future', name: 'Stock Future', description: 'Single-stock futures research calls' },
+  { id: 'srv-stock-options', name: 'Stock Options', description: 'Single-stock options research calls' },
+  { id: 'srv-index-futures', name: 'Index Futures', description: 'Index futures research calls' },
+  { id: 'srv-index-options', name: 'Index Options', description: 'Index options research calls' },
+  { id: 'srv-bullions', name: 'Bullions', description: 'Gold and silver research calls' },
+  { id: 'srv-base-metals', name: 'Base Metals', description: 'Base metals research calls' },
+  { id: 'srv-energy', name: 'Energy', description: 'Crude oil and natural gas research calls' },
+  { id: 'srv-mcx-derivatives', name: 'MCX Derivatives', description: 'MCX derivatives research calls' },
+  { id: 'srv-nse-derivatives', name: 'NSE Derivatives', description: 'NSE derivatives research calls' },
+  { id: 'srv-bse-derivatives', name: 'BSE Derivatives', description: 'BSE derivatives research calls' },
+  { id: 'srv-hni-options', name: 'HNI Options - NSE & BSE', description: 'High net-worth options research on NSE & BSE' }
 ];
+// Bumped when the official list changes, so browsers holding an older saved list switch to it
+const SERVICES_VERSION = '2026-11-official-tiers';
 
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
   enabled: true,
@@ -191,7 +201,7 @@ const DEFAULT_LEADS = [
       email: 'vikram.rao@apexcapital.in',
       phone1: '+91 98451 98210',
       phone2: '',
-      serviceName: 'Nifty & BankNifty Options Alpha',
+      serviceName: 'Index Options',
       serviceTenure: '6 months',
       grossSales: '75000',
       netSales: '63559.32',
@@ -272,7 +282,7 @@ const DEFAULT_LEADS = [
       email: 'bgatreshh@gmail.com',
       phone1: '7022463268',
       phone2: '',
-      serviceName: 'Equity Advisory Pro',
+      serviceName: 'Stock Cash',
       serviceTenure: '3 months',
       grossSales: '50000',
       netSales: '42372.88',
@@ -305,7 +315,7 @@ const DEFAULT_SALES = [
     submittedByUserId: 'usr-1',
     leadId: 'LD-101',
     panNumber: 'ABCDE1234F',
-    serviceOpted: 'Nifty & BankNifty Options Alpha',
+    serviceOpted: 'Index Options',
     serviceTenure: '6 months',
     transactionNumbers: ['TXN-8841920'],
     clientCategory: 'Individual',
@@ -328,7 +338,7 @@ const DEFAULT_SALES = [
       email: 'vikram.rao@apexcapital.in',
       phone1: '+91 98451 98210',
       phone2: '',
-      serviceName: 'Nifty & BankNifty Options Alpha',
+      serviceName: 'Index Options',
       serviceTenure: '6 months',
       grossSales: '75000',
       netSales: '63559.32',
@@ -351,7 +361,7 @@ const DEFAULT_SALES = [
     submittedByUserId: 'usr-1',
     leadId: 'LD-105',
     panNumber: 'ABCDE5678K',
-    serviceOpted: 'Equity Advisory Pro',
+    serviceOpted: 'Stock Cash',
     serviceTenure: '3 months',
     transactionNumbers: ['TXN-7022463'],
     clientCategory: 'Individual',
@@ -374,7 +384,7 @@ const DEFAULT_SALES = [
       email: 'bgatreshh@gmail.com',
       phone1: '7022463268',
       phone2: '',
-      serviceName: 'Equity Advisory Pro',
+      serviceName: 'Stock Cash',
       serviceTenure: '3 months',
       grossSales: '50000',
       netSales: '42372.88',
@@ -981,7 +991,7 @@ export const CRMProvider = ({ children }) => {
   // ─── Services Master (Super Admin Managed) ──────────────────────────────
   const [services, setServices] = useState(() => {
     const saved = localStorage.getItem('crm_services');
-    if (saved) {
+    if (saved && localStorage.getItem('crm_services_version') === SERVICES_VERSION) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -992,6 +1002,7 @@ export const CRMProvider = ({ children }) => {
 
   useEffect(() => {
     localStorage.setItem('crm_services', JSON.stringify(services));
+    localStorage.setItem('crm_services_version', SERVICES_VERSION);
   }, [services]);
 
   // ─── Voice Agent Settings ────────────────────────────────────────────────
