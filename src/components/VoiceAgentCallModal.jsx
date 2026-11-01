@@ -42,7 +42,7 @@ export const VoiceAgentCallModal = ({
   const clientName = clientInfo.clientName || sale?.clientName || 'Client';
   const phone = sale?.phone1 || clientInfo.phone1 || '+91 98765 43210';
   const serviceName = sale?.serviceOpted || clientInfo.serviceName || 'Equity Advisory';
-  const tenure = sale?.serviceTenure || clientInfo.serviceTenure || '3 months';
+  const tenure = sale?.serviceTenure || clientInfo.serviceTenure || '3 Months';
   const grossAmount = sale?.amount || ('₹' + (sale?.grossSales || '50,000'));
   const txnId = (sale?.transactionNumbers && sale.transactionNumbers[0]) || clientInfo.transactionNumbers?.[0] || 'TXN-982182';
 

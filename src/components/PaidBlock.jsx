@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { SERVICE_TENURES } from './ClientInformationModal';
+import { SERVICE_TENURES, normalizeTenure } from './ClientInformationModal';
 import { TradeCallBroadcasts } from './TradeCallBroadcasts';
 import {
   getTenureProgress,
@@ -42,7 +42,7 @@ const STATUS_TONE = {
 };
 
 const tenureRank = (tenure) => {
-  const i = SERVICE_TENURES.indexOf(tenure);
+  const i = SERVICE_TENURES.indexOf(normalizeTenure(tenure));
   return i === -1 ? SERVICE_TENURES.length : i;
 };
 
@@ -125,8 +125,9 @@ export const PaidBlock = () => {
       .forEach(p => {
         if (!byService.has(p.serviceName)) byService.set(p.serviceName, new Map());
         const byTenure = byService.get(p.serviceName);
-        if (!byTenure.has(p.serviceTenure)) byTenure.set(p.serviceTenure, []);
-        byTenure.get(p.serviceTenure).push(p);
+        const tenure = normalizeTenure(p.serviceTenure);
+        if (!byTenure.has(tenure)) byTenure.set(tenure, []);
+        byTenure.get(tenure).push(p);
       });
     return [...byService.entries()]
       .sort(([a], [b]) => a.localeCompare(b))

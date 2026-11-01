@@ -42,13 +42,25 @@ export const INDIAN_STATES = [
 
 export const SERVICE_TENURES = [
   'Demo',
-  '1 month',
-  '2 months',
-  '3 months',
-  '6 months',
-  '9 months',
-  '12 months'
+  '1 Month',
+  '2 Months',
+  '3 Months',
+  '4 Months',
+  '5 Months',
+  '6 Months',
+  '7 Months',
+  '8 Months',
+  '9 Months',
+  '10 Months',
+  '11 Months',
+  '12 Months'
 ];
+
+// Records saved before the list was re-cased hold e.g. "3 months"; map them onto the current option
+export const normalizeTenure = (tenure) => {
+  const t = String(tenure || '').trim().toLowerCase();
+  return SERVICE_TENURES.find(opt => opt.toLowerCase() === t) || tenure;
+};
 
 export const ClientInformationModal = ({ 
   isOpen, 
@@ -79,7 +91,7 @@ export const ClientInformationModal = ({
     phone2: '',
     paymentDate: new Date().toISOString().split('T')[0],
     serviceName: '',
-    serviceTenure: '3 months',
+    serviceTenure: '3 Months',
     transactionNumbers: [''], // Up to 5 (min 1)
     grossSales: '',
     netSales: '0.00',
@@ -132,7 +144,7 @@ export const ClientInformationModal = ({
         phone2: existing.phone2 || '',
         paymentDate: existing.paymentDate || todayStr,
         serviceName: existing.serviceName || initialServices,
-        serviceTenure: existing.serviceTenure || '3 months',
+        serviceTenure: normalizeTenure(existing.serviceTenure) || '3 Months',
         transactionNumbers: existingTxnNumbers,
         grossSales: gross,
         netSales: calcNet,
