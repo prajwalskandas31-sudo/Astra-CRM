@@ -62,6 +62,9 @@ export const normalizeTenure = (tenure) => {
   return SERVICE_TENURES.find(opt => opt.toLowerCase() === t) || tenure;
 };
 
+// Select value for "+ Custom Service Name"; the typed name is what gets saved
+const CUSTOM_SERVICE = '__custom_service__';
+
 export const ClientInformationModal = ({ 
   isOpen, 
   onClose, 
@@ -102,6 +105,7 @@ export const ClientInformationModal = ({
   const [transactionAttachments, setTransactionAttachments] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [phone2Error, setPhone2Error] = useState('');
+  const [isCustomService, setIsCustomService] = useState(false);
   
   // Admin Gross Limit Override Modal State
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -119,7 +123,7 @@ export const ClientInformationModal = ({
     if (lead) {
       const existing = lead.clientInfo || {};
       const todayStr = new Date().toISOString().split('T')[0];
-      const initialServices = services && services.length > 0 ? services[0].name : 'Equity Cash & Intraday Pro';
+      const initialServices = services && services.length > 0 ? services[0].name : 'Stock Cash';
 
       const existingTxnNumbers = existing.transactionNumbers && Array.isArray(existing.transactionNumbers) && existing.transactionNumbers.length > 0
         ? existing.transactionNumbers
@@ -151,6 +155,9 @@ export const ClientInformationModal = ({
         gst: calcGst,
         clientState: existing.clientState || 'Maharashtra'
       });
+
+      // A saved name that is not one of the official tiers was typed in as a custom service
+      setIsCustomService(!!existing.serviceName && !(services || []).some(s => s.name === existing.serviceName));
 
       if (existing.transactionAttachments && Array.isArray(existing.transactionAttachments)) {
         setTransactionAttachments(existing.transactionAttachments);
@@ -907,14 +914,30 @@ export const ClientInformationModal = ({
                     {fieldErrors.serviceName && <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Fill details</span>}
                   </label>
                   <select
-                    value={formData.serviceName}
-                    onChange={(e) => handleChange('serviceName', e.target.value)}
+                    value={isCustomService ? CUSTOM_SERVICE : formData.serviceName}
+                    onChange={(e) => {
+                      const custom = e.target.value === CUSTOM_SERVICE;
+                      setIsCustomService(custom);
+                      handleChange('serviceName', custom ? '' : e.target.value);
+                    }}
                     style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
                   >
                     {services && services.map(srv => (
                       <option key={srv.id} value={srv.name}>{srv.name}</option>
                     ))}
+                    <option value={CUSTOM_SERVICE}>+ Custom Service Name</option>
                   </select>
+                  {isCustomService && (
+                    <input
+                      type="text"
+                      value={formData.serviceName}
+                      onChange={(e) => handleChange('serviceName', e.target.value)}
+                      placeholder="Type the custom service name"
+                      maxLength={60}
+                      autoFocus
+                      style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem', marginTop: '6px' }}
+                    />
+                  )}
                 </div>
 
                 {/* Service Tenure */}
