@@ -28,10 +28,16 @@ def crm(tmp_path_factory):
     import backend.auth as auth
     import backend.signatures as signatures
     import backend.leegality as leegality
+    import backend.broadcasts as broadcasts
     import backend.main as main
-    for module in (auth, signatures, leegality, main):
+    for module in (auth, signatures, leegality, broadcasts, main):
         importlib.reload(module)
-    signatures.SIGNATURES_PATH = str(tmp_path_factory.mktemp("data") / "signatures.json")
+    data_dir = tmp_path_factory.mktemp("data")
+    signatures.SIGNATURES_PATH = str(data_dir / "signatures.json")
+    # Broadcasts never read the real backend/.env or data files in tests
+    broadcasts.ENV_PATH = str(data_dir / "broadcasts.env")
+    for name in ("PAID_CLIENTS_PATH", "DELETED_PAID_PATH", "BROADCASTS_PATH", "SENDERS_PATH", "OFFSETS_PATH"):
+        setattr(broadcasts, name, str(data_dir / (name.lower().replace("_path", "") + ".json")))
 
     client = TestClient(main.app)
     ip_counter = iter(range(1, 10_000))
@@ -48,7 +54,8 @@ def crm(tmp_path_factory):
         assert res.status_code == 200, res.text
         return res.json()["access_token"]
 
-    return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, login=login, token=token)
+    return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts,
+                           login=login, token=token)
 
 
 def bearer(tok):

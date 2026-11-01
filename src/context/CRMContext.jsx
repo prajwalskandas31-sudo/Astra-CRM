@@ -2864,7 +2864,44 @@ export const CRMProvider = ({ children }) => {
 
   const deletePaidClient = (paidId) => {
     setPaidClients(prev => prev.filter(p => p.id !== paidId));
+    if (authToken && isBackendEnabled()) {
+      fetch(`${API_BASE_URL}/paid-clients/${encodeURIComponent(paidId)}`, { method: 'DELETE', headers: authHeaders() })
+        .catch(() => console.warn('Paid client delete did not reach the server; Telegram trade calls may still reach them.'));
+    }
   };
+
+  // ─── Paid Block ↔ server: the Telegram trade-call bots send SMS to the server copy ──
+  const isAdminSession = ['Super Admin', 'Admin'].includes(currentUser?.role);
+
+  // Pull clients other browsers synced (and drop ones deleted elsewhere), then push ours below
+  useEffect(() => {
+    if (!authToken || !isAdminSession || !isBackendEnabled()) return;
+    let cancelled = false;
+    fetch(`${API_BASE_URL}/paid-clients`, { headers: authHeaders() })
+      .then(res => (res.ok ? res.json() : null))
+      .then(body => {
+        if (cancelled || !body || !Array.isArray(body.clients)) return;
+        const deleted = new Set(body.deletedIds || []);
+        setPaidClients(prev => {
+          const kept = prev.filter(p => !deleted.has(p.id));
+          const known = new Set(kept.map(p => p.id));
+          const missing = body.clients.filter(c => c && !known.has(c.id));
+          return missing.length || kept.length !== prev.length ? [...kept, ...missing] : prev;
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authToken, isAdminSession]);
+
+  useEffect(() => {
+    if (!authToken || !isAdminSession || !isBackendEnabled() || paidClients.length === 0) return;
+    const timer = setTimeout(() => {
+      fetch(`${API_BASE_URL}/paid-clients/sync`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ clients: paidClients }) })
+        .then(res => { if (!res.ok) console.warn('Paid clients sync failed:', res.status); })
+        .catch(() => console.warn('Paid clients sync failed: server unreachable.'));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [paidClients, authToken, isAdminSession]);
 
 
   // Custom Roles
