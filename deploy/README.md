@@ -1,7 +1,16 @@
 # Deployment
 
-The CRM runs as two Docker containers on the server (`skanda@200.234.32.65`, folder `~/srinivas-crm`):
-nginx serves the frontend on port **8080** and forwards `/api` to the FastAPI backend.
+The CRM runs as Docker containers on the server (`skanda@200.234.32.65`, folder `~/srinivas-crm`):
+
+| Container | Role |
+|---|---|
+| `frontend` | nginx: serves the app on port **8080**, forwards `/api` to the backend, gzips responses |
+| `backend` | FastAPI, 6 worker processes (`WEB_CONCURRENCY` in `.env` to change) |
+| `db` | PostgreSQL 16: every CRM record (users, leads, sales, settings, Paid block, signatures). Volume `crm-db` |
+| `backup` | `pg_dump` at start-up and nightly at 02:00 into `~/srinivas-crm/backups`, kept 14 days |
+
+All data lives in Postgres and is shared by every browser through `/api/sync` (see `backend/sync.py`
+for who may read and change what). Browsers keep only a cache. Restarts and redeploys keep all data.
 
 ## CI/CD (`.github/workflows/ci-cd.yml`)
 
@@ -21,15 +30,17 @@ Deploy secrets live in the GitHub `production` environment (only `main` can use 
 
 ## Server-only files (never synced, never in git)
 
-- `.env`: `CRM_PORT`, `JWT_SECRET_KEY`
+- `.env`: `CRM_PORT`, `JWT_SECRET_KEY`, `POSTGRES_PASSWORD` (created by the first deploy; never change it, the
+  database keeps the password it was created with). Optional: `WEB_CONCURRENCY`, `BACKUP_HOUR`, `BACKUP_KEEP_DAYS`
+- `backups/`: database dumps (never synced, never deleted by a deploy)
 - `secrets/credentials.json`: account passwords
 - `backend/.env`: Leegality API keys, and the Trade Call Broadcast settings below
 
 ## Trade Call Broadcasts (Telegram → SMS)
 
 Each service has its own Telegram bot. A call posted to that bot goes out as SMS, through the wappie gateway,
-to every **active** Paid client on that service (expired tenures are skipped). The Paid block is synced to
-`backend/data/paid_clients.json` by Admin/Super Admin sessions; the bots read that copy.
+to every **active** Paid client on that service (expired tenures are skipped). The bots read the Paid block
+from the database. Only one backend worker runs the bots (it holds a database lock), so each call is sent once.
 
 Settings in `backend/.env` (restart the backend after changing bots):
 
@@ -54,8 +65,51 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 
 ## Rotating account passwords
 
+The credentials file sets the passwords of a brand-new database. After that, passwords live in the database
+(changed in the CRM by a Super Admin), and a restart never resets them. To force the file's passwords again:
+
 ```bash
 python deploy/generate_credentials.py          # writes secrets/credentials.json + CRM_ACCOUNT_CREDENTIALS.txt
 scp secrets/credentials.json skanda@200.234.32.65:srinivas-crm/secrets/credentials.json
-ssh skanda@200.234.32.65 'cd srinivas-crm && docker compose restart backend'
+ssh skanda@200.234.32.65 'cd srinivas-crm && docker compose exec backend python -m backend.db_init --apply-credentials'
 ```
+
+## Backups and restore
+
+- Nightly: `backups/crm-YYYYMMDD-HHMMSS.dump` (plus one each time the backup container starts), kept 14 days.
+- Before every deploy: `backups/pre-deploy-*.dump`, last 10 kept.
+- These sit on the same server. Copy them off it regularly (another machine or cloud storage), e.g. from your PC:
+  `scp skanda@200.234.32.65:srinivas-crm/backups/crm-*.dump ./crm-backups/`
+
+Restore (replaces all current data; asks for confirmation):
+
+```bash
+ssh skanda@200.234.32.65
+cd srinivas-crm && deploy/restore_backup.sh backups/crm-20261103-020000.dump
+```
+
+## Upgrading from the in-memory version
+
+The first deploy of this version creates the database and seeds the accounts from `secrets/credentials.json`.
+It also imports the files the old version kept in `backend/data` (Paid clients, broadcast log, Telegram senders,
+signatures, Leegality records), once. The first Super Admin to sign in afterwards uploads the leads, sales and
+assignments their browser holds, because the old version kept those only in browsers. Users created in the CRM
+since the last restart lived only in memory and must be created again, once.
+
+## Capacity and load testing
+
+Sized for ~300 simultaneous users on 8 vCPU / 32 GB. Before go-live (outside working hours; it writes test
+records and removes them again), run from any PC:
+
+```bash
+python deploy/load_test.py http://SERVER:8080 --password-file secrets/credentials.json     --users 300 --admins 10 --create-users 290 --leads 20000 --minutes 3
+```
+
+To grow further: raise `WEB_CONCURRENCY` with more CPUs; above ~1,000 users move Postgres to its own server
+(set `DATABASE_URL`) and run several backend servers behind a load balancer. Nothing in the app keeps
+state in memory, so this needs no code change.
+
+A message queue (Apache Artemis) is deliberately not part of this setup: no work in the CRM waits in a
+queue today, and requests are answered directly. The first place it would earn its keep is the Telegram →
+SMS fan-out, once Paid clients number in the thousands: each SMS as a durable message with retries that
+survives a backend restart mid-broadcast. Add it then, as an `artemis` container next to `db`.

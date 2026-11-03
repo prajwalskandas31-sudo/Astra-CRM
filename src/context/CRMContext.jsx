@@ -10,6 +10,22 @@ import {
 import { getPrimarySignatory, pullSignaturesFromServer } from '../services/digitalSignatureService';
 import { buildPaidClient, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
 import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
+import { useServerSync } from '../services/serverSync';
+
+// Which crm_* keys this browser held before the app wrote anything (the server import needs to know
+// whether local data is real or just defaults saved on first render).
+const LOCAL_KEYS_AT_START = typeof window !== 'undefined' ? new Set(Object.keys(localStorage)) : new Set();
+
+// localStorage is only a cache of the server data; a full browser quota must never crash the app.
+const cacheSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn(`Browser storage is full; "${key}" is not cached locally (the server copy is unaffected).`);
+  }
+};
+
+const uniqueId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 // ─── IP Detection & Restriction Utilities ───────────────────────────────────
 // Fetches the user's current public IP from a free, no-auth API.
@@ -42,7 +58,7 @@ function loadIPRegistry() {
 
 // Save the global IP registry to localStorage
 function saveIPRegistry(registry) {
-  localStorage.setItem('crm_ip_registry', JSON.stringify(registry));
+  cacheSet('crm_ip_registry', JSON.stringify(registry));
 }
 
 const DEFAULT_USERS = [
@@ -414,7 +430,7 @@ if (typeof window !== 'undefined' && localStorage.getItem('crm_storage_version')
   localStorage.removeItem('crm_sales');
   localStorage.removeItem('crm_lead_requests');
   localStorage.removeItem('crm_users');
-  localStorage.setItem('crm_storage_version', DATA_STORAGE_VERSION);
+  cacheSet('crm_storage_version', DATA_STORAGE_VERSION);
 }
 
 export const FEATURE_CATEGORIES = [
@@ -658,11 +674,11 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_users', JSON.stringify(users));
+    cacheSet('crm_users', JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem('crm_document_types', JSON.stringify(documentTypes));
+    cacheSet('crm_document_types', JSON.stringify(documentTypes));
   }, [documentTypes]);
 
   const [userCustomFields, setUserCustomFields] = useState(() => {
@@ -677,7 +693,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_user_custom_fields', JSON.stringify(userCustomFields));
+    cacheSet('crm_user_custom_fields', JSON.stringify(userCustomFields));
   }, [userCustomFields]);
 
   const [customRoles, setCustomRoles] = useState(() => {
@@ -692,7 +708,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_custom_roles', JSON.stringify(customRoles));
+    cacheSet('crm_custom_roles', JSON.stringify(customRoles));
   }, [customRoles]);
 
   // User_Shortcut_Settings relational mapping table: [{ userId, dispositionId, isEnabled }]
@@ -708,7 +724,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
+    cacheSet('crm_user_shortcut_settings', JSON.stringify(userShortcutSettings));
   }, [userShortcutSettings]);
 
   // ── Feature Access & Permissions Management ─────────────────────────────
@@ -724,7 +740,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_user_permissions', JSON.stringify(userPermissions));
+    cacheSet('crm_user_permissions', JSON.stringify(userPermissions));
   }, [userPermissions]);
 
   // ─── Leegality API Integration Config ──────────────────────────────────────
@@ -821,7 +837,7 @@ export const CRMProvider = ({ children }) => {
   const setSimulatedRole = (newRole, targetUserId = null) => {
     if (!canSwitchProfiles()) return;
     setSimulatedRoleState(newRole);
-    localStorage.setItem('crm_simulated_role', newRole);
+    cacheSet('crm_simulated_role', newRole);
     let matchedUser = null;
     if (targetUserId) {
       matchedUser = (users || []).find(u => u.id === targetUserId) || DEFAULT_USERS.find(u => u.id === targetUserId);
@@ -845,7 +861,7 @@ export const CRMProvider = ({ children }) => {
     }
     if (matchedUser) {
       setCurrentUser(matchedUser);
-      localStorage.setItem('crm_user', JSON.stringify(matchedUser));
+      cacheSet('crm_user', JSON.stringify(matchedUser));
     }
   };
 
@@ -855,8 +871,8 @@ export const CRMProvider = ({ children }) => {
     if (targetUser) {
       setCurrentUser(targetUser);
       setSimulatedRoleState(targetUser.role || 'Executive');
-      localStorage.setItem('crm_user', JSON.stringify(targetUser));
-      localStorage.setItem('crm_simulated_role', targetUser.role || 'Executive');
+      cacheSet('crm_user', JSON.stringify(targetUser));
+      cacheSet('crm_simulated_role', targetUser.role || 'Executive');
     }
   };
 
@@ -908,7 +924,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_leads', JSON.stringify(leads));
+    cacheSet('crm_leads', JSON.stringify(leads));
   }, [leads]);
 
   const [sales, setSales] = useState(() => {
@@ -926,7 +942,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_sales', JSON.stringify(sales));
+    cacheSet('crm_sales', JSON.stringify(sales));
   }, [sales]);
 
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
@@ -943,7 +959,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_lead_requests', JSON.stringify(leadRequests));
+    cacheSet('crm_lead_requests', JSON.stringify(leadRequests));
   }, [leadRequests]);
 
   const [assignmentInstances, setAssignmentInstances] = useState(() => {
@@ -970,7 +986,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_assignment_instances', JSON.stringify(assignmentInstances));
+    cacheSet('crm_assignment_instances', JSON.stringify(assignmentInstances));
   }, [assignmentInstances]);
 
   const [masterRecords, setMasterRecords] = useState(() => {
@@ -978,14 +994,14 @@ export const CRMProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) return parsed.map(m => (m && m.id ? m : { ...m, id: uniqueId('mr') }));
       } catch (e) {}
     }
     return [];
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_master_records', JSON.stringify(masterRecords));
+    cacheSet('crm_master_records', JSON.stringify(masterRecords));
   }, [masterRecords]);
 
   // ─── Services Master (Super Admin Managed) ──────────────────────────────
@@ -1001,8 +1017,8 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_services', JSON.stringify(services));
-    localStorage.setItem('crm_services_version', SERVICES_VERSION);
+    cacheSet('crm_services', JSON.stringify(services));
+    cacheSet('crm_services_version', SERVICES_VERSION);
   }, [services]);
 
   // ─── Voice Agent Settings ────────────────────────────────────────────────
@@ -1018,7 +1034,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_voice_agent_settings', JSON.stringify(voiceAgentSettings));
+    cacheSet('crm_voice_agent_settings', JSON.stringify(voiceAgentSettings));
   }, [voiceAgentSettings]);
 
   // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
@@ -1034,7 +1050,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_financial_settings', JSON.stringify(financialSettings));
+    cacheSet('crm_financial_settings', JSON.stringify(financialSettings));
   }, [financialSettings]);
 
   // ─── Persistent System Notifications (Notification Bar) ─────────────────
@@ -1050,7 +1066,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_notifications', JSON.stringify(notifications));
+    cacheSet('crm_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
 
@@ -1067,7 +1083,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_esign_records', JSON.stringify(eSignRecords));
+    cacheSet('crm_esign_records', JSON.stringify(eSignRecords));
   }, [eSignRecords]);
 
   // ─── Paid Block: clients who completed e-KYC & E-Sign, tracked by service tenure ──
@@ -1095,8 +1111,38 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('crm_paid_clients', JSON.stringify(paidClients));
+    cacheSet('crm_paid_clients', JSON.stringify(paidClients));
   }, [paidClients]);
+
+  // ─── Shared data ↔ server (hosted deployments) ─────────────────────────────
+  const syncRole = authUser?.role;
+  const isSyncSuperAdmin = syncRole === 'Super Admin';
+  const isSyncAdmin = isSyncSuperAdmin || syncRole === 'Admin';
+  const hadLocal = (key) => LOCAL_KEYS_AT_START.has(key);
+  const idsOf = (list) => new Set(list.map(i => i.id));
+  useServerSync({
+    leads: { value: leads, setValue: setLeads, kind: 'list', canWrite: true, importLocal: hadLocal('crm_leads'), defaultIds: idsOf(DEFAULT_LEADS) },
+    sales: { value: sales, setValue: setSales, kind: 'list', canWrite: true, importLocal: hadLocal('crm_sales'), defaultIds: idsOf(DEFAULT_SALES) },
+    assignmentInstances: { value: assignmentInstances, setValue: setAssignmentInstances, kind: 'list', canWrite: true, importLocal: hadLocal('crm_assignment_instances') },
+    leadRequests: { value: leadRequests, setValue: setLeadRequests, kind: 'list', canWrite: true, importLocal: hadLocal('crm_lead_requests') },
+    notifications: { value: notifications, setValue: setNotifications, kind: 'list', canWrite: true, importLocal: false, defaultIds: idsOf(DEFAULT_NOTIFICATIONS) },
+    userShortcutSettings: { value: userShortcutSettings, setValue: setUserShortcutSettings, kind: 'list', canWrite: true,
+      key: s => `${s.userId}:${s.dispositionId}`, importLocal: hadLocal('crm_user_shortcut_settings') },
+    masterRecords: { value: masterRecords, setValue: setMasterRecords, kind: 'list', canWrite: isSyncAdmin, importLocal: hadLocal('crm_master_records') },
+    eSignRecords: { value: eSignRecords, setValue: setESignRecords, kind: 'list', canWrite: isSyncAdmin, importLocal: hadLocal('crm_esign_records') },
+    paidClients: { value: paidClients, setValue: setPaidClients, kind: 'list', canWrite: isSyncAdmin, importLocal: true },
+    services: { value: services, setValue: setServices, kind: 'list', canWrite: isSyncSuperAdmin, keepWhenServerEmpty: true },
+    userCustomFields: { value: userCustomFields, setValue: setUserCustomFields, kind: 'list', canWrite: isSyncSuperAdmin, keepWhenServerEmpty: true },
+    userPermissions: { value: userPermissions, setValue: setUserPermissions, kind: 'map', canWrite: isSyncSuperAdmin, keepWhenServerEmpty: true },
+    financialSettings: { value: financialSettings, setValue: setFinancialSettings, kind: 'map', canWrite: isSyncSuperAdmin,
+      keepWhenServerEmpty: true, defaults: DEFAULT_FINANCIAL_SETTINGS },
+    voiceAgentSettings: { value: voiceAgentSettings, setValue: setVoiceAgentSettings, kind: 'map', canWrite: isSyncSuperAdmin,
+      keepWhenServerEmpty: true, defaults: DEFAULT_VOICE_AGENT_SETTINGS },
+  }, {
+    enabled: serverSyncActive && !!authUser,
+    token: authToken,
+    isSuperAdmin: isSyncSuperAdmin,
+  });
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -1118,15 +1164,20 @@ export const CRMProvider = ({ children }) => {
     'Authorization': `Bearer ${authToken}`
   });
 
+  // Hosted deployments share leads, sales, etc. through /api/sync (see useServerSync below), so
+  // changes are made to local state and synced; the older per-action endpoints are for local dev.
+  const serverSyncActive = isBackendAuthoritative() && !!authToken;
+
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
     const isLocalhost = isBackendEnabled();
     if (!authToken || !isLocalhost) return;
     try {
+      const skipped = Promise.resolve({ ok: false });
       const [uRes, lRes, sRes, dRes, rRes, dtRes] = await Promise.all([
         fetch(`${API_BASE_URL}/users`, { headers: authHeaders() }),
-        fetch(`${API_BASE_URL}/leads`, { headers: authHeaders() }),
-        fetch(`${API_BASE_URL}/sales`, { headers: authHeaders() }),
+        serverSyncActive ? skipped : fetch(`${API_BASE_URL}/leads`, { headers: authHeaders() }),
+        serverSyncActive ? skipped : fetch(`${API_BASE_URL}/sales`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/dispositions`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/custom-roles`, { headers: authHeaders() }),
         fetch(`${API_BASE_URL}/document-types`, { headers: authHeaders() })
@@ -1185,8 +1236,8 @@ export const CRMProvider = ({ children }) => {
         if (me.role !== 'Super Admin' || !stored || stored.id === me.id) {
           setCurrentUser(me);
           setSimulatedRoleState(me.role);
-          localStorage.setItem('crm_user', JSON.stringify(me));
-          localStorage.setItem('crm_simulated_role', me.role);
+          cacheSet('crm_user', JSON.stringify(me));
+          cacheSet('crm_simulated_role', me.role);
         }
       } catch {
         // Network hiccup: keep the session; API calls will still be rejected server-side if invalid.
@@ -1273,13 +1324,13 @@ export const CRMProvider = ({ children }) => {
           setAuthToken(data.access_token);
           setCurrentUser(data.user);
           setSimulatedRoleState(data.user?.role || 'Executive');
-          localStorage.setItem('crm_token', data.access_token);
-          localStorage.setItem('crm_user', JSON.stringify(data.user));
-          localStorage.setItem('crm_simulated_role', data.user?.role || 'Executive');
+          cacheSet('crm_token', data.access_token);
+          cacheSet('crm_user', JSON.stringify(data.user));
+          cacheSet('crm_simulated_role', data.user?.role || 'Executive');
           if (isBackendAuthoritative()) {
             // Cached CRM data in this browser belongs to whoever signed in last; drop it when the account changes.
             const lastUserId = localStorage.getItem('crm_last_user_id');
-            localStorage.setItem('crm_last_user_id', data.user.id);
+            cacheSet('crm_last_user_id', data.user.id);
             if (lastUserId && lastUserId !== data.user.id) {
               const keep = new Set(['crm_token', 'crm_user', 'crm_simulated_role', 'crm_last_user_id']);
               Object.keys(localStorage)
@@ -1391,9 +1442,9 @@ export const CRMProvider = ({ children }) => {
     setAuthToken(token);
     setCurrentUser(matchedUser);
     setSimulatedRoleState(matchedUser.role || 'Executive');
-    localStorage.setItem('crm_token', token);
-    localStorage.setItem('crm_user', JSON.stringify(matchedUser));
-    localStorage.setItem('crm_simulated_role', matchedUser.role || 'Executive');
+    cacheSet('crm_token', token);
+    cacheSet('crm_user', JSON.stringify(matchedUser));
+    cacheSet('crm_simulated_role', matchedUser.role || 'Executive');
     return true;
   };
 
@@ -1566,7 +1617,7 @@ export const CRMProvider = ({ children }) => {
           }
           return l;
         });
-        localStorage.setItem('crm_leads', JSON.stringify(updated));
+        cacheSet('crm_leads', JSON.stringify(updated));
         return updated;
       });
 
@@ -1585,7 +1636,7 @@ export const CRMProvider = ({ children }) => {
           }
           return inst;
         });
-        localStorage.setItem('crm_assignment_instances', JSON.stringify(updatedInst));
+        cacheSet('crm_assignment_instances', JSON.stringify(updatedInst));
         return updatedInst;
       });
     }
@@ -1593,7 +1644,7 @@ export const CRMProvider = ({ children }) => {
     // 3. Remove user from users state & localStorage
     setUsers(prevUsers => {
       const updatedUsers = (prevUsers || []).filter(u => u.id !== userId);
-      localStorage.setItem('crm_users', JSON.stringify(updatedUsers));
+      cacheSet('crm_users', JSON.stringify(updatedUsers));
       return updatedUsers;
     });
 
@@ -1602,8 +1653,8 @@ export const CRMProvider = ({ children }) => {
       const fallbackUser = (users || []).find(u => u.id !== userId && u.role === 'Super Admin') || DEFAULT_USERS[0];
       setCurrentUser(fallbackUser);
       setSimulatedRoleState(fallbackUser.role || 'Super Admin');
-      localStorage.setItem('crm_user', JSON.stringify(fallbackUser));
-      localStorage.setItem('crm_simulated_role', fallbackUser.role || 'Super Admin');
+      cacheSet('crm_user', JSON.stringify(fallbackUser));
+      cacheSet('crm_simulated_role', fallbackUser.role || 'Super Admin');
     }
 
     // 5. Backend sync attempt if running (already done up front when the backend is authoritative)
@@ -1915,7 +1966,7 @@ export const CRMProvider = ({ children }) => {
 
   // Post-Call Lead Outcome Update with Date/Time Support
   const updateLeadDisposition = async (leadId, dispositionName, callNotes = '', scheduledDateTime = '') => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}/disposition`, {
         method: 'POST',
         headers: authHeaders(),
@@ -1937,7 +1988,7 @@ export const CRMProvider = ({ children }) => {
 
   // Client Information Submission (Block 2 requirement: saves mandatory client details and marks deal as Paid/Converted)
   const saveClientInformation = async (leadId, clientInfoData, dispositionName = 'Paid / Converted') => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}/client-info`, {
         method: 'POST',
         headers: authHeaders(),
@@ -2013,7 +2064,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const addMasterRecords = (newRecords) => {
-    setMasterRecords(prev => [...prev, ...newRecords]);
+    setMasterRecords(prev => [...prev, ...newRecords.map(m => (m.id ? m : { ...m, id: uniqueId('mr') }))]);
   };
 
   const assignLeadsByLanguage = (language, quantity, targetUserId) => {
@@ -2138,7 +2189,7 @@ export const CRMProvider = ({ children }) => {
       || `Bulk_Upload_${todayStr}.csv`;
 
     try {
-      localStorage.setItem('crm_last_bulk_upload_filename', effectiveFileName);
+      cacheSet('crm_last_bulk_upload_filename', effectiveFileName);
     } catch (e) {}
 
     const formatted = newLeadsArray.map((ld, i) => {
@@ -2169,7 +2220,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const reassignLeads = async (fromUserId, toUserId) => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/leads/reassign`, {
         method: 'POST',
         headers: authHeaders(),
@@ -2192,7 +2243,7 @@ export const CRMProvider = ({ children }) => {
 
   const reassignLeadsFiltered = ({ fromUserId, toUserId, quantity, language, disposition, date, dateMode = 'single', startDate, endDate }) => {
     // Attempt backend sync in background
-    try {
+    if (!serverSyncActive) try {
       fetch(`${API_BASE_URL}/leads/reassign`, {
         method: 'POST',
         headers: authHeaders(),
@@ -2282,7 +2333,7 @@ export const CRMProvider = ({ children }) => {
 
   // Sales Workflow
   const registerSale = async (saleData) => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/sales`, {
         method: 'POST',
         headers: authHeaders(),
@@ -2293,8 +2344,10 @@ export const CRMProvider = ({ children }) => {
 
     const todayStr = new Date().toISOString().split('T')[0];
     const newSale = {
-      id: 'SL-' + Math.floor(500 + Math.random() * 500),
+      id: uniqueId('SL'),
       date: todayStr,
+      submittedByUserId: currentUser?.id,
+      employeeName: currentUser?.name,
       ...saleData,
       status: 'Pending Super Admin Approval',
       stage: 'Sale Submitted'
@@ -2303,7 +2356,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const approveSale = async (saleId) => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/sales/${saleId}/approve`, {
         method: 'POST',
         headers: authHeaders()
@@ -2315,7 +2368,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const rejectSale = async (saleId) => {
-    try {
+    if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/sales/${saleId}/reject`, {
         method: 'POST',
         headers: authHeaders()
@@ -2375,7 +2428,8 @@ export const CRMProvider = ({ children }) => {
       actionType,
       actionPayload,
       targetUserId,
-      targetRole
+      targetRole,
+      createdByUserId: currentUser?.id
     };
     setNotifications(prev => [newNotif, ...prev]);
     return newNotif;
@@ -2464,7 +2518,7 @@ export const CRMProvider = ({ children }) => {
 
     // 2. Register sale record in pending state
     const newSale = {
-      id: 'SL-' + Math.floor(1000 + Math.random() * 9000),
+      id: uniqueId('SL'),
       date: todayStr,
       clientName: clientInfoData.firmName || clientInfoData.clientName,
       contactPerson: clientInfoData.clientName,
@@ -2875,7 +2929,7 @@ export const CRMProvider = ({ children }) => {
 
   const deletePaidClient = (paidId) => {
     setPaidClients(prev => prev.filter(p => p.id !== paidId));
-    if (authToken && isBackendEnabled()) {
+    if (authToken && isBackendEnabled() && !serverSyncActive) {
       fetch(`${API_BASE_URL}/paid-clients/${encodeURIComponent(paidId)}`, { method: 'DELETE', headers: authHeaders() })
         .catch(() => console.warn('Paid client delete did not reach the server; Telegram trade calls may still reach them.'));
     }
@@ -2886,7 +2940,7 @@ export const CRMProvider = ({ children }) => {
 
   // Pull clients other browsers synced (and drop ones deleted elsewhere), then push ours below
   useEffect(() => {
-    if (!authToken || !isAdminSession || !isBackendEnabled()) return;
+    if (!authToken || !isAdminSession || !isBackendEnabled() || serverSyncActive) return;
     let cancelled = false;
     fetch(`${API_BASE_URL}/paid-clients`, { headers: authHeaders() })
       .then(res => (res.ok ? res.json() : null))
@@ -2905,7 +2959,7 @@ export const CRMProvider = ({ children }) => {
   }, [authToken, isAdminSession]);
 
   useEffect(() => {
-    if (!authToken || !isAdminSession || !isBackendEnabled() || paidClients.length === 0) return;
+    if (!authToken || !isAdminSession || !isBackendEnabled() || serverSyncActive || paidClients.length === 0) return;
     const timer = setTimeout(() => {
       fetch(`${API_BASE_URL}/paid-clients/sync`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ clients: paidClients }) })
         .then(res => { if (!res.ok) console.warn('Paid clients sync failed:', res.status); })

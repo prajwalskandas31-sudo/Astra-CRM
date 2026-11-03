@@ -5,6 +5,7 @@ dist/
 .env
 secrets/
 backend/data/
+backups/
 .deployed-sha
 scratch/
 Block/

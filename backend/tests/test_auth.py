@@ -49,10 +49,11 @@ def test_per_ip_limit_is_looser_than_per_account(crm):
 
 
 def test_exact_identity_beats_colliding_mobile(crm):
-    users = crm.main.USERS_DB
+    users = crm.store.all("users")
     priya = next(u for u in users if u["email"] == "anitha.y@company.com")
     other = next(u for u in users if u["email"] == "anuradha.n@company.com")
     priya["employeeId"], other["mobile"] = "5551234567", "5551234567"
+    crm.store.put_many("users", [priya, other])
     res = crm.login("5551234567", crm.creds["anitha.y@company.com"])
     assert res.status_code == 200 and res.json()["user"]["email"] == "anitha.y@company.com"
 

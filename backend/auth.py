@@ -3,7 +3,6 @@ import hmac
 import json
 import os
 import secrets
-import threading
 import time
 import jwt
 from datetime import datetime, timedelta
@@ -11,9 +10,9 @@ from typing import Optional
 from fastapi import HTTPException, Security, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 try:
-    from backend.database import USERS_DB
+    from backend import store
 except ImportError:
-    from database import USERS_DB
+    import store
 
 
 # Without a configured secret, a random one is generated per process (tokens then reset on restart).
@@ -82,22 +81,27 @@ def set_user_password(user: dict, password: str) -> None:
     user["tokenVersion"] = user.get("tokenVersion", 0) + 1
 
 
-def load_credentials() -> None:
-    """Replace seed passwords with hashes from the credentials file; accounts not listed there cannot log in."""
+def read_credentials_file() -> Optional[dict]:
+    """email -> password from CRM_CREDENTIALS_FILE, or None when no file is configured."""
     path = os.environ.get("CRM_CREDENTIALS_FILE", "")
+    if not path:
+        return None
     creds = {}
-    if path and os.path.exists(path):
+    if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             for entry in json.load(f):
                 creds[entry["email"].strip().lower()] = entry["password"]
+    return creds
 
-    for user in USERS_DB:
-        plain = creds.get((user.get("email") or "").lower())
-        if plain is None and not path:
-            plain = user.get("password")  # Local development without a credentials file keeps seed passwords.
-        user.pop("password", None)
-        user["passwordHash"] = hash_password(plain) if plain else None
-        user.setdefault("tokenVersion", 0)
+
+def seed_password(user: dict, creds: Optional[dict]) -> None:
+    """Hash a seed account's password from the credentials file; accounts not listed there cannot log in."""
+    plain = (creds or {}).get((user.get("email") or "").lower())
+    if plain is None and creds is None:
+        plain = user.get("password")  # Local development without a credentials file keeps seed passwords.
+    user.pop("password", None)
+    user["passwordHash"] = hash_password(plain) if plain else None
+    user.setdefault("tokenVersion", 0)
 
 
 # ==========================================
@@ -107,32 +111,33 @@ _MAX_FAILURES = 5
 # An office shares one public IP, so the per-IP limit is looser than the per-account one.
 _MAX_FAILURES_PER_IP = 30
 _LOCKOUT_SECONDS = 15 * 60
-_failures: dict[str, list[float]] = {}
-_failures_lock = threading.Lock()
+# Counters live in the shared store so every backend worker enforces the same limit.
+_FAILURES = "login_failures"
+
+
+def _recent(key: str, now: float) -> list:
+    doc = store.get(_FAILURES, key)
+    return [t for t in (doc or {}).get("times", []) if now - t < _LOCKOUT_SECONDS]
 
 
 def check_not_locked(*keys: str) -> None:
     now = time.time()
-    with _failures_lock:
-        for key in keys:
-            recent = [t for t in _failures.get(key, []) if now - t < _LOCKOUT_SECONDS]
-            _failures[key] = recent
-            limit = _MAX_FAILURES_PER_IP if key.startswith("ip:") else _MAX_FAILURES
-            if len(recent) >= limit:
-                raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
+    for key in keys:
+        limit = _MAX_FAILURES_PER_IP if key.startswith("ip:") else _MAX_FAILURES
+        if len(_recent(key, now)) >= limit:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
 
 
 def record_failure(*keys: str) -> None:
     now = time.time()
-    with _failures_lock:
+    with store.transaction():
         for key in keys:
-            _failures.setdefault(key, []).append(now)
+            store.put(_FAILURES, key, {"id": key, "times": [*_recent(key, now), now][-100:]})
 
 
 def clear_failures(*keys: str) -> None:
-    with _failures_lock:
-        for key in keys:
-            _failures.pop(key, None)
+    for key in keys:
+        store.delete(_FAILURES, key)
 
 
 # ==========================================
@@ -159,7 +164,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired authentication token")
 
-    user = next((u for u in USERS_DB if u["id"] == payload.get("sub")), None)
+    user = store.get("users", payload.get("sub") or "")
     if user is None or payload.get("ver") != user.get("tokenVersion", 0):
         raise HTTPException(status_code=401, detail="Session is no longer valid. Please sign in again.")
     if user.get("status") != "Active":

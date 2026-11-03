@@ -7,6 +7,7 @@ Block
 *.docx
 backend/.env
 backend/data
+backups
 **/__pycache__
 secrets
 CRM_ACCOUNT_CREDENTIALS.txt

@@ -11,7 +11,6 @@ import hmac
 import io
 import json
 import os
-import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -22,9 +21,11 @@ from pydantic import BaseModel
 from PIL import Image, ImageDraw, ImageFont
 
 try:
+    from backend import store
     from backend.auth import require_roles
     from backend.signatures import stored_primary_signature
 except ImportError:
+    import store
     from auth import require_roles
     from signatures import stored_primary_signature
 
@@ -32,10 +33,9 @@ except ImportError:
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BACKEND_DIR, ".env")
 TEMPLATE_MAP_PATH = os.path.join(BACKEND_DIR, "leegality_template_map.json")
-RECORDS_PATH = os.path.join(BACKEND_DIR, "data", "leegality_documents.json")
+RECORDS = "leegalityDocuments"  # one database value: {documentId: record}
 
 router = APIRouter(prefix="/api/leegality", tags=["leegality"])
-_records_lock = threading.Lock()
 
 
 # ==========================================
@@ -80,23 +80,16 @@ def _now(tmap):
 
 
 # ==========================================
-# Local record store (backend DB is in-memory, so persist dispatches to disk)
+# Dispatch records (kept in the database)
 # ==========================================
 def _read_records():
-    if not os.path.exists(RECORDS_PATH):
-        return {}
-    with open(RECORDS_PATH, encoding="utf-8") as f:
-        return json.load(f)
+    return store.get_value(RECORDS, {})
 
 
 def _update_record(document_id, patch):
-    with _records_lock:
-        records = _read_records()
-        records[document_id] = {**records.get(document_id, {}), **patch}
-        os.makedirs(os.path.dirname(RECORDS_PATH), exist_ok=True)
-        with open(RECORDS_PATH, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2)
-        return records[document_id]
+    with store.update_value(RECORDS, {}) as records:
+        records[0][document_id] = {**records[0].get(document_id, {}), **patch}
+        return records[0][document_id]
 
 
 # ==========================================

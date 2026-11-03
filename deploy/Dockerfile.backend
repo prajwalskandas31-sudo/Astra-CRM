@@ -3,6 +3,7 @@ WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt email-validator
 COPY backend/ backend/
-RUN mkdir -p backend/data
+COPY deploy/start_backend.sh /usr/local/bin/start_backend.sh
+RUN mkdir -p backend/data && chmod +x /usr/local/bin/start_backend.sh
 EXPOSE 8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["start_backend.sh"]

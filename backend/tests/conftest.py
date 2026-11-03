@@ -15,9 +15,20 @@ sys.path.insert(0, str(ROOT))
 
 @pytest.fixture(scope="module")
 def crm(tmp_path_factory):
-    """A fresh backend (seed data, random credentials, new JWT secret) for each test module."""
+    """A fresh backend (empty database, seed data, random credentials, new JWT secret) for each test module."""
     import backend.database as database
     importlib.reload(database)
+    # SQLite by default; CRM_TEST_DATABASE_URL runs the same tests against a scratch Postgres (wiped first)
+    pg_url = os.environ.get("CRM_TEST_DATABASE_URL")
+    if pg_url:
+        import psycopg
+        with psycopg.connect(pg_url, autocommit=True) as conn:
+            conn.execute("DROP TABLE IF EXISTS records, record_moves; DROP SEQUENCE IF EXISTS records_seq_counter")
+        os.environ["DATABASE_URL"] = pg_url
+    else:
+        os.environ.pop("DATABASE_URL", None)
+    os.environ["CRM_SQLITE_PATH"] = str(tmp_path_factory.mktemp("db") / "crm.sqlite3")
+    os.environ["BROADCAST_POLLERS_DISABLED"] = "1"
 
     creds = {u["email"]: f"Test-{secrets.token_hex(6)}" for u in database.USERS_DB}
     path = tmp_path_factory.mktemp("secrets") / "credentials.json"
@@ -25,19 +36,23 @@ def crm(tmp_path_factory):
     os.environ["CRM_CREDENTIALS_FILE"] = str(path)
     os.environ["JWT_SECRET_KEY"] = secrets.token_hex(32)
 
+    import backend.store as store
+    store.reset_backend()
     import backend.auth as auth
     import backend.signatures as signatures
     import backend.leegality as leegality
     import backend.broadcasts as broadcasts
-    import backend.main as main
-    for module in (auth, signatures, leegality, broadcasts, main):
+    import backend.sync as sync
+    import backend.db_init as db_init
+    for module in (store, auth, signatures, leegality, broadcasts, sync, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
-    signatures.SIGNATURES_PATH = str(data_dir / "signatures.json")
-    # Broadcasts never read the real backend/.env or data files in tests
+    # Never import the real backend/data files into the test database
+    db_init.DATA_DIR = str(data_dir)
+    import backend.main as main
+    main = importlib.reload(main)
+    # Broadcasts never read the real backend/.env in tests
     broadcasts.ENV_PATH = str(data_dir / "broadcasts.env")
-    for name in ("PAID_CLIENTS_PATH", "DELETED_PAID_PATH", "BROADCASTS_PATH", "SENDERS_PATH", "OFFSETS_PATH"):
-        setattr(broadcasts, name, str(data_dir / (name.lower().replace("_path", "") + ".json")))
 
     client = TestClient(main.app)
     ip_counter = iter(range(1, 10_000))
@@ -55,7 +70,7 @@ def crm(tmp_path_factory):
         return res.json()["access_token"]
 
     return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts,
-                           login=login, token=token)
+                           store=store, login=login, token=token)
 
 
 def bearer(tok):
