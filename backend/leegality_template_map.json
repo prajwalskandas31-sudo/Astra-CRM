@@ -27,8 +27,8 @@
     ]
   },
   "signatureImageFields": [
-    { "id": null, "name": "RA Signature Page 7", "width": "200", "height": "80" },
-    { "id": null, "name": "RA Signature Page 14", "width": "200", "height": "80" }
+    { "id": null, "name": "Image 1", "width": "200", "height": "80" },
+    { "id": null, "name": "Image 1", "width": "200", "height": "80" }
   ],
   "signatureImageValue": "base64",
   "timestampFormat": "%d-%m-%Y %H:%M:%S",

@@ -185,8 +185,13 @@ def _stamp_signature(signature, stamp_text, width_px, height_px):
 
 def _signature_fields(tmap, signature_data_url):
     signature = _decode_image(signature_data_url)
-    fields, stamps = [], []
+    fields, stamps, sent = [], [], set()
     for cfg in tmap["signatureImageFields"]:
+        # Both placements in kFWn7uC are named "Image 1"; without ids they are one field to Leegality, so send it once
+        key = cfg.get("id") or cfg["name"]
+        if key in sent:
+            continue
+        sent.add(key)
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
