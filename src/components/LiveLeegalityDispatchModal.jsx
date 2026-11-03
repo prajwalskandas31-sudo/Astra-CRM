@@ -300,6 +300,12 @@ export const LiveLeegalityDispatchModal = ({
                     Signature types: {delivery.allowedSignatures.join(', ') || '—'}
                   </span>
                 </div>
+                {record.deliveryConfig.templateMatches === false && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: '#fca5a5' }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    Leegality built this document from template {record.deliveryConfig.templateId || 'none'}{record.deliveryConfig.templateName ? ` (${record.deliveryConfig.templateName})` : ''}, not {record.templateId}. Set workflow {record.profileId} to use template {record.templateId}.
+                  </div>
+                )}
                 {['email', 'phone'].filter(k => record.sentContact?.[k] && !delivery[k]).map(k => (
                   <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: '#fca5a5' }}>
                     <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />

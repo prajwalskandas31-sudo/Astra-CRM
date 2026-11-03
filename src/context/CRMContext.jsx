@@ -2655,6 +2655,7 @@ export const CRMProvider = ({ children }) => {
     const tenure = clientInfo.serviceTenure || sale?.serviceTenure;
     if (!clientName) throw new Error('Client Name is missing on the Client Information Page.');
     if (!tenure) throw new Error('Service Tenure is missing on the Client Information Page.');
+    if (!email || !phone) throw new Error('Email ID and Phone Number 1 are both required on the Client Information Page.');
 
     const apiResult = await dispatchLeegalitySignRequest({ saleId, clientName, email, phone, serviceTenure: tenure });
 

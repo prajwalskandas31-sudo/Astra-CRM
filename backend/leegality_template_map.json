@@ -1,7 +1,7 @@
 {
-  "_comment": "Maps CRM data onto template fields of Leegality workflow LzfDhWc (template hm6uV8X). Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only.",
+  "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only.",
   "profileId": "LzfDhWc",
-  "templateId": "hm6uV8X",
+  "templateId": "kFWn7uC",
   "dateField": {
     "id": null,
     "name": "Date 1",
@@ -11,9 +11,19 @@
   "tenureCheckbox": {
     "name": "Checkbox 1",
     "options": [
-      { "id": null, "name": "Option 1", "label": "Monthly", "tenures": ["1 month"] },
-      { "id": null, "name": "Option 2", "label": "Quarterly", "tenures": ["3 months"] },
-      { "id": null, "name": "Option 3", "label": "Yearly", "tenures": ["12 months"] }
+      { "id": null, "name": "Option 1", "label": "Demo", "tenures": ["Demo"] },
+      { "id": null, "name": "Option 2", "label": "1 Month", "tenures": ["1 Month"] },
+      { "id": null, "name": "Option 3", "label": "2 Months", "tenures": ["2 Months"] },
+      { "id": null, "name": "Option 4", "label": "3 Months", "tenures": ["3 Months"] },
+      { "id": null, "name": "Option 5", "label": "4 Months", "tenures": ["4 Months"] },
+      { "id": null, "name": "Option 6", "label": "5 Months", "tenures": ["5 Months"] },
+      { "id": null, "name": "Option 7", "label": "6 Months", "tenures": ["6 Months"] },
+      { "id": null, "name": "Option 8", "label": "7 Months", "tenures": ["7 Months"] },
+      { "id": null, "name": "Option 9", "label": "8 Months", "tenures": ["8 Months"] },
+      { "id": null, "name": "Option 10", "label": "9 Months", "tenures": ["9 Months"] },
+      { "id": null, "name": "Option 11", "label": "10 Months", "tenures": ["10 Months"] },
+      { "id": null, "name": "Option 12", "label": "11 Months", "tenures": ["11 Months"] },
+      { "id": null, "name": "Option 13", "label": "12 Months", "tenures": ["12 Months"] }
     ]
   },
   "signatureImageFields": [

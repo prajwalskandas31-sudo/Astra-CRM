@@ -1,5 +1,9 @@
 """
-Leegality e-KYC & E-Sign integration (Workflow LzfDhWc, template hm6uV8X).
+Leegality e-KYC & E-Sign integration (template kFWn7uC "RA Terms and Conditions - UTFS").
+
+Mirrors the dashboard's Create > New Document > Templates journey: Date 1, the
+Service Tenure checkbox and both stamped signatures are filled from the CRM, the
+sender does not sign, and the client is invited by name, email and phone.
 
 All Leegality traffic goes through this backend so the auth token and private
 salt never reach the browser, and requests leave from a whitelisted IP.
@@ -255,13 +259,14 @@ def leegality_wallet(current_user: dict = Depends(require_roles(["Super Admin"])
     return _wallet(_settings())
 
 
-def _delivery_config(document_id, settings):
-    """What Leegality actually configured on the new document: notification channels and allowed signature types.
-    These come from the workflow, and the create API cannot override them, so read them back after every send."""
-    params = {"documentId": document_id, "invitations_inviteeConfigs": "true"}
+def _delivery_config(document_id, settings, expected_template_id):
+    """What Leegality actually configured on the new document: template, notification channels and allowed
+    signature types. These come from the workflow, and the create API cannot override them, so read them back after every send."""
+    params = {"documentId": document_id, "invitations_inviteeConfigs": "true", "template": "true", "template_name": "true"}
     _, body = _leegality("GET", "/v3.3/document/details", settings, params=params)
     if body.get("status") != 1:
         return {"error": _messages(body)}
+    template = (body.get("data") or {}).get("template") or {}
     invitees = []
     for inv in (body.get("data") or {}).get("invitations") or []:
         cfg = inv.get("inviteeConfigs") or {}
@@ -274,7 +279,12 @@ def _delivery_config(document_id, settings):
             "whatsAppNotification": bool(cfg.get("whatsAppNotification")),
             "allowedSignatures": inv.get("allowedSignatures") or [],
         })
-    return {"invitees": invitees}
+    return {
+        "templateId": template.get("id"),
+        "templateName": template.get("name"),
+        "templateMatches": template.get("id") == expected_template_id,
+        "invitees": invitees,
+    }
 
 
 @router.post("/esign/dispatch")
@@ -284,8 +294,10 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
 
     email = (req.email or "").strip()
     phone = "".join(ch for ch in (req.phone or "") if ch.isdigit())[-10:]
-    if not email and not phone:
-        raise HTTPException(status_code=400, detail="Client email or phone is required on the Client Information Page.")
+    # The signer is invited with "Enter both": name, email and phone all go to Leegality
+    missing = [label for label, value in (("Email ID", email), ("Phone Number 1", phone)) if not value]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"{' and '.join(missing)} missing on the Client Information Page; Leegality needs both email and phone.")
 
     option_idx = _tenure_option(tmap, req.serviceTenure)
     executed_at = _now(tmap)
@@ -297,11 +309,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
     sig_fields, stamps = _signature_fields(tmap, stored_primary_signature() or req.signatureDataUrl)
     fields += sig_fields
 
-    invitee = {"name": req.clientName.strip()}
-    if email:
-        invitee["email"] = email
-    if phone:
-        invitee["phone"] = phone
+    invitee = {"name": req.clientName.strip(), "email": email, "phone": phone}
 
     payload = {
         "profileId": tmap["profileId"],
@@ -332,8 +340,9 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         "documentStatus": "SENT",
         "webhookEvents": [],
         "walletAfterDispatch": _wallet(settings),
-        "deliveryConfig": _delivery_config(data["documentId"], settings),
-        "sentContact": {"email": email or None, "phone": phone or None},
+        "templateId": tmap["templateId"],
+        "deliveryConfig": _delivery_config(data["documentId"], settings, tmap["templateId"]),
+        "sentContact": {"email": email, "phone": phone},
     })
     return record
 
