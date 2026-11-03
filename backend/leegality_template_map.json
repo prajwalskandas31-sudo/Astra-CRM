@@ -1,6 +1,6 @@
 {
   "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only.",
-  "profileId": "LzfDhWc",
+  "profileId": "KKliSJp",
   "templateId": "kFWn7uC",
   "dateField": {
     "id": null,

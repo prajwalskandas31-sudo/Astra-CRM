@@ -93,7 +93,7 @@ export const ESignManagementBlock = () => {
       return;
     }
     setIsDispatching(true);
-    showToast(`Dispatching live Leegality package for '${targetSale.clientName}' (Workflow: LzfDhWc)...`, 'info');
+    showToast(`Dispatching live Leegality package for '${targetSale.clientName}' (Workflow: KKliSJp)...`, 'info');
     try {
       const res = await triggerEKycAndESign(targetSale.id);
       setIsDispatching(false);
@@ -193,7 +193,7 @@ export const ESignManagementBlock = () => {
                   boxShadow: '0 4px 15px rgba(6, 182, 212, 0.35)',
                   cursor: isDispatching ? 'not-allowed' : 'pointer'
                 }}
-                title={`Dispatches live Leegality package (Workflow: LzfDhWc) to ${pendingESignSales[0].clientName}`}
+                title={`Dispatches live Leegality package (Workflow: KKliSJp) to ${pendingESignSales[0].clientName}`}
               >
                 <Zap size={16} />
                 {isDispatching ? 'Dispatching Leegality Gateway...' : `Trigger Leegality E-Sign (${pendingESignSales[0].clientName})`}
@@ -211,7 +211,7 @@ export const ESignManagementBlock = () => {
                 gap: '6px'
               }}>
                 <CheckCircle2 size={14} color="#10b981" />
-                <span>All approved sales e-signed (Workflow: LzfDhWc)</span>
+                <span>All approved sales e-signed (Workflow: KKliSJp)</span>
               </div>
             )}
           </div>
@@ -407,7 +407,7 @@ export const ESignManagementBlock = () => {
             <div>• <strong>Designation:</strong> {primarySignatory?.designation || 'Principal Officer'}</div>
             <div>• <strong>Registered Entity:</strong> {primarySignatory?.entity || 'Astra CRM Enterprise'} ({primarySignatory?.sebiReg || 'EMP-001'})</div>
             <div>• <strong>Registered Office:</strong> {primarySignatory?.officeAddress || 'Corporate Headquarters, Bengaluru, Karnataka'}</div>
-            <div>• <strong>Execution Mode:</strong> Leegality Workflow LzfDhWc (RA Terms &amp; Conditions template)</div>
+            <div>• <strong>Execution Mode:</strong> Leegality Workflow KKliSJp (RA Terms &amp; Conditions template)</div>
           </div>
 
           {/* Authentic E-Sign Preview */}
@@ -547,7 +547,7 @@ export const ESignManagementBlock = () => {
                   cursor: isDispatching ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
                 }}
-                title={`Executes live Leegality API dispatch (Workflow: LzfDhWc) for ${pendingESignSales[0].clientName}`}
+                title={`Executes live Leegality API dispatch (Workflow: KKliSJp) for ${pendingESignSales[0].clientName}`}
               >
                 <Zap size={14} /> {isDispatching ? 'Dispatching...' : `⚡ 1-Click Live Leegality Dispatch (${pendingESignSales[0].clientName})`}
               </button>

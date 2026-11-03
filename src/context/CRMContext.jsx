@@ -2635,7 +2635,7 @@ export const CRMProvider = ({ children }) => {
     return candidates.length === 1 ? candidates[0] : undefined;
   };
 
-  // ─── e-KYC & E-Sign Trigger via Leegality (Workflow LzfDhWc, through the CRM backend) ───
+  // ─── e-KYC & E-Sign Trigger via Leegality (Workflow KKliSJp, through the CRM backend) ───
   const triggerEKycAndESign = async (saleId) => {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) throw new Error(`Sale with ID '${saleId}' not found`);
@@ -2679,7 +2679,7 @@ export const CRMProvider = ({ children }) => {
         disposition: 'Awaiting Client E-Sign',
         history: [...(l.history || []), {
           date: new Date().toISOString().split('T')[0],
-          text: `Leegality e-KYC & E-Sign request created (Doc ID: ${docId}, Workflow: LzfDhWc). Leegality: ${leegalityMessage}`
+          text: `Leegality e-KYC & E-Sign request created (Doc ID: ${docId}, Workflow: KKliSJp). Leegality: ${leegalityMessage}`
         }]
       } : l));
     }

@@ -175,7 +175,7 @@ export const LiveLeegalityDispatchModal = ({
                 Leegality e-KYC & E-Sign
               </h3>
               <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '6px', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
-                Workflow ID: {record.profileId || 'LzfDhWc'}
+                Workflow ID: {record.profileId || 'KKliSJp'}
               </span>
             </div>
             <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
@@ -315,7 +315,7 @@ export const LiveLeegalityDispatchModal = ({
                 {!delivery.emailNotification && !delivery.smsNotification && (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', color: '#fca5a5' }}>
                     <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    Workflow LzfDhWc has email and SMS notifications turned off, so the client was not notified. Share the signing link below manually, or enable notifications for the signer in the Leegality workflow.
+                    Workflow KKliSJp has email and SMS notifications turned off, so the client was not notified. Share the signing link below manually, or enable notifications for the signer in the Leegality workflow.
                   </div>
                 )}
               </div>
