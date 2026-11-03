@@ -1,5 +1,5 @@
 /**
- * Leegality e-KYC & E-Sign client (Workflow LzfDhWc).
+ * Leegality e-KYC & E-Sign client (Workflow KKliSJp).
  *
  * The browser never talks to Leegality directly: Leegality's API only accepts
  * server-side calls from whitelisted IPs, and the auth token / private salt must
@@ -15,8 +15,8 @@ const STORAGE_KEY = 'astra_leegality_api_config';
 // UI-only preferences. Credentials live in backend/.env, never here.
 export const DEFAULT_LEEGALITY_CONFIG = {
   status: 'Active', // 'Active' | 'Disabled'
-  profileId: 'LzfDhWc',
-  templateId: 'hm6uV8X',
+  profileId: 'KKliSJp',
+  templateId: 'kFWn7uC',
   environment: 'Live Production'
 };
 
@@ -26,7 +26,7 @@ export const getLeegalityConfig = () => {
     if (raw) {
       // Drop credentials cached by older builds of the CRM
       const { legacyAuthToken, privateSalt, creditsLeft, whitelistedIPs, ...rest } = JSON.parse(raw);
-      return { ...DEFAULT_LEEGALITY_CONFIG, ...rest, profileId: DEFAULT_LEEGALITY_CONFIG.profileId };
+      return { ...DEFAULT_LEEGALITY_CONFIG, ...rest, profileId: DEFAULT_LEEGALITY_CONFIG.profileId, templateId: DEFAULT_LEEGALITY_CONFIG.templateId };
     }
   } catch (err) {
     console.warn('Error reading Leegality config from localStorage:', err);

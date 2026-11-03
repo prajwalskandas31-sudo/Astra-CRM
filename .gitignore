@@ -35,6 +35,7 @@ scratch/
 # Backend secrets & local Leegality records
 backend/.env
 backend/data/
+backups/
 
 # Deployment secrets
 secrets/

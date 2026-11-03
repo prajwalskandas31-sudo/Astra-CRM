@@ -70,7 +70,7 @@ const EKycTrafficLight = ({ sale, canTrigger, isDispatching, onTrigger, onViewSt
       className={`ekyc-light ${light}`}
       onClick={onClick}
       disabled={light === 'red' && isDispatching}
-      title={light === 'red' ? 'Create the real Leegality signing request (Workflow LzfDhWc)' : 'Live status from Leegality'}
+      title={light === 'red' ? 'Create the real Leegality signing request (Workflow KKliSJp)' : 'Live status from Leegality'}
     >
       {content}
     </button>
@@ -102,7 +102,7 @@ export const SaleApprovalWorkflow = () => {
 
   const handleDirectTriggerEKycAndESign = async (targetSale) => {
     setIsDispatchingDirect(true);
-    showToast(`Dispatching live Leegality e-KYC & E-Sign package for '${targetSale.clientName}' (Workflow LzfDhWc)...`, 'info');
+    showToast(`Dispatching live Leegality e-KYC & E-Sign package for '${targetSale.clientName}' (Workflow KKliSJp)...`, 'info');
     try {
       const res = await triggerEKycAndESign(targetSale.id);
       setIsDispatchingDirect(false);
@@ -248,7 +248,7 @@ export const SaleApprovalWorkflow = () => {
                               }}
                               onClick={() => handleDirectTriggerEKycAndESign(s)}
                               disabled={isDispatchingDirect}
-                              title="Directly trigger real Leegality e-KYC & E-Sign dispatch (Workflow LzfDhWc)"
+                              title="Directly trigger real Leegality e-KYC & E-Sign dispatch (Workflow KKliSJp)"
                             >
                               <Sparkles size={12} /> Trigger e-KYC & E-Sign
                             </button>

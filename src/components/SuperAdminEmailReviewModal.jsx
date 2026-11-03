@@ -76,7 +76,7 @@ export const SuperAdminEmailReviewModal = ({
       showToast('Only Super Admin has authority to trigger e-KYC and E-Sign.', 'error');
       return;
     }
-    showToast('Triggering real Leegality e-KYC & E-Sign (Workflow LzfDhWc)...', 'info');
+    showToast('Triggering real Leegality e-KYC & E-Sign (Workflow KKliSJp)...', 'info');
     if (onTriggerEKycAndESign) {
       onTriggerEKycAndESign(sale);
     } else if (onSkipVoiceCall) {
@@ -475,7 +475,7 @@ export const SuperAdminEmailReviewModal = ({
                     border: 'none',
                     color: '#ffffff'
                   }}
-                  title="Directly trigger real Leegality e-KYC and E-Sign (Workflow LzfDhWc)"
+                  title="Directly trigger real Leegality e-KYC and E-Sign (Workflow KKliSJp)"
                 >
                   <Sparkles size={14} /> Trigger e-KYC & E-Sign
                 </button>
@@ -495,7 +495,7 @@ export const SuperAdminEmailReviewModal = ({
                     borderColor: 'rgba(59, 130, 246, 0.4)',
                     color: '#60a5fa'
                   }}
-                  title="Skip voice call and execute real Leegality e-KYC & E-Sign process (Workflow LzfDhWc)"
+                  title="Skip voice call and execute real Leegality e-KYC & E-Sign process (Workflow KKliSJp)"
                 >
                   <FastForward size={14} /> Skip Voice Call (Proceed to E-Sign)
                 </button>

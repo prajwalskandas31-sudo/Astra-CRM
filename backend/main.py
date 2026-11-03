@@ -7,26 +7,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 
 try:
-    from backend.database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
-    from backend.auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
+    from backend import store
+    from backend.auth import (create_access_token, get_current_user, require_roles, verify_password,
                               set_user_password, validate_password_strength, public_user, is_admin, role_rank,
                               check_not_locked, record_failure, clear_failures)
     from backend.leegality import router as leegality_router
     from backend.signatures import router as signatures_router
     from backend import broadcasts
+    from backend import sync
+    from backend.db_init import init_database
 except ImportError:
-    from database import USERS_DB, DISPOSITIONS_DB, LEADS_DB, SALES_DB, CUSTOM_ROLES_DB, LEAD_REQUESTS_DB, ASSIGNMENT_INSTANCES_DB, DOCUMENT_TYPES_DB
-    from auth import (create_access_token, get_current_user, require_roles, load_credentials, verify_password,
+    import store
+    from auth import (create_access_token, get_current_user, require_roles, verify_password,
                       set_user_password, validate_password_strength, public_user, is_admin, role_rank,
                       check_not_locked, record_failure, clear_failures)
     from leegality import router as leegality_router
     from signatures import router as signatures_router
     import broadcasts
+    import sync
+    from db_init import init_database
 
 
 app = FastAPI(title="Srinivas CRM API", version="1.0.0", docs_url=None, redoc_url=None, openapi_url=None)
 
-load_credentials()
+# Creates the tables and seeds a brand-new database; a no-op once data exists. In Docker this has
+# already run once, before the workers started (deploy/start_backend.sh).
+init_database()
 
 # Enable CORS for Node.JS Vite Frontend
 app.add_middleware(
@@ -40,12 +46,14 @@ app.add_middleware(
 app.include_router(leegality_router)
 app.include_router(signatures_router)
 app.include_router(broadcasts.router)
+app.include_router(sync.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
 @app.on_event("startup")
 def start_broadcast_pollers():
-    if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1":
+    # With several workers only one may poll Telegram, or every call would be sent once per worker
+    if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
 
 
@@ -154,6 +162,7 @@ class UserDocumentUpload(BaseModel):
 # Health Check
 @app.get("/api/health")
 def health_check():
+    store.cursor()  # fails (500) when the database is unreachable
     return {"status": "online", "system": "Srinivas CRM FastAPI Backend"}
 
 # Authentication Routes
@@ -167,24 +176,32 @@ def _normalize_identifier(identifier: str) -> str:
         return _digits(ident)
     return ident.lower()
 
+def _user(user_id: str) -> Optional[dict]:
+    return store.get("users", user_id)
+
+def _save_user(user: dict) -> dict:
+    store.put("users", user["id"], user)
+    return user
+
 def _find_login_user(identifier: str):
     ident = _normalize_identifier(identifier)
     if not ident:
         return None
+    users = store.all("users")
     # Email/employee ID are exact identities and take precedence, so nobody can shadow them via their mobile.
-    exact = [u for u in USERS_DB if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())]
+    exact = [u for u in users if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())]
     if exact:
         return exact[0] if len(exact) == 1 else None
     if len(ident) < 10 or not ident.isdigit():
         return None
-    matches = [u for u in USERS_DB if ident == _digits(u.get("mobile"))]
+    matches = [u for u in users if ident == _digits(u.get("mobile"))]
     # An identifier that matches more than one account is refused rather than guessed.
     return matches[0] if len(matches) == 1 else None
 
 def _ensure_unique_identity(exclude: Optional[dict] = None, name=None, email=None, mobile=None, employee_id=None):
     """Names (used for lead ownership), emails, mobiles and employee IDs (used to sign in) must be unique."""
-    for u in USERS_DB:
-        if u is exclude:
+    for u in store.all("users"):
+        if exclude is not None and u["id"] == exclude["id"]:
             continue
         if name is not None and (u.get("name") or "").strip().lower() == name.strip().lower():
             raise HTTPException(status_code=400, detail="A user with this name already exists.")
@@ -235,7 +252,7 @@ def verify_password_endpoint(req: PasswordVerify, current_user: dict = Depends(g
     """Re-authentication for sensitive in-app actions (signature vault, IP guard, admin overrides)."""
     key = f"verify:{current_user['id']}"
     check_not_locked(key)
-    admins = [u for u in USERS_DB if is_admin(u) and u.get("status") == "Active"]
+    admins = [u for u in store.all("users") if is_admin(u) and u.get("status") == "Active"]
     if req.scope == "admin":
         candidates = admins
     elif req.scope == "self_or_admin":
@@ -251,7 +268,7 @@ def verify_password_endpoint(req: PasswordVerify, current_user: dict = Depends(g
 # Users Directory Routes
 @app.get("/api/users")
 def get_users(status_filter: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    users = USERS_DB
+    users = store.all("users")
     if status_filter and status_filter != "All":
         users = [u for u in users if u["status"] == status_filter]
     return [public_user(u, current_user) for u in users]
@@ -276,7 +293,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "role": req.role,
         "email": email,
         "reportingTo": req.reportingTo or "Sreenivasulu",
-        "employeeId": req.employeeId or f"EMP-{len(USERS_DB) + 100}",
+        "employeeId": req.employeeId or f"EMP-{store.count('users') + 100}",
         "status": "Active",
         "expiryDate": "27-07-2027",
         "bankAccountNumber": req.bankAccountNumber or "",
@@ -287,7 +304,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "documents": req.documents or []
     }
     set_user_password(new_user, req.password)
-    USERS_DB.insert(0, new_user)
+    _save_user(new_user)
     return public_user(new_user)
 
 # Name is excluded: lead ownership can fall back to name matching, so only admins may rename.
@@ -295,7 +312,7 @@ _SELF_EDITABLE_FIELDS = {"mobile", "bankAccountNumber", "ifscCode", "bankNameAnd
 
 @app.put("/api/users/{user_id}")
 def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_current_user)):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -337,11 +354,12 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.documents is not None: user["documents"] = req.documents
 
+    _save_user(user)
     return public_user(user)
 
 @app.put("/api/users/{user_id}/toggle-status")
 def toggle_user_status(user_id: str, current_user: dict = Depends(require_roles(["Super Admin", "Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user["id"] == current_user["id"]:
@@ -351,64 +369,59 @@ def toggle_user_status(user_id: str, current_user: dict = Depends(require_roles(
 
     user["status"] = "Inactive" if user["status"] == "Active" else "Active"
     user["tokenVersion"] = user.get("tokenVersion", 0) + 1
+    _save_user(user)
     return public_user(user)
 
 @app.put("/api/users/{user_id}/password")
 def change_user_password(user_id: str, req: PasswordChange, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     validate_password_strength(req.newPassword)
     set_user_password(user, req.newPassword)
+    _save_user(user)
     return {"message": f"Password updated for user {user['name']}"}
 
 @app.post("/api/users/{user_id}/reassign-and-delete")
 def delete_user_with_reassignment(user_id: str, req: LeadReassignDelete, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     if user["id"] == current_user["id"]:
         raise HTTPException(status_code=400, detail="You cannot delete your own account.")
-    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
-    if not target_user or target_user is user:
+    target_user = _user(req.targetUserId)
+    if not target_user or target_user["id"] == user["id"]:
         raise HTTPException(status_code=400, detail="Target user for lead reassignment not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
 
     # Reassign all active leads
     reassigned_count = 0
-    for lead in LEADS_DB:
-        if lead["assignedToId"] == user_id:
-            lead["assignedToId"] = target_user["id"]
-            lead["assignedToName"] = target_user["name"]
-            lead["history"].append({
-                "date": now_str,
-                "text": f"Pre-deletion lead reassigned to {target_user['name']} by Super Admin"
-            })
+    with store.transaction():
+        for lead in store.all("leads", [user_id]):
+            _assign(lead, target_user, f"Pre-deletion lead reassigned to {target_user['name']} by Super Admin", now_str)
             reassigned_count += 1
-
-    # Remove user
-    USERS_DB.remove(user)
+        store.delete("users", user_id)
     return {"message": f"Reassigned {reassigned_count} leads to {target_user['name']} and deleted user {user['name']}."}
 
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user["id"] == current_user["id"]:
         raise HTTPException(status_code=400, detail="You cannot delete your own account.")
-    if any(l.get("assignedToId") == user_id for l in LEADS_DB):
+    if store.all("leads", [user_id]):
         raise HTTPException(status_code=400, detail="User still holds leads. Reassign them before deleting.")
-    USERS_DB.remove(user)
+    store.delete("users", user_id)
     return {"message": f"Deleted user {user['name']}."}
 
 # Dispositions & Pipeline Routes (Block 2)
 @app.get("/api/dispositions")
 def get_dispositions(current_user: dict = Depends(get_current_user)):
-    return DISPOSITIONS_DB
+    return store.all("dispositions")
 
 @app.post("/api/dispositions")
 def create_disposition(req: DispositionCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
@@ -419,27 +432,28 @@ def create_disposition(req: DispositionCreate, current_user: dict = Depends(requ
         "color": req.color,
         "isDefault": False
     }
-    DISPOSITIONS_DB.append(new_disp)
+    store.put("dispositions", new_disp["id"], new_disp)
     return new_disp
 
 @app.put("/api/dispositions/{disp_id}")
 def update_disposition(disp_id: str, req: DispositionCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    disp = next((d for d in DISPOSITIONS_DB if d["id"] == disp_id), None)
+    disp = store.get("dispositions", disp_id)
     if not disp:
         raise HTTPException(status_code=404, detail="Disposition not found")
 
     disp["name"] = req.name
     disp["description"] = req.description
     disp["color"] = req.color
+    store.put("dispositions", disp_id, disp)
     return disp
 
 @app.delete("/api/dispositions/{disp_id}")
 def delete_disposition(disp_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    disp = next((d for d in DISPOSITIONS_DB if d["id"] == disp_id), None)
+    disp = store.get("dispositions", disp_id)
     if not disp:
         raise HTTPException(status_code=404, detail="Disposition not found")
 
-    DISPOSITIONS_DB.remove(disp)
+    store.delete("dispositions", disp_id)
     return {"message": "Disposition deleted successfully"}
 
 # Leads & Post-Call Workflow Routes
@@ -454,29 +468,39 @@ def _lead_visible_to(lead: dict, user: dict) -> bool:
         and not lead.get("isUnassigned") and lead.get("assignedToId") != "unassigned" and lead.get("assignedToName") != "Unassigned"
     )
 
+def _assign(lead: dict, target_user: dict, history_text: str, now_str: str) -> None:
+    """Give a lead to target_user, record why, and save it."""
+    lead["assignedToId"] = target_user["id"]
+    lead["assigned_user_id"] = target_user["id"]
+    lead["assignedToName"] = target_user["name"]
+    lead["isUnassigned"] = False
+    lead.setdefault("history", []).append({"date": now_str, "text": history_text})
+    store.put("leads", lead["id"], lead)
+
 @app.get("/api/leads")
 def get_leads(current_user: dict = Depends(get_current_user)):
-    # Scoped lead visibility based on role
-    return [l for l in LEADS_DB if _lead_visible_to(l, current_user)]
+    # Scoped lead visibility based on role (browsers use /api/sync; this also matches legacy leads by name)
+    return [l for l in store.all("leads") if _lead_visible_to(l, current_user)]
 
 @app.post("/api/leads/{lead_id}/disposition")
 def update_lead_disposition(lead_id: str, req: LeadDispositionUpdate, current_user: dict = Depends(get_current_user)):
-    lead = next((l for l in LEADS_DB if l["id"] == lead_id), None)
+    lead = store.get("leads", lead_id)
     if not lead or not _lead_visible_to(lead, current_user):
         raise HTTPException(status_code=404, detail="Lead not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     notes_str = f" (Notes: '{req.callNotes}')" if req.callNotes else ""
     lead["disposition"] = req.dispositionName
-    lead["history"].append({
+    lead.setdefault("history", []).append({
         "date": now_str,
         "text": f"Post-Call Disposition updated to [{req.dispositionName}] by {current_user['role']} {current_user['name']}{notes_str}"
     })
+    store.put("leads", lead_id, lead)
     return lead
 
 @app.post("/api/leads/reassign")
 def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(require_roles(["Super Admin", "Admin"]))):
-    target_user = next((u for u in USERS_DB if u["id"] == req.toUserId), None)
+    target_user = _user(req.toUserId)
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
 
@@ -484,16 +508,17 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
     reassigned_count = 0
     max_count = req.quantity if (req.quantity and req.quantity > 0) else float('inf')
 
-    for lead in LEADS_DB:
+    candidates = store.all("leads", None if req.fromUserId == "ALL" else [req.fromUserId])
+    for lead in candidates:
         if reassigned_count >= max_count:
             break
-        if req.fromUserId != "ALL" and lead["assignedToId"] != req.fromUserId:
+        if req.fromUserId != "ALL" and lead.get("assignedToId") != req.fromUserId:
             continue
         if req.language and req.language != "ALL" and lead.get("language", "").lower() != req.language.lower():
             continue
         if req.disposition and req.disposition != "ALL" and lead.get("disposition", "New Lead").lower() != req.disposition.lower():
             continue
-        
+
         # Date filter: single or range
         if req.dateMode == "range" or (req.startDate or req.endDate):
             if req.startDate or req.endDate:
@@ -512,9 +537,6 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
             if not any(req.date in d for d in dates):
                 continue
 
-        lead["assignedToId"] = target_user["id"]
-        lead["assignedToName"] = target_user["name"]
-        
         date_desc = "Any"
         if req.dateMode == "range" and (req.startDate or req.endDate):
             if req.startDate and req.endDate:
@@ -526,10 +548,9 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
         elif req.date:
             date_desc = req.date
 
-        lead["history"].append({
-            "date": now_str,
-            "text": f"Lead reassigned to {target_user['name']} by {current_user['name']} via Protocol [Qty: {req.quantity or 'All'}, Lang: {req.language or 'All'}, Disp: {req.disposition or 'All'}, Date: {date_desc}]"
-        })
+        _assign(lead, target_user,
+                f"Lead reassigned to {target_user['name']} by {current_user['name']} via Protocol [Qty: {req.quantity or 'All'}, Lang: {req.language or 'All'}, Disp: {req.disposition or 'All'}, Date: {date_desc}]",
+                now_str)
         reassigned_count += 1
 
     return {"message": f"Reassigned {reassigned_count} leads to {target_user['name']}."}
@@ -538,14 +559,14 @@ def reassign_leads(req: LeadReassignRequest, current_user: dict = Depends(requir
 def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
     if not req.quantity or req.quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity Validation: Assign Quantity must be a valid positive integer greater than zero.")
-    
-    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+
+    target_user = _user(req.targetUserId)
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found in Block 1 Hierarchy")
 
     lang_key = (req.language or "").strip().lower()
     matching_unassigned = [
-        l for l in LEADS_DB
+        l for l in store.all("leads")
         if (lang_key == "all" or l.get("language", "").strip().lower() == lang_key)
         and (l.get("isUnassigned") or not l.get("assignedToId") or l.get("assignedToName") == "Unassigned" or l.get("assignedToId") == "unassigned" or not l.get("assigned_user_id"))
     ]
@@ -569,15 +590,10 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
 
     assigned_ids = []
     for lead in leads_to_assign:
-        lead["assignedToId"] = target_user["id"]
-        lead["assigned_user_id"] = target_user["id"]
-        lead["assignedToName"] = target_user["name"]
-        lead["isUnassigned"] = False
         lead["disposition"] = lead.get("disposition") or "New Lead"
-        lead.setdefault("history", []).append({
-            "date": now_str,
-            "text": f"Allocated to {target_user['name']} ({target_user['role']}) via Language-Based Lead Assignment Engine [{req.language}]. Batch: {len(leads_to_assign)} leads."
-        })
+        _assign(lead, target_user,
+                f"Allocated to {target_user['name']} ({target_user['role']}) via Language-Based Lead Assignment Engine [{req.language}]. Batch: {len(leads_to_assign)} leads.",
+                now_str)
         assigned_ids.append(lead["id"])
 
     # Derive source file name from bulk upload leads
@@ -585,7 +601,7 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
     source_file_name = ", ".join(distinct_sources) if distinct_sources else "Sample_Bulk_Leads.csv"
 
     inst = {
-        "id": f"inst-{int(datetime.utcnow().timestamp())}",
+        "id": f"inst-{uuid.uuid4().hex[:12]}",
         "sourceFileName": source_file_name,
         "sourceFile": source_file_name,
         "batchName": source_file_name,
@@ -599,7 +615,7 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
         "date": today_str,
         "leadIds": assigned_ids
     }
-    ASSIGNMENT_INSTANCES_DB.insert(0, inst)
+    store.put("assignmentInstances", inst["id"], inst)
 
     return {
         "success": True,
@@ -613,8 +629,8 @@ def assign_leads_by_language_endpoint(req: LanguageLeadAssignRequest, current_us
 @app.get("/api/sales")
 def get_sales(current_user: dict = Depends(get_current_user)):
     if is_admin(current_user):
-        return SALES_DB
-    return [s for s in SALES_DB if s.get("employeeId") == current_user["id"]]
+        return store.all("sales")
+    return store.all("sales", [current_user["id"]])
 
 @app.post("/api/sales")
 def submit_sale(req: SaleRegister, current_user: dict = Depends(get_current_user)):
@@ -624,53 +640,56 @@ def submit_sale(req: SaleRegister, current_user: dict = Depends(get_current_user
         "clientName": req.clientName,
         "amount": req.amount,
         "employeeId": current_user["id"],
+        "submittedByUserId": current_user["id"],
         "employeeName": current_user["name"],
         "date": datetime.utcnow().strftime("%Y-%m-%d"),
         "status": "Pending Super Admin Approval",
         "mitcStatus": req.mitcStatus or "Verified",
         "complianceStatus": req.complianceStatus or "Compliant"
     }
-    SALES_DB.insert(0, new_sale)
+    store.put("sales", new_sale["id"], new_sale)
     return new_sale
 
 @app.post("/api/sales/{sale_id}/approve")
 def approve_sale(sale_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    sale = next((s for s in SALES_DB if s["id"] == sale_id), None)
+    sale = store.get("sales", sale_id)
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
 
     sale["status"] = "Approved (Moved to eKYC)"
     sale["stage"] = "eKYC Verification"
+    store.put("sales", sale_id, sale)
     return sale
 
 @app.post("/api/sales/{sale_id}/reject")
 def reject_sale(sale_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    sale = next((s for s in SALES_DB if s["id"] == sale_id), None)
+    sale = store.get("sales", sale_id)
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
 
     sale["status"] = "Rejected"
+    store.put("sales", sale_id, sale)
     return sale
 
 # Custom Roles Routes
 @app.get("/api/custom-roles")
 def get_custom_roles(current_user: dict = Depends(get_current_user)):
-    return CUSTOM_ROLES_DB
+    return store.all("customRoles")
 
 @app.post("/api/custom-roles")
 def create_custom_role(req: CustomRoleCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
     new_role = {
-        "id": f"crole-{int(datetime.utcnow().timestamp())}",
+        "id": f"crole-{uuid.uuid4().hex[:12]}",
         "roleName": req.roleName,
         "level": req.level,
         "accessScope": req.accessScope
     }
-    CUSTOM_ROLES_DB.append(new_role)
+    store.put("customRoles", new_role["id"], new_role)
     return new_role
 
 @app.delete("/api/custom-roles/{role_id}")
 def delete_custom_role(role_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    CUSTOM_ROLES_DB[:] = [r for r in CUSTOM_ROLES_DB if r.get("id") != role_id]
+    store.delete("customRoles", role_id)
     return {"success": True, "message": "Role deleted"}
 
 # Block 4: Lead Summary & Super Admin Operations Schemas & Routes
@@ -696,13 +715,13 @@ class GranularLeadDeleteRequest(BaseModel):
 @app.get("/api/lead-requests")
 def get_lead_requests(current_user: dict = Depends(get_current_user)):
     # Auto-disappear rule: Return active pending requests
-    return [r for r in LEAD_REQUESTS_DB if r.get("status") == "Pending"
-            and (is_admin(current_user) or r.get("requestedByUserId") == current_user["id"])]
+    owners = None if is_admin(current_user) else [current_user["id"]]
+    return [r for r in store.all("leadRequests", owners) if r.get("status") == "Pending"]
 
 @app.post("/api/lead-requests")
 def create_lead_request(req: LeadRequestCreate, current_user: dict = Depends(get_current_user)):
     new_req = {
-        "id": f"req-{int(datetime.utcnow().timestamp())}",
+        "id": f"req-{uuid.uuid4().hex[:12]}",
         "requestedByUserId": current_user["id"],
         "requestedByName": current_user["name"],
         "role": current_user["role"],
@@ -713,109 +732,95 @@ def create_lead_request(req: LeadRequestCreate, current_user: dict = Depends(get
         "status": "Pending",
         "note": req.note
     }
-    LEAD_REQUESTS_DB.insert(0, new_req)
+    store.put("leadRequests", new_req["id"], new_req)
     return new_req
 
 @app.post("/api/lead-requests/{req_id}/fulfill")
 def fulfill_lead_request(req_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    req = next((r for r in LEAD_REQUESTS_DB if r["id"] == req_id), None)
-    if not req:
+    if not store.get("leadRequests", req_id):
         raise HTTPException(status_code=404, detail="Lead request not found")
-    
-    req["status"] = "Fulfilled"
     # Remove from active list for auto-disappear rule
-    if req in LEAD_REQUESTS_DB:
-        LEAD_REQUESTS_DB.remove(req)
+    store.delete("leadRequests", req_id)
     return {"message": "Lead request fulfilled and removed from active dashboard."}
 
 @app.get("/api/assignment-instances")
 def get_assignment_instances(current_user: dict = Depends(require_roles(["Super Admin", "Admin"]))):
-    return ASSIGNMENT_INSTANCES_DB
+    return store.all("assignmentInstances")
 
 @app.delete("/api/assignment-instances/batch")
 def delete_assignment_files(req: BatchFileDeleteRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
     deleted_count = 0
-    for inst_id in req.instanceIds:
-        inst = next((i for i in ASSIGNMENT_INSTANCES_DB if i["id"] == inst_id), None)
-        if inst:
-            # Delete associated leads
-            lead_ids_to_del = inst.get("leadIds", [])
-            for lid in lead_ids_to_del:
-                l_item = next((l for l in LEADS_DB if l["id"] == lid), None)
-                if l_item:
-                    LEADS_DB.remove(l_item)
-            ASSIGNMENT_INSTANCES_DB.remove(inst)
-            deleted_count += 1
+    with store.transaction():
+        for inst_id in req.instanceIds:
+            inst = store.get("assignmentInstances", inst_id)
+            if inst:
+                # Delete associated leads
+                for lid in inst.get("leadIds", []):
+                    store.delete("leads", lid)
+                store.delete("assignmentInstances", inst_id)
+                deleted_count += 1
     return {"message": f"Successfully deleted {deleted_count} assignment file instance(s)."}
 
 @app.post("/api/assignment-instances/reassign")
 def reassign_assignment_file(req: BatchFileReassignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    inst = next((i for i in ASSIGNMENT_INSTANCES_DB if i["id"] == req.instanceId), None)
+    inst = store.get("assignmentInstances", req.instanceId)
     if not inst:
         raise HTTPException(status_code=404, detail="Assignment instance file not found")
-    
-    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+
+    target_user = _user(req.targetUserId)
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     inst["assignedToId"] = target_user["id"]
+    inst["assigned_user_id"] = target_user["id"]
     inst["assignedToName"] = target_user["name"]
 
     # Reassign all leads in this instance
     count = 0
-    for lid in inst.get("leadIds", []):
-        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
-        if lead:
-            lead["assignedToId"] = target_user["id"]
-            lead["assignedToName"] = target_user["name"]
-            lead["history"].append({
-                "date": now_str,
-                "text": f"Batch file reassigned to {target_user['name']} by Super Admin"
-            })
-            count += 1
+    with store.transaction():
+        store.put("assignmentInstances", inst["id"], inst)
+        for lid in inst.get("leadIds", []):
+            lead = store.get("leads", lid)
+            if lead:
+                _assign(lead, target_user, f"Batch file reassigned to {target_user['name']} by Super Admin", now_str)
+                count += 1
 
     return {"message": f"Reassigned assignment file '{inst['batchName']}' ({count} leads) to {target_user['name']}."}
 
+def _drop_from_instances(lead_ids: List[str]) -> None:
+    """Assignment files no longer list leads that were moved or deleted individually."""
+    gone = set(lead_ids)
+    for inst in store.all("assignmentInstances"):
+        if gone.intersection(inst.get("leadIds") or []):
+            inst["leadIds"] = [lid for lid in inst["leadIds"] if lid not in gone]
+            inst["quantity"] = len(inst["leadIds"])
+            store.put("assignmentInstances", inst["id"], inst)
+
 @app.post("/api/leads/granular-reassign")
 def granular_reassign_leads(req: GranularLeadReassignRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    target_user = next((u for u in USERS_DB if u["id"] == req.targetUserId), None)
+    target_user = _user(req.targetUserId)
     if not target_user:
         raise HTTPException(status_code=404, detail="Target user not found")
 
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
     count = 0
-    for lid in req.leadIds:
-        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
-        if lead:
-            lead["assignedToId"] = target_user["id"]
-            lead["assignedToName"] = target_user["name"]
-            lead["history"].append({
-                "date": now_str,
-                "text": f"Granular reassignment to {target_user['name']} by Super Admin"
-            })
-            count += 1
-
-    for inst in ASSIGNMENT_INSTANCES_DB:
-        if "leadIds" in inst and any(lid in inst["leadIds"] for lid in req.leadIds):
-            inst["leadIds"] = [lid for lid in inst["leadIds"] if lid not in req.leadIds]
-            inst["quantity"] = len(inst["leadIds"])
+    with store.transaction():
+        for lid in req.leadIds:
+            lead = store.get("leads", lid)
+            if lead:
+                _assign(lead, target_user, f"Granular reassignment to {target_user['name']} by Super Admin", now_str)
+                count += 1
+        _drop_from_instances(req.leadIds)
 
     return {"message": f"Reassigned {count} selected lead(s) to {target_user['name']}."}
 
 @app.delete("/api/leads/granular-delete")
 def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
     count = 0
-    for lid in req.leadIds:
-        lead = next((l for l in LEADS_DB if l["id"] == lid), None)
-        if lead:
-            LEADS_DB.remove(lead)
-            count += 1
-
-    for inst in ASSIGNMENT_INSTANCES_DB:
-        if "leadIds" in inst and any(lid in inst["leadIds"] for lid in req.leadIds):
-            inst["leadIds"] = [lid for lid in inst["leadIds"] if lid not in req.leadIds]
-            inst["quantity"] = len(inst["leadIds"])
+    with store.transaction():
+        count = len(store.delete_many("leads", req.leadIds))
+        _drop_from_instances(req.leadIds)
 
     return {"message": f"Deleted {count} selected lead(s) permanently."}
 
@@ -824,25 +829,25 @@ def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = D
 # ==========================================
 @app.get("/api/document-types")
 def get_document_types(current_user: dict = Depends(get_current_user)):
-    return DOCUMENT_TYPES_DB
+    return store.all("documentTypes")
 
 @app.post("/api/document-types")
 def create_document_type(req: DocumentTypeCreate, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    if len(DOCUMENT_TYPES_DB) >= 10:
+    if store.count("documentTypes") >= 10:
         raise HTTPException(status_code=400, detail="Maximum limit of 10 document types reached.")
-    
+
     new_doc_type = {
-        "id": f"doctype-{int(datetime.utcnow().timestamp())}",
+        "id": f"doctype-{uuid.uuid4().hex[:12]}",
         "name": req.name,
         "description": req.description or "",
         "required": req.required or False
     }
-    DOCUMENT_TYPES_DB.append(new_doc_type)
+    store.put("documentTypes", new_doc_type["id"], new_doc_type)
     return new_doc_type
 
 @app.put("/api/document-types/{doctype_id}")
 def update_document_type(doctype_id: str, req: DocumentTypeUpdate, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    dt = next((d for d in DOCUMENT_TYPES_DB if d["id"] == doctype_id), None)
+    dt = store.get("documentTypes", doctype_id)
     if not dt:
         raise HTTPException(status_code=404, detail="Document type not found")
     if req.name is not None:
@@ -851,14 +856,15 @@ def update_document_type(doctype_id: str, req: DocumentTypeUpdate, current_user:
         dt["description"] = req.description
     if req.required is not None:
         dt["required"] = req.required
+    store.put("documentTypes", doctype_id, dt)
     return dt
 
 @app.delete("/api/document-types/{doctype_id}")
 def delete_document_type(doctype_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    dt = next((d for d in DOCUMENT_TYPES_DB if d["id"] == doctype_id), None)
+    dt = store.get("documentTypes", doctype_id)
     if not dt:
         raise HTTPException(status_code=404, detail="Document type not found")
-    DOCUMENT_TYPES_DB.remove(dt)
+    store.delete("documentTypes", doctype_id)
     return {"message": "Document type deleted successfully."}
 
 # ==========================================
@@ -866,23 +872,23 @@ def delete_document_type(doctype_id: str, current_user: dict = Depends(require_r
 # ==========================================
 @app.get("/api/users/{user_id}/documents")
 def get_user_documents(user_id: str, current_user: dict = Depends(get_current_user)):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user or (user["id"] != current_user["id"] and not is_admin(current_user)):
         raise HTTPException(status_code=404, detail="User not found")
     return user.get("documents", [])
 
 @app.post("/api/users/{user_id}/documents")
 def upload_user_document(user_id: str, req: UserDocumentUpload, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if "documents" not in user:
         user["documents"] = []
-    
+
     # If a document for this documentTypeId exists, replace it, else append
     existing_doc = next((d for d in user["documents"] if d.get("documentTypeId") == req.documentTypeId), None)
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-    
+
     doc_entry = {
         "id": existing_doc["id"] if existing_doc else f"doc-{uuid.uuid4().hex[:8]}",
         "documentTypeId": req.documentTypeId,
@@ -893,18 +899,18 @@ def upload_user_document(user_id: str, req: UserDocumentUpload, current_user: di
         "fileData": req.fileData,
         "uploadedAt": now_str
     }
-    
+
     if existing_doc:
         idx = user["documents"].index(existing_doc)
         user["documents"][idx] = doc_entry
     else:
         user["documents"].append(doc_entry)
-        
+    _save_user(user)
     return doc_entry
 
 @app.delete("/api/users/{user_id}/documents/{doc_id}")
 def delete_user_document(user_id: str, doc_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
-    user = next((u for u in USERS_DB if u["id"] == user_id), None)
+    user = _user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     docs = user.get("documents", [])
@@ -912,5 +918,7 @@ def delete_user_document(user_id: str, doc_id: str, current_user: dict = Depends
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     docs.remove(doc)
+    user["documents"] = docs
+    _save_user(user)
     return {"message": "Document deleted successfully."}
 

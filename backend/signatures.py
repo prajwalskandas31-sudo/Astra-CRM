@@ -1,14 +1,11 @@
 """Digital Signature Storage Block: one shared, server-side copy of the signatory signatures.
 
-Browsers keep a local cache, but this file is the source of truth, so every Super Admin/Admin
+Browsers keep a local cache, but the database copy is the source of truth, so every Super Admin/Admin
 browser sees the same signature and Leegality dispatch never depends on which browser uploaded it.
 """
 import base64
 import io
-import json
-import os
 import re
-import threading
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
@@ -17,27 +14,24 @@ from PIL import Image
 from pydantic import BaseModel
 
 try:
+    from backend import store
     from backend.auth import require_roles, verify_password, check_not_locked, record_failure, clear_failures, ADMIN_ROLES
 except ImportError:
+    import store
     from auth import require_roles, verify_password, check_not_locked, record_failure, clear_failures, ADMIN_ROLES
 
 
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-SIGNATURES_PATH = os.path.join(BACKEND_DIR, "data", "signatures.json")
+SIGNATURES = "signatures"  # one database value: {key: signature record}
 MAX_SIGNATURES = 25
 MAX_IMAGE_CHARS = 3_000_000  # ~2.2 MB image as a data URL
 KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 PRIMARY_KEY = "master_officer"
 
 router = APIRouter(prefix="/api/signatures", tags=["signatures"])
-_lock = threading.Lock()
 
 
 def read_signatures() -> dict:
-    if not os.path.exists(SIGNATURES_PATH):
-        return {}
-    with open(SIGNATURES_PATH, encoding="utf-8") as f:
-        return json.load(f)
+    return store.get_value(SIGNATURES, {})
 
 
 def stored_primary_signature() -> Optional[str]:
@@ -95,7 +89,7 @@ def save_signatures(req: SignatureSave, current_user: dict = Depends(require_rol
     is_super_admin = current_user["role"] == "Super Admin"
     now = datetime.now(timezone.utc).isoformat()
     # Read, authorize and write under one lock so a concurrent save can't slip in between
-    with _lock:
+    with store.transaction():
         stored = read_signatures()
         # The Primary Signatory signs every Leegality agreement, so only a Super Admin may change it
         if not is_super_admin and _content(req.signatures.get(PRIMARY_KEY)) != _content(stored.get(PRIMARY_KEY)):
@@ -111,10 +105,5 @@ def save_signatures(req: SignatureSave, current_user: dict = Depends(require_rol
                 stamped[name] = {**record, "serverSavedAt": now, "serverSavedBy": current_user["name"]}
         if not is_super_admin and PRIMARY_KEY in stored:
             stamped[PRIMARY_KEY] = stored[PRIMARY_KEY]
-
-        os.makedirs(os.path.dirname(SIGNATURES_PATH), exist_ok=True)
-        tmp = SIGNATURES_PATH + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(stamped, f)
-        os.replace(tmp, SIGNATURES_PATH)
+        store.set_value(SIGNATURES, stamped)
     return stamped

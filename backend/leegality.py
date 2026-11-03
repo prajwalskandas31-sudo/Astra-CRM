@@ -1,5 +1,9 @@
 """
-Leegality e-KYC & E-Sign integration (Workflow LzfDhWc, template hm6uV8X).
+Leegality e-KYC & E-Sign integration (template kFWn7uC "RA Terms and Conditions - UTFS").
+
+Mirrors the dashboard's Create > New Document > Templates journey: Date 1, the
+Service Tenure checkbox and both stamped signatures are filled from the CRM, the
+sender does not sign, and the client is invited by name, email and phone.
 
 All Leegality traffic goes through this backend so the auth token and private
 salt never reach the browser, and requests leave from a whitelisted IP.
@@ -11,7 +15,6 @@ import hmac
 import io
 import json
 import os
-import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -22,9 +25,11 @@ from pydantic import BaseModel
 from PIL import Image, ImageDraw, ImageFont
 
 try:
+    from backend import store
     from backend.auth import require_roles
     from backend.signatures import stored_primary_signature
 except ImportError:
+    import store
     from auth import require_roles
     from signatures import stored_primary_signature
 
@@ -32,10 +37,9 @@ except ImportError:
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BACKEND_DIR, ".env")
 TEMPLATE_MAP_PATH = os.path.join(BACKEND_DIR, "leegality_template_map.json")
-RECORDS_PATH = os.path.join(BACKEND_DIR, "data", "leegality_documents.json")
+RECORDS = "leegalityDocuments"  # one database value: {documentId: record}
 
 router = APIRouter(prefix="/api/leegality", tags=["leegality"])
-_records_lock = threading.Lock()
 
 
 # ==========================================
@@ -80,23 +84,16 @@ def _now(tmap):
 
 
 # ==========================================
-# Local record store (backend DB is in-memory, so persist dispatches to disk)
+# Dispatch records (kept in the database)
 # ==========================================
 def _read_records():
-    if not os.path.exists(RECORDS_PATH):
-        return {}
-    with open(RECORDS_PATH, encoding="utf-8") as f:
-        return json.load(f)
+    return store.get_value(RECORDS, {})
 
 
 def _update_record(document_id, patch):
-    with _records_lock:
-        records = _read_records()
-        records[document_id] = {**records.get(document_id, {}), **patch}
-        os.makedirs(os.path.dirname(RECORDS_PATH), exist_ok=True)
-        with open(RECORDS_PATH, "w", encoding="utf-8") as f:
-            json.dump(records, f, indent=2)
-        return records[document_id]
+    with store.update_value(RECORDS, {}) as records:
+        records[0][document_id] = {**records[0].get(document_id, {}), **patch}
+        return records[0][document_id]
 
 
 # ==========================================
@@ -188,8 +185,13 @@ def _stamp_signature(signature, stamp_text, width_px, height_px):
 
 def _signature_fields(tmap, signature_data_url):
     signature = _decode_image(signature_data_url)
-    fields, stamps = [], []
+    fields, stamps, sent = [], [], set()
     for cfg in tmap["signatureImageFields"]:
+        # Both placements in kFWn7uC are named "Image 1"; without ids they are one field to Leegality, so send it once
+        key = cfg.get("id") or cfg["name"]
+        if key in sent:
+            continue
+        sent.add(key)
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
@@ -262,13 +264,14 @@ def leegality_wallet(current_user: dict = Depends(require_roles(["Super Admin"])
     return _wallet(_settings())
 
 
-def _delivery_config(document_id, settings):
-    """What Leegality actually configured on the new document: notification channels and allowed signature types.
-    These come from the workflow, and the create API cannot override them, so read them back after every send."""
-    params = {"documentId": document_id, "invitations_inviteeConfigs": "true"}
+def _delivery_config(document_id, settings, expected_template_id):
+    """What Leegality actually configured on the new document: template, notification channels and allowed
+    signature types. These come from the workflow, and the create API cannot override them, so read them back after every send."""
+    params = {"documentId": document_id, "invitations_inviteeConfigs": "true", "template": "true", "template_name": "true"}
     _, body = _leegality("GET", "/v3.3/document/details", settings, params=params)
     if body.get("status") != 1:
         return {"error": _messages(body)}
+    template = (body.get("data") or {}).get("template") or {}
     invitees = []
     for inv in (body.get("data") or {}).get("invitations") or []:
         cfg = inv.get("inviteeConfigs") or {}
@@ -281,7 +284,12 @@ def _delivery_config(document_id, settings):
             "whatsAppNotification": bool(cfg.get("whatsAppNotification")),
             "allowedSignatures": inv.get("allowedSignatures") or [],
         })
-    return {"invitees": invitees}
+    return {
+        "templateId": template.get("id"),
+        "templateName": template.get("name"),
+        "templateMatches": template.get("id") == expected_template_id,
+        "invitees": invitees,
+    }
 
 
 @router.post("/esign/dispatch")
@@ -291,8 +299,10 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
 
     email = (req.email or "").strip()
     phone = "".join(ch for ch in (req.phone or "") if ch.isdigit())[-10:]
-    if not email and not phone:
-        raise HTTPException(status_code=400, detail="Client email or phone is required on the Client Information Page.")
+    # The signer is invited with "Enter both": name, email and phone all go to Leegality
+    missing = [label for label, value in (("Email ID", email), ("Phone Number 1", phone)) if not value]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"{' and '.join(missing)} missing on the Client Information Page; Leegality needs both email and phone.")
 
     option_idx = _tenure_option(tmap, req.serviceTenure)
     executed_at = _now(tmap)
@@ -304,11 +314,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
     sig_fields, stamps = _signature_fields(tmap, stored_primary_signature() or req.signatureDataUrl)
     fields += sig_fields
 
-    invitee = {"name": req.clientName.strip()}
-    if email:
-        invitee["email"] = email
-    if phone:
-        invitee["phone"] = phone
+    invitee = {"name": req.clientName.strip(), "email": email, "phone": phone}
 
     payload = {
         "profileId": tmap["profileId"],
@@ -339,8 +345,9 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         "documentStatus": "SENT",
         "webhookEvents": [],
         "walletAfterDispatch": _wallet(settings),
-        "deliveryConfig": _delivery_config(data["documentId"], settings),
-        "sentContact": {"email": email or None, "phone": phone or None},
+        "templateId": tmap["templateId"],
+        "deliveryConfig": _delivery_config(data["documentId"], settings, tmap["templateId"]),
+        "sentContact": {"email": email, "phone": phone},
     })
     return record
 

@@ -103,11 +103,12 @@ def test_super_admin_cannot_lock_themselves_out(crm, tokens):
 # ---- Lead visibility
 
 def test_leads_scoped_by_owner_id(crm, tokens):
-    leads = crm.main.LEADS_DB
-    leads.append({"id": "ld-other", "assignedToId": "usr-2", "assignedToName": "ABHINAYA M", "history": []})
-    leads.append({"id": "ld-name-collide", "assignedToId": "usr-2", "assignedToName": "AJAY", "history": []})
-    leads.append({"id": "ld-mine", "assignedToId": EXEC_ID, "assignedToName": "AJAY", "history": []})
-    leads.append({"id": "ld-legacy", "assignedToName": "AJAY", "history": []})
+    crm.store.put_many("leads", [
+        {"id": "ld-other", "assignedToId": "usr-2", "assignedToName": "ABHINAYA M", "history": []},
+        {"id": "ld-name-collide", "assignedToId": "usr-2", "assignedToName": "AJAY", "history": []},
+        {"id": "ld-mine", "assignedToId": EXEC_ID, "assignedToName": "AJAY", "history": []},
+        {"id": "ld-legacy", "assignedToName": "AJAY", "history": []},
+    ])
 
     visible = {l["id"] for l in crm.client.get("/api/leads", headers=bearer(tokens["exec"])).json()}
     assert visible == {"ld-mine", "ld-legacy"}

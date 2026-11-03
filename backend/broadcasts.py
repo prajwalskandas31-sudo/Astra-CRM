@@ -1,8 +1,8 @@
 """Trade Call Broadcasts: a Telegram bot per service relays each posted call as SMS to that
 service's active Paid clients through the wappie SMS gateway.
 
-The Paid block lives in the browser, so admin sessions sync it here (paid_clients.json); this
-server copy is what the always-on Telegram pollers read when a call comes in.
+The Paid block is shared through the database (collection "paidClients"); that copy is what the
+always-on Telegram pollers read when a call comes in.
 
 Only Telegram accounts whose phone number is listed in TELEGRAM_ALLOWED_PHONES can post: the
 sender proves the number once by tapping "Share my number", and their Telegram user id is stored.
@@ -23,20 +23,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 try:
+    from backend import store
     from backend.auth import require_roles, ADMIN_ROLES
 except ImportError:
+    import store
     from auth import require_roles, ADMIN_ROLES
 
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BACKEND_DIR, ".env")
-DATA_DIR = os.path.join(BACKEND_DIR, "data")
-PAID_CLIENTS_PATH = os.path.join(DATA_DIR, "paid_clients.json")
-# Ids deleted from the Paid block; a browser that still has one cached can never re-add it
-DELETED_PAID_PATH = os.path.join(DATA_DIR, "paid_clients_deleted.json")
-BROADCASTS_PATH = os.path.join(DATA_DIR, "broadcasts.json")
-SENDERS_PATH = os.path.join(DATA_DIR, "telegram_senders.json")
-OFFSETS_PATH = os.path.join(DATA_DIR, "telegram_offsets.json")
+# Database names (see store.py): collections hold one record each, values one JSON document
+PAID_CLIENTS = "paidClients"
+BROADCASTS = "broadcasts"
+DELETED_PAID = "paidClientsDeleted"  # ids deleted from the Paid block; a stale browser can never re-add one
+SENDERS = "telegramSenders"
+OFFSETS = "telegramOffsets"
+_POLLER_LOCK_KEY = 7_340_002
 
 ENV_KEYS = ("TELEGRAM_BOTS", "TELEGRAM_ALLOWED_PHONES", "SMS_ACCESS_TOKEN", "SMS_SENDER", "SMS_SERVICE",
             "SMS_COUNTRY_CODE", "SMS_API_URL", "SMS_MESSAGE_FORMAT", "SMS_MAX_CHARS", "SMS_TEST_RECIPIENT", "SMS_DRY_RUN", "SMS_BLOCKED_HOURS")
@@ -57,8 +59,8 @@ router = APIRouter(tags=["broadcasts"])
 # The wappie gateway (GET only) and Telegram both carry their tokens in the URL, and httpx logs full
 # request URLs at INFO, so keep its logger quiet; our own errors record only the exception type.
 logging.getLogger("httpx").setLevel(logging.WARNING)
-_lock = threading.Lock()
 _stop = threading.Event()
+_poller_lock_conn = None
 _pollers: dict = {}  # service name -> {"username", "error", "thread"}
 
 
@@ -121,21 +123,6 @@ def in_blocked_hours(cfg: dict, now: Optional[datetime] = None) -> bool:
     return start <= hour < end if start < end else hour >= start or hour < end
 
 
-def _read(path: str, default):
-    if not os.path.exists(path):
-        return default
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _write(path: str, data) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-    os.replace(tmp, path)
-
-
 def normalize_phone(value) -> Optional[str]:
     """A 10-digit Indian mobile number, or None."""
     digits = re.sub(r"\D", "", str(value or ""))
@@ -166,7 +153,7 @@ def is_active(client: dict, today: Optional[str] = None) -> bool:
 def active_recipients(service_name: str) -> List[dict]:
     """Active Paid clients on a service, one entry per phone number."""
     recipients, seen = [], set()
-    for client in _read(PAID_CLIENTS_PATH, []):
+    for client in store.all(PAID_CLIENTS):
         phone = normalize_phone(client.get("phone"))
         if phone and phone not in seen and _same_service(client.get("serviceName"), service_name) and is_active(client):
             seen.add(phone)
@@ -311,9 +298,7 @@ def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: boo
             "results": results,
         })
 
-    with _lock:
-        log = _read(BROADCASTS_PATH, [])
-        _write(BROADCASTS_PATH, [record, *log][:MAX_LOGGED_BROADCASTS])
+    store.put(BROADCASTS, record["id"], record)
     return record
 
 
@@ -372,15 +357,13 @@ def handle_update(service_name: str, token: str, update: dict) -> None:
         if str(contact.get("user_id", "")) != user_id or phone not in cfg["allowed_phones"]:
             _reply(token, chat_id, "This number is not authorized to post trade calls.", reply_markup={"remove_keyboard": True})
             return
-        with _lock:
-            senders = _read(SENDERS_PATH, {})
-            senders[user_id] = {"phone": phone, "name": sender.get("first_name", ""), "authorizedAt": datetime.now(timezone.utc).isoformat()}
-            _write(SENDERS_PATH, senders)
+        with store.update_value(SENDERS, {}) as senders:
+            senders[0][user_id] = {"phone": phone, "name": sender.get("first_name", ""), "authorizedAt": datetime.now(timezone.utc).isoformat()}
         _reply(token, chat_id, f"Verified. Messages you post here go out as SMS to active {service_name} clients.",
                reply_markup={"remove_keyboard": True})
         return
 
-    senders = _read(SENDERS_PATH, {})
+    senders = store.get_value(SENDERS, {})
     authorized = user_id in senders and senders[user_id].get("phone") in cfg["allowed_phones"]
     if not authorized:
         _reply(token, chat_id, "Only authorized numbers can post trade calls. Tap \"Share my number\" to verify.",
@@ -421,7 +404,7 @@ def _poll(service_name: str, token: str) -> None:
 
     while not _stop.is_set():
         try:
-            offset = _read(OFFSETS_PATH, {}).get(service_name)
+            offset = store.get_value(OFFSETS, {}).get(service_name)
             # Long poll: Telegram holds the request up to 25 s until a message arrives
             res = httpx.post(f"{TELEGRAM_API}/bot{token}/getUpdates",
                              json={"offset": offset, "timeout": 25, "allowed_updates": ["message"]}, timeout=40)
@@ -431,10 +414,8 @@ def _poll(service_name: str, token: str) -> None:
             state["error"] = None
             for update in updates["result"]:
                 # Advance the offset first so a crash in one message can never re-send it
-                with _lock:
-                    offsets = _read(OFFSETS_PATH, {})
-                    offsets[service_name] = update["update_id"] + 1
-                    _write(OFFSETS_PATH, offsets)
+                with store.update_value(OFFSETS, {}) as offsets:
+                    offsets[0][service_name] = update["update_id"] + 1
                 try:
                     handle_update(service_name, token, update)
                 except Exception as err:
@@ -442,6 +423,25 @@ def _poll(service_name: str, token: str) -> None:
         except Exception as err:
             state["error"] = f"Polling: {err}"
             _stop.wait(10)
+
+
+def claim_poller_role() -> bool:
+    """True in exactly one backend worker: the one holding the database's poller lock.
+
+    The lock lives as long as this worker's connection, so if that worker dies another one can
+    take over on its next start. SQLite (local development) runs a single worker anyway.
+    """
+    global _poller_lock_conn
+    db = store.backend()
+    if db.name != "postgres":
+        return True
+    import psycopg
+    conn = psycopg.connect(os.environ["DATABASE_URL"], autocommit=True)
+    if conn.execute("SELECT pg_try_advisory_lock(%s)", (_POLLER_LOCK_KEY,)).fetchone()[0]:
+        _poller_lock_conn = conn
+        return True
+    conn.close()
+    return False
 
 
 def start_pollers() -> None:
@@ -467,7 +467,7 @@ class PaidClientSync(BaseModel):
 
 @router.get("/api/paid-clients")
 def get_paid_clients(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
-    return {"clients": _read(PAID_CLIENTS_PATH, []), "deletedIds": _read(DELETED_PAID_PATH, [])}
+    return {"clients": store.all(PAID_CLIENTS), "deletedIds": store.get_value(DELETED_PAID, [])}
 
 
 @router.post("/api/paid-clients/sync")
@@ -480,24 +480,28 @@ def sync_paid_clients(req: PaidClientSync, current_user: dict = Depends(require_
         if not isinstance(client.get("id"), str) or not client["id"]:
             raise HTTPException(status_code=400, detail="Every paid client needs an id.")
         incoming[client["id"]] = {k: client.get(k) for k in PAID_FIELDS}
-    with _lock:
-        for deleted_id in _read(DELETED_PAID_PATH, []):
+    with store.transaction():
+        for deleted_id in store.get_value(DELETED_PAID, []):
             incoming.pop(deleted_id, None)
-        stored = _read(PAID_CLIENTS_PATH, [])
-        merged = [incoming.pop(c["id"], c) for c in stored]
-        merged.extend(incoming.values())
-        _write(PAID_CLIENTS_PATH, merged)
-    return {"count": len(merged)}
+        for paid_id, client in incoming.items():
+            existing = store.get(PAID_CLIENTS, paid_id)
+            if existing is None or any(existing.get(k) != client.get(k) for k in PAID_FIELDS):
+                store.put(PAID_CLIENTS, paid_id, {**(existing or {}), **client})
+        return {"count": store.count(PAID_CLIENTS)}
+
+
+def forget_paid_client(paid_id: str) -> None:
+    """Delete a Paid client and remember the id, so no browser can bring it back."""
+    with store.transaction():
+        store.delete(PAID_CLIENTS, paid_id)
+        with store.update_value(DELETED_PAID, []) as deleted:
+            if paid_id not in deleted[0]:
+                deleted[0] = [*deleted[0], paid_id]
 
 
 @router.delete("/api/paid-clients/{paid_id}")
 def delete_paid_client(paid_id: str, current_user: dict = Depends(require_roles(ADMIN_ROLES))):
-    with _lock:
-        stored = _read(PAID_CLIENTS_PATH, [])
-        _write(PAID_CLIENTS_PATH, [c for c in stored if c.get("id") != paid_id])
-        deleted = _read(DELETED_PAID_PATH, [])
-        if paid_id not in deleted:
-            _write(DELETED_PAID_PATH, [*deleted, paid_id])
+    forget_paid_client(paid_id)
     return {"deleted": paid_id}
 
 
@@ -514,7 +518,7 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "error": state.get("error"),
             "activeClients": len(active_recipients(service_name)),
         })
-    senders = _read(SENDERS_PATH, {})
+    senders = store.get_value(SENDERS, {})
     return {
         "config": {
             "smsReady": not config_problems(cfg),
@@ -531,7 +535,7 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
         "senders": [{"telegramUserId": uid, "name": s.get("name"), "phone": mask_phone(s.get("phone")),
                      "authorizedAt": s.get("authorizedAt"), "stillAllowed": s.get("phone") in cfg["allowed_phones"]}
                     for uid, s in senders.items()],
-        "broadcasts": _read(BROADCASTS_PATH, []),
+        "broadcasts": list(reversed(store.all(BROADCASTS)))[:MAX_LOGGED_BROADCASTS],
     }
 
 

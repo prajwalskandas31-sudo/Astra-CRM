@@ -12,6 +12,19 @@ SERVICES="backend frontend"
 [ -f .env ] || { echo "Missing .env (JWT_SECRET_KEY, CRM_PORT) on the server" >&2; exit 1; }
 [ -f secrets/credentials.json ] || { echo "Missing secrets/credentials.json on the server" >&2; exit 1; }
 
+# First deploy with the database: create its password once (never changed afterwards, or Postgres refuses it)
+if ! grep -qE '^POSTGRES_PASSWORD=.+' .env; then
+  echo "==> Creating POSTGRES_PASSWORD in .env"
+  printf '\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+fi
+mkdir -p backups
+
+if docker compose ps --status running --services 2>/dev/null | grep -qx db; then
+  echo "==> Backing up the database before deploying"
+  docker compose exec -T db pg_dump -U crm -d crm -Fc > "backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
+  ls -1t backups/pre-deploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f  # keep the last 10
+fi
+
 echo "==> Keeping current images for rollback"
 for svc in $SERVICES; do
   if docker image inspect "srinivas-crm-$svc:latest" >/dev/null 2>&1; then

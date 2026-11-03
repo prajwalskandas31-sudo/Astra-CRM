@@ -24,6 +24,17 @@ def client(cid, phone, service=SERVICE, end=None, status="Active"):
             "serviceStartDate": day(-10), "serviceEndDate": end or day(30), "status": status}
 
 
+def set_paid(b, clients):
+    """Replace every stored Paid client."""
+    for existing in b.store.all(b.PAID_CLIENTS):
+        b.store.delete(b.PAID_CLIENTS, existing["id"])
+    b.store.put_many(b.PAID_CLIENTS, clients)
+
+
+def broadcast_log(b):
+    return list(reversed(b.store.all(b.BROADCASTS)))
+
+
 @pytest.fixture
 def bc(crm, monkeypatch):
     """The broadcasts module with a test .env, empty data files and the network stubbed out."""
@@ -37,8 +48,12 @@ def bc(crm, monkeypatch):
             f.write("\n".join(f"{k}={v}" for k, v in {**env, **overrides}.items()))
 
     write_env()
-    for path in (b.PAID_CLIENTS_PATH, b.DELETED_PAID_PATH, b.BROADCASTS_PATH, b.SENDERS_PATH, b.OFFSETS_PATH):
-        b._write(path, {} if path in (b.SENDERS_PATH, b.OFFSETS_PATH) else [])
+    set_paid(b, [])
+    for record in b.store.all(b.BROADCASTS):
+        b.store.delete(b.BROADCASTS, record["id"])
+    b.store.set_value(b.DELETED_PAID, [])
+    b.store.set_value(b.SENDERS, {})
+    b.store.set_value(b.OFFSETS, {})
 
     sms, replies = [], []
 
@@ -101,7 +116,7 @@ def test_sync_upserts_without_dropping_other_browsers_clients(crm, bc):
 
 
 def test_only_active_clients_on_the_service_receive_the_call(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [
+    set_paid(bc, [
         client("a", "9876500001"),
         client("dup", "+91 98765 00001"),                       # same phone: one SMS
         client("other", "9876500002", service="Bullions"),
@@ -114,7 +129,7 @@ def test_only_active_clients_on_the_service_receive_the_call(bc):
 
 
 def test_unverified_sender_is_refused_and_nothing_is_sent(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     reply = message(bc, text="BUY NIFTY 24500 CE @ 120")
     assert "authorized" in reply
     assert bc.replies[-1]["reply_markup"]["keyboard"][0][0]["request_contact"] is True
@@ -124,13 +139,13 @@ def test_unverified_sender_is_refused_and_nothing_is_sent(bc):
 def test_forwarded_or_unlisted_contacts_are_rejected(bc):
     message(bc, contact={"phone_number": SENDER_PHONE, "user_id": 999})  # someone else's contact card
     message(bc, contact={"phone_number": "9123456789", "user_id": SENDER_ID})  # number not allowed
-    assert bc._read(bc.SENDERS_PATH, {}) == {}
+    assert bc.store.get_value(bc.SENDERS, {}) == {}
     message(bc, text="BUY NIFTY")
     assert bc.sms == []
 
 
 def test_verified_sender_broadcasts_to_active_clients(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001"), client("b", "9000000500"), client("x", "9876500003", status="Service Expired")])
+    set_paid(bc, [client("a", "9876500001"), client("b", "9000000500"), client("x", "9876500003", status="Service Expired")])
     authorize(bc)
     reply = message(bc, text="BUY NIFTY 24500 CE @ 120 SL 100 TGT 150")
 
@@ -140,13 +155,13 @@ def test_verified_sender_broadcasts_to_active_clients(bc):
     assert first["country_code"] == "+91" and first["message"] == "BUY NIFTY 24500 CE @ 120 SL 100 TGT 150"
     assert "Partly sent: 1 of 2" in reply and "Client b" in reply
 
-    log = bc._read(bc.BROADCASTS_PATH, [])
+    log = broadcast_log(bc)
     assert log[0]["sent"] == 1 and log[0]["failed"] == 1 and log[0]["activeClients"] == 2
     assert all("xxxxx" in r["phone"] for r in log[0]["results"])
 
 
 def test_message_format_and_length_limit(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     bc.write_env(SMS_MESSAGE_FORMAT="{service} call: {call} -INVESTEQ", SMS_MAX_CHARS="60")
     authorize(bc)
     message(bc, text="SELL GOLD")
@@ -158,7 +173,7 @@ def test_message_format_and_length_limit(bc):
 
 
 def test_test_mode_sends_only_to_the_test_number(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001"), client("b", "9876500002")])
+    set_paid(bc, [client("a", "9876500001"), client("b", "9876500002")])
     bc.write_env(SMS_TEST_RECIPIENT="9811122233, +91 98111 22234")
     authorize(bc)
     reply = message(bc, text="BUY NIFTY")
@@ -167,7 +182,7 @@ def test_test_mode_sends_only_to_the_test_number(bc):
 
 
 def test_stale_calls_and_missing_config_are_not_sent(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     authorize(bc)
     assert "NOT sent" in message(bc, text="BUY NIFTY", age=600)
     bc.write_env(SMS_SENDER="")
@@ -176,7 +191,7 @@ def test_stale_calls_and_missing_config_are_not_sent(bc):
 
 
 def test_revoking_a_phone_blocks_an_already_verified_sender(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     authorize(bc)
     bc.write_env(TELEGRAM_ALLOWED_PHONES="9123456789")
     assert "authorized" in message(bc, text="BUY NIFTY")
@@ -184,7 +199,7 @@ def test_revoking_a_phone_blocks_an_already_verified_sender(bc):
 
 
 def test_broadcast_status_endpoint(crm, bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     body = crm.client.get("/api/broadcasts", headers=bearer(crm.token(SA))).json()
     assert body["config"]["smsReady"] is True
     assert body["services"][0]["service"] == SERVICE and body["services"][0]["activeClients"] == 1
@@ -192,7 +207,7 @@ def test_broadcast_status_endpoint(crm, bc):
 
 
 def test_crm_test_send_is_super_admin_only_and_reaches_only_test_numbers(crm, bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     body = {"service": SERVICE, "call": "BUY NIFTY"}
     assert crm.client.post("/api/broadcasts/test", json=body, headers=bearer(crm.token(ADMIN))).status_code == 403
 
@@ -211,7 +226,7 @@ DLT_FORMAT = ("FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} Unite Technologies 
 
 
 def test_calls_fill_the_dlt_template_slots(bc):
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     bc.write_env(SMS_MESSAGE_FORMAT=DLT_FORMAT)
     authorize(bc)
 
@@ -228,7 +243,7 @@ def test_calls_fill_the_dlt_template_slots(bc):
 
 def test_se_route_is_not_sent_in_the_carrier_blocked_hours(bc, monkeypatch):
     from datetime import datetime as real_datetime
-    bc._write(bc.PAID_CLIENTS_PATH, [client("a", "9876500001")])
+    set_paid(bc, [client("a", "9876500001")])
     bc.write_env(SMS_SERVICE="SE", SMS_BLOCKED_HOURS="")
     cfg = bc.settings()
     assert cfg["blocked_hours"] == (21, 10)
