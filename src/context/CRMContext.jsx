@@ -1115,6 +1115,9 @@ export const CRMProvider = ({ children }) => {
   }, [paidClients]);
 
   // ─── Shared data ↔ server (hosted deployments) ─────────────────────────────
+  // Hosted deployments share leads, sales, etc. through /api/sync, so changes are made to local
+  // state and synced; the older per-action endpoints are for local development.
+  const serverSyncActive = isBackendAuthoritative() && !!authToken;
   const syncRole = authUser?.role;
   const isSyncSuperAdmin = syncRole === 'Super Admin';
   const isSyncAdmin = isSyncSuperAdmin || syncRole === 'Admin';
@@ -1163,10 +1166,6 @@ export const CRMProvider = ({ children }) => {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${authToken}`
   });
-
-  // Hosted deployments share leads, sales, etc. through /api/sync (see useServerSync below), so
-  // changes are made to local state and synced; the older per-action endpoints are for local dev.
-  const serverSyncActive = isBackendAuthoritative() && !!authToken;
 
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
