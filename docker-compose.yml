@@ -7,7 +7,7 @@ x-db-env: &db-env
   PGHOST: db
   PGUSER: crm
   PGDATABASE: crm
-  PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+  PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}  # ggignore: read from .env, not a secret
 
 services:
   db:
@@ -15,7 +15,7 @@ services:
     environment:
       POSTGRES_USER: crm
       POSTGRES_DB: crm
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}  # ggignore: read from .env, not a secret
     # Defaults are light (safe on the small current server); the 32 GB / 8 vCPU server raises them in
     # .env, see deploy/env.large-server.example. The database is never published outside Docker.
     command: >

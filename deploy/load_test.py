@@ -6,6 +6,12 @@ download every lead, the heaviest request in the app.
 
     python deploy/load_test.py http://SERVER:8080 --password-file creds.json --users 300 --admins 10         --create-users 290 --leads 20000 --minutes 3
 
+The headline numbers come from a separate "probe" process acting as one more person: it checks for
+updates every second and reloads everything every 10 seconds, timing each request. That is what
+people at their desks experience. The per-request table below it is from the load generator itself,
+which queues internally when it drives hundreds of connections from one process, so its timings
+overstate what the server takes; read it for counts and errors.
+
 --password-file is the secrets/credentials.json format ([{"email", "password"}, ...]). The test
 leads it creates are tagged and deleted again at the end. Run it before go-live, never during
 working hours: it writes to the real database.
@@ -13,6 +19,7 @@ working hours: it writes to the real database.
 import argparse
 import asyncio
 import json
+import multiprocessing
 import random
 import statistics
 import time
@@ -60,7 +67,7 @@ async def timed(stats, kind, coro):
 
 async def session(client, stats, token, user_id, is_admin, deadline):
     headers = {"Authorization": f"Bearer {token}"}
-    collections = "leads,sales,assignmentInstances,leadRequests,notifications,services,financialSettings"
+    collections = COLLECTIONS
     res = await timed(stats, "full_pull_admin" if is_admin else "full_pull", client.get(
         "/api/sync", params={"collections": collections, "since": 0}, headers=headers))
     if res is None:
@@ -82,6 +89,39 @@ async def session(client, stats, token, user_id, is_admin, deadline):
             await timed(stats, "push_update", client.post("/api/sync", headers=headers,
                                                           json={"collections": {"leads": {"upserts": [lead]}}}))
         await asyncio.sleep(POLL_SECONDS)
+
+
+COLLECTIONS = "leads,sales,assignmentInstances,leadRequests,notifications,services,financialSettings"
+
+
+def probe(base_url, token, seconds, out):
+    """One extra person, in its own process so the load generator's queueing does not distort it."""
+    headers = {"Authorization": f"Bearer {token}"}
+    polls, fulls, errors = [], [], 0
+    with httpx.Client(base_url=base_url, timeout=60) as client:
+        cursor = 0
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            full = cursor == 0 or len(polls) % 10 == 9
+            start = time.perf_counter()
+            try:
+                res = client.get("/api/sync", params={"collections": COLLECTIONS, "since": 0 if full else cursor}, headers=headers)
+                res.raise_for_status()
+                (fulls if full else polls).append(time.perf_counter() - start)
+                if not full or cursor == 0:
+                    cursor = res.json()["cursor"]
+            except httpx.HTTPError:
+                errors += 1
+            time.sleep(1)
+    out.put({"polls": polls, "fulls": fulls, "errors": errors})
+
+
+def summary(values):
+    if not values:
+        return "no samples"
+    values = sorted(values)
+    p95 = values[max(0, int(len(values) * 0.95) - 1)]
+    return f"typical {statistics.median(values) * 1000:.0f} ms, 95% under {p95 * 1000:.0f} ms, worst {values[-1] * 1000:.0f} ms"
 
 
 async def main():
@@ -152,6 +192,11 @@ async def main():
         print(f"Uploaded {len(lead_ids)} leads in {time.perf_counter() - start:.1f} s")
 
         deadline = time.monotonic() + args.ramp_seconds + args.minutes * 60
+        staff_token = next((t for t, u in accounts if u["role"] not in ("Super Admin", "Admin")), admin[0])
+        results = multiprocessing.Queue()
+        prober = multiprocessing.Process(target=probe, args=(args.base_url.rstrip("/"), staff_token,
+                                                             args.ramp_seconds + args.minutes * 60, results))
+        prober.start()
         t0 = time.perf_counter()
         tasks = []
         admins = [a for a in accounts if a[1]["role"] in ("Super Admin", "Admin")]
@@ -162,6 +207,13 @@ async def main():
             await asyncio.sleep(args.ramp_seconds / args.users)  # people do not all sign in at the same moment
         await asyncio.gather(*tasks)
         wall = time.perf_counter() - t0
+        probed = results.get()
+        prober.join()
+        print("\nWhat one person experiences while all of this runs (probe):")
+        print(f"  checking for updates: {summary(probed['polls'])}")
+        print(f"  reloading all data:   {summary(probed['fulls'])}")
+        print(f"  failed requests:      {probed['errors']}")
+        print("\nLoad generator (counts and errors; its timings include its own queueing):")
         stats.report(wall)
 
         for i in range(0, len(lead_ids), 2000):
