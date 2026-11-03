@@ -16,10 +16,12 @@ services:
       POSTGRES_USER: crm
       POSTGRES_DB: crm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-    # Sized for a 32 GB / 8 vCPU server; the database is never published outside Docker
+    # Defaults are light (safe on the small current server); the 32 GB / 8 vCPU server raises them in
+    # .env, see deploy/env.large-server.example. The database is never published outside Docker.
     command: >
-      postgres -c max_connections=150 -c shared_buffers=1GB -c effective_cache_size=4GB
-               -c work_mem=16MB -c maintenance_work_mem=256MB
+      postgres -c max_connections=${PG_MAX_CONNECTIONS:-60} -c shared_buffers=${PG_SHARED_BUFFERS:-256MB}
+               -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB} -c work_mem=${PG_WORK_MEM:-8MB}
+               -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-64MB}
     volumes:
       - crm-db:/var/lib/postgresql/data
     healthcheck:
@@ -40,7 +42,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
       CRM_CREDENTIALS_FILE: /run/secrets/crm_credentials.json
       DATABASE_URL: postgresql://crm:${POSTGRES_PASSWORD}@db:5432/crm
-      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-6}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-12}
     volumes:
       # Files from versions before the database; imported once on first start, then kept as-is
       - crm-data:/app/backend/data

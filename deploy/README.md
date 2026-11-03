@@ -5,7 +5,7 @@ The CRM runs as Docker containers on the server (`skanda@200.234.32.65`, folder 
 | Container | Role |
 |---|---|
 | `frontend` | nginx: serves the app on port **8080**, forwards `/api` to the backend, gzips responses |
-| `backend` | FastAPI, 6 worker processes (`WEB_CONCURRENCY` in `.env` to change) |
+| `backend` | FastAPI, 2 worker processes by default; 6 on the large server (see below) |
 | `db` | PostgreSQL 16: every CRM record (users, leads, sales, settings, Paid block, signatures). Volume `crm-db` |
 | `backup` | `pg_dump` at start-up and nightly at 02:00 into `~/srinivas-crm/backups`, kept 14 days |
 
@@ -98,8 +98,12 @@ since the last restart lived only in memory and must be created again, once.
 
 ## Capacity and load testing
 
-Sized for ~300 simultaneous users on 8 vCPU / 32 GB. Before go-live (outside working hours; it writes test
-records and removes them again), run from any PC:
+The defaults are deliberately light, so the current small server is never overloaded. The ~300-user setup
+is for the 32 GB / 8 vCPU server: append `deploy/env.large-server.example` to that server's `.env`, then
+`docker compose up -d`. Never run the load test against the current small server.
+
+Before go-live on the large server (outside working hours; it writes test records and removes them again),
+run from any PC:
 
 ```bash
 python deploy/load_test.py http://SERVER:8080 --password-file secrets/credentials.json     --users 300 --admins 10 --create-users 290 --leads 20000 --minutes 3
