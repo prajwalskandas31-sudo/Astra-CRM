@@ -819,9 +819,7 @@ def granular_reassign_leads(req: GranularLeadReassignRequest, current_user: dict
 def granular_delete_leads(req: GranularLeadDeleteRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
     count = 0
     with store.transaction():
-        for lid in req.leadIds:
-            if store.delete("leads", lid):
-                count += 1
+        count = len(store.delete_many("leads", req.leadIds))
         _drop_from_instances(req.leadIds)
 
     return {"message": f"Deleted {count} selected lead(s) permanently."}

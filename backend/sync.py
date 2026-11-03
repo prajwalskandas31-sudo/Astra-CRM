@@ -341,6 +341,7 @@ def push(req: PushRequest, current_user: dict = Depends(get_current_user)):
                     writes[rid] = doc
                 saved[name].append(rid)
             store.put_pairs(name, list(writes.items()))
+            plain_deletes = []
             for rid in changes.deletes:
                 old = existing.get(rid)
                 if old is None:
@@ -353,6 +354,7 @@ def push(req: PushRequest, current_user: dict = Depends(get_current_user)):
                 if policy.on_delete:
                     policy.on_delete(rid)
                 else:
-                    store.delete(name, rid)
+                    plain_deletes.append(rid)
                 saved[name].append(rid)
+            store.delete_many(name, plain_deletes)
     return {"saved": saved, "rejected": rejected, "cursor": store.cursor()}

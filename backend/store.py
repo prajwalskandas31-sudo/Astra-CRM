@@ -357,19 +357,29 @@ def put_many(collection: str, docs: Iterable[dict], key: str = "id") -> int:
     return put_pairs(collection, [(doc[key], doc) for doc in docs])
 
 
-def delete(collection: str, record_id: str) -> bool:
-    """Replace the record with a tombstone. Returns False when it did not exist."""
+def delete_many(collection: str, record_ids: Iterable[str]) -> list:
+    """Replace records with tombstones in one batch. Returns the ids that existed (and are now deleted)."""
     db = backend()
+    ids = list(dict.fromkeys(record_ids))
     with transaction():
         with _conn() as conn:
-            prev = conn.execute(db.sql("SELECT deleted FROM records WHERE collection = ? AND id = ?"),
-                                (collection, record_id)).fetchone()
-            if not prev or prev[0]:
-                return False
-            seq = db.next_seqs(conn, 1)[0]
-            conn.execute(db.sql("UPDATE records SET deleted = ?, data = NULL, seq = ?, updated_at = ? WHERE collection = ? AND id = ?"),
-                         (True, seq, _now(), collection, record_id))
-    return True
+            live = []
+            for chunk in _chunks(ids):
+                rows = conn.execute(db.sql(
+                    f"SELECT id FROM records WHERE collection = ? AND deleted = ? AND id IN ({', '.join('?' for _ in chunk)})"),
+                    tuple([collection, False, *chunk])).fetchall()
+                live += [r[0] for r in rows]
+            if live:
+                now = _now()
+                conn.cursor().executemany(
+                    db.sql("UPDATE records SET deleted = ?, data = NULL, seq = ?, updated_at = ? WHERE collection = ? AND id = ?"),
+                    [(True, seq, now, collection, rid) for rid, seq in zip(live, db.next_seqs(conn, len(live)))])
+    return live
+
+
+def delete(collection: str, record_id: str) -> bool:
+    """Replace the record with a tombstone. Returns False when it did not exist."""
+    return bool(delete_many(collection, [record_id]))
 
 
 # ==========================================

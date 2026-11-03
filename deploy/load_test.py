@@ -162,6 +162,7 @@ async def main():
             await asyncio.sleep(args.ramp_seconds / args.users)  # people do not all sign in at the same moment
         await asyncio.gather(*tasks)
         wall = time.perf_counter() - t0
+        stats.report(wall)
 
         for i in range(0, len(lead_ids), 2000):
             await client.post("/api/sync", headers={"Authorization": f"Bearer {admin[0]}"},
@@ -171,7 +172,6 @@ async def main():
             await client.delete(f"/api/users/{user['id']}", headers=sa_headers)
         if temp_users:
             print(f"Removed the {len(temp_users)} temporary users.")
-    stats.report(wall)
 
 
 if __name__ == "__main__":
