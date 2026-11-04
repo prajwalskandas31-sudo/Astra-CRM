@@ -3,32 +3,135 @@
   "profileId": "KKliSJp",
   "templateId": "kFWn7uC",
   "dateField": {
-    "id": null,
+    "id": "1793543330123",
     "name": "Date 1",
-    "type": "text",
+    "type": "date",
     "format": "%d/%m/%Y"
   },
   "tenureCheckbox": {
     "name": "Checkbox 1",
     "options": [
-      { "id": null, "name": "Option 1", "label": "Demo", "tenures": ["Demo"] },
-      { "id": null, "name": "Option 2", "label": "1 Month", "tenures": ["1 Month"] },
-      { "id": null, "name": "Option 3", "label": "2 Months", "tenures": ["2 Months"] },
-      { "id": null, "name": "Option 4", "label": "3 Months", "tenures": ["3 Months"] },
-      { "id": null, "name": "Option 5", "label": "4 Months", "tenures": ["4 Months"] },
-      { "id": null, "name": "Option 6", "label": "5 Months", "tenures": ["5 Months"] },
-      { "id": null, "name": "Option 7", "label": "6 Months", "tenures": ["6 Months"] },
-      { "id": null, "name": "Option 8", "label": "7 Months", "tenures": ["7 Months"] },
-      { "id": null, "name": "Option 9", "label": "8 Months", "tenures": ["8 Months"] },
-      { "id": null, "name": "Option 10", "label": "9 Months", "tenures": ["9 Months"] },
-      { "id": null, "name": "Option 11", "label": "10 Months", "tenures": ["10 Months"] },
-      { "id": null, "name": "Option 12", "label": "11 Months", "tenures": ["11 Months"] },
-      { "id": null, "name": "Option 13", "label": "12 Months", "tenures": ["12 Months"] }
+      {
+        "id": "1793543353246",
+        "name": "Option 1",
+        "label": "Demo",
+        "tenures": [
+          "Demo"
+        ]
+      },
+      {
+        "id": "1793543353296",
+        "name": "Option 2",
+        "label": "1 Month",
+        "tenures": [
+          "1 Month"
+        ]
+      },
+      {
+        "id": "1793543359928",
+        "name": "Option 3",
+        "label": "2 Months",
+        "tenures": [
+          "2 Months"
+        ]
+      },
+      {
+        "id": "1793543363860",
+        "name": "Option 4",
+        "label": "3 Months",
+        "tenures": [
+          "3 Months"
+        ]
+      },
+      {
+        "id": "1793543367858",
+        "name": "Option 5",
+        "label": "4 Months",
+        "tenures": [
+          "4 Months"
+        ]
+      },
+      {
+        "id": "1793543373116",
+        "name": "Option 6",
+        "label": "5 Months",
+        "tenures": [
+          "5 Months"
+        ]
+      },
+      {
+        "id": "1793543377265",
+        "name": "Option 7",
+        "label": "6 Months",
+        "tenures": [
+          "6 Months"
+        ]
+      },
+      {
+        "id": "1793543381806",
+        "name": "Option 8",
+        "label": "7 Months",
+        "tenures": [
+          "7 Months"
+        ]
+      },
+      {
+        "id": "1793543385778",
+        "name": "Option 9",
+        "label": "8 Months",
+        "tenures": [
+          "8 Months"
+        ]
+      },
+      {
+        "id": "1793543389750",
+        "name": "Option 10",
+        "label": "9 Months",
+        "tenures": [
+          "9 Months"
+        ]
+      },
+      {
+        "id": "1793543398175",
+        "name": "Option 11",
+        "label": "10 Months",
+        "tenures": [
+          "10 Months"
+        ]
+      },
+      {
+        "id": "1793543403228",
+        "name": "Option 12",
+        "label": "11 Months",
+        "tenures": [
+          "11 Months"
+        ]
+      },
+      {
+        "id": "1793543409560",
+        "name": "Option 13",
+        "label": "12 Months",
+        "tenures": [
+          "12 Months"
+        ]
+      }
     ]
   },
   "signatureImageFields": [
-    { "id": null, "name": "Image 1", "width": "200", "height": "80" },
-    { "id": null, "name": "Image 1", "width": "200", "height": "80" }
+    {
+      "id": "1793543538337",
+      "name": "Image 1",
+      "width": "auto",
+      "height": "auto",
+      "type": "file"
+    },
+    {
+      "id": "1793543581913",
+      "name": "Image 1",
+      "width": "auto",
+      "height": "auto",
+      "type": "file"
+    }
   ],
   "signatureImageValue": "base64",
   "timestampFormat": "%d-%m-%Y %H:%M:%S",

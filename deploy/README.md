@@ -63,6 +63,22 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## e-KYC & E-Sign (Leegality)
+
+"Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with
+Date 1 = today, Checkbox 1 = the Service Tenure (Demo = Option 1, 1 Month = Option 2 … 12 Months = Option 13),
+and the Primary Signatory from the Digital Signature Storage block in both signature boxes, each stamped
+with the date and 24-hour time (IST) it was sent.
+
+Both signature boxes are named "Image 1", so Leegality needs their field ids; until they are set, sending is
+refused rather than producing an agreement with one box empty. Leegality has no API for the ids. In the
+dashboard open Templates > RA Terms and Conditions - UTFS > three dots > **Download Form Fields**, then:
+
+    python deploy/import_leegality_fields.py <downloaded .json> --dry-run   # check the matches
+    python deploy/import_leegality_fields.py <downloaded .json>             # write backend/leegality_template_map.json
+
+Commit the updated map; the next deploy picks it up. If the template is ever edited, download and import again.
+
 ## Rotating account passwords
 
 The credentials file sets the passwords of a brand-new database. After that, passwords live in the database
