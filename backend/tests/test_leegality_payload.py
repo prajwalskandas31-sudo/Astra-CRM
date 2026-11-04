@@ -80,13 +80,22 @@ def test_stamp_font_scales_without_system_fonts(monkeypatch):
     assert leegality._font(48).size == 48
 
 
+def _fake_leegality(sent, signer=None):
+    """Leegality's sign request: echoes the invitee it used (the workflow's saved signer, if one is given)."""
+    def fake(method, path, settings, **kwargs):
+        sent.setdefault("calls", []).append((method, path, kwargs.get("params")))
+        if method == "DELETE":
+            return 200, {"status": 1, "messages": [{"code": "document.delete.success"}]}
+        sent["payload"] = kwargs["json"]
+        used = signer or kwargs["json"]["invitees"][0]
+        return 200, {"status": 1, "data": {"documentId": "DOC-1", "invitees": [used]}, "messages": []}
+    return fake
+
+
 def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeypatch):
     """The real map: every field by its Download Form Fields id, type and value."""
     sent = {}
-
-    def fake_leegality(method, path, settings, **kwargs):
-        sent["payload"] = kwargs["json"]
-        return 200, {"status": 1, "data": {"documentId": "DOC-1", "invitees": []}, "messages": []}
+    fake_leegality = _fake_leegality(sent)
 
     monkeypatch.setattr(leegality, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://x"})
     monkeypatch.setattr(leegality, "_leegality", fake_leegality)
@@ -110,6 +119,31 @@ def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeyp
     images = [by_id["1793543538337"], by_id["1793543581913"]]
     assert all(f["name"] == "Image 1" and f["type"] == "files" and f["value"].startswith("data:image/png;base64,") for f in images)
     assert payload["invitees"] == [{"name": "Test Client", "email": "c@example.com", "phone": "9876543210"}]
+    assert not [c for c in sent["calls"] if c[0] == "DELETE"]
+
+
+def test_agreement_sent_to_the_workflows_saved_signer_is_cancelled(monkeypatch):
+    """Workflow KKliSJp had a saved signer that Leegality used instead of the client from the CRM."""
+    sent = {}
+    saved_signer = {"name": "af", "email": "signer@example.com", "phone": "9000000001"}
+    monkeypatch.setattr(leegality, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://x"})
+    monkeypatch.setattr(leegality, "_leegality", _fake_leegality(sent, saved_signer))
+    monkeypatch.setattr(leegality, "_update_record", lambda doc_id, record: pytest.fail("must not be recorded as sent"))
+    monkeypatch.setattr(leegality, "stored_primary_signature", _png_data_url)
+
+    req = leegality.ESignDispatchRequest(saleId="S1", clientName="test_3", email="signer@example.com",
+                                         phone="9000000002", serviceTenure="3 Months")
+    with pytest.raises(HTTPException) as err:
+        leegality.dispatch_esign(req, current_user={"name": "SA"})
+
+    assert err.value.status_code == 409
+    assert "saved signer (af" in err.value.detail and "was cancelled" in err.value.detail
+    assert ("DELETE", "/v3.0/sign/request", {"documentId": "DOC-1"}) in sent["calls"]
+
+
+def test_signer_match_ignores_case_spacing_and_country_code():
+    assert leegality._contact_key("Ravi  Kumar", "Ravi@X.com ", "+91 98765-43210") == \
+        leegality._contact_key("ravi kumar", "ravi@x.com", "9876543210")
 
 
 def test_signature_boxes_without_ids_are_refused_before_sending():
