@@ -159,7 +159,8 @@ def _font(size):
             return ImageFont.truetype(name, size)
         except OSError:
             continue
-    return ImageFont.load_default()
+    # The server image ships no system fonts; Pillow's bundled font scales only when given the size
+    return ImageFont.load_default(size=size)
 
 
 def _stamp_signature(signature, stamp_lines, width_px, height_px):

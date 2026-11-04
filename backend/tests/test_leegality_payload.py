@@ -68,6 +68,18 @@ def test_both_signature_boxes_get_the_stamped_signature(monkeypatch):
         assert img.size == (300 * 4, 60 * 4)  # the boxes' 5:1 shape
 
 
+def test_stamp_font_scales_without_system_fonts(monkeypatch):
+    """The server container has no fonts; the stamp must not fall back to a fixed 10 px font."""
+    real_truetype = leegality.ImageFont.truetype
+
+    def no_system_fonts(font=None, size=10, *args, **kwargs):
+        if isinstance(font, str):
+            raise OSError(font)  # a system font by name; Pillow's bundled font arrives as bytes
+        return real_truetype(font, size, *args, **kwargs)
+    monkeypatch.setattr(leegality.ImageFont, "truetype", no_system_fonts)
+    assert leegality._font(48).size == 48
+
+
 def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeypatch):
     """The real map: every field by its Download Form Fields id, type and value."""
     sent = {}
