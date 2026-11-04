@@ -1,5 +1,5 @@
 {
-  "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only.",
+  "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only. Verified live 2026-11-04: Checkbox 1 Option N is N Months and Option 13 is Demo (template order, not the Workflow PDF); options and images need their ids; images go as type files (the download says file, which Leegality ignores), a data URL, and 200x80 px.",
   "profileId": "KKliSJp",
   "templateId": "kFWn7uC",
   "dateField": {
@@ -14,105 +14,105 @@
       {
         "id": "1793543353246",
         "name": "Option 1",
-        "label": "Demo",
-        "tenures": [
-          "Demo"
-        ]
-      },
-      {
-        "id": "1793543353296",
-        "name": "Option 2",
         "label": "1 Month",
         "tenures": [
           "1 Month"
         ]
       },
       {
-        "id": "1793543359928",
-        "name": "Option 3",
+        "id": "1793543353296",
+        "name": "Option 2",
         "label": "2 Months",
         "tenures": [
           "2 Months"
         ]
       },
       {
-        "id": "1793543363860",
-        "name": "Option 4",
+        "id": "1793543359928",
+        "name": "Option 3",
         "label": "3 Months",
         "tenures": [
           "3 Months"
         ]
       },
       {
-        "id": "1793543367858",
-        "name": "Option 5",
+        "id": "1793543363860",
+        "name": "Option 4",
         "label": "4 Months",
         "tenures": [
           "4 Months"
         ]
       },
       {
-        "id": "1793543373116",
-        "name": "Option 6",
+        "id": "1793543367858",
+        "name": "Option 5",
         "label": "5 Months",
         "tenures": [
           "5 Months"
         ]
       },
       {
-        "id": "1793543377265",
-        "name": "Option 7",
+        "id": "1793543373116",
+        "name": "Option 6",
         "label": "6 Months",
         "tenures": [
           "6 Months"
         ]
       },
       {
-        "id": "1793543381806",
-        "name": "Option 8",
+        "id": "1793543377265",
+        "name": "Option 7",
         "label": "7 Months",
         "tenures": [
           "7 Months"
         ]
       },
       {
-        "id": "1793543385778",
-        "name": "Option 9",
+        "id": "1793543381806",
+        "name": "Option 8",
         "label": "8 Months",
         "tenures": [
           "8 Months"
         ]
       },
       {
-        "id": "1793543389750",
-        "name": "Option 10",
+        "id": "1793543385778",
+        "name": "Option 9",
         "label": "9 Months",
         "tenures": [
           "9 Months"
         ]
       },
       {
-        "id": "1793543398175",
-        "name": "Option 11",
+        "id": "1793543389750",
+        "name": "Option 10",
         "label": "10 Months",
         "tenures": [
           "10 Months"
         ]
       },
       {
-        "id": "1793543403228",
-        "name": "Option 12",
+        "id": "1793543398175",
+        "name": "Option 11",
         "label": "11 Months",
         "tenures": [
           "11 Months"
         ]
       },
       {
-        "id": "1793543409560",
-        "name": "Option 13",
+        "id": "1793543403228",
+        "name": "Option 12",
         "label": "12 Months",
         "tenures": [
           "12 Months"
+        ]
+      },
+      {
+        "id": "1793543409560",
+        "name": "Option 13",
+        "label": "Demo",
+        "tenures": [
+          "Demo"
         ]
       }
     ]
@@ -121,19 +121,19 @@
     {
       "id": "1793543538337",
       "name": "Image 1",
-      "width": "auto",
-      "height": "auto",
-      "type": "file"
+      "width": "200",
+      "height": "80",
+      "type": "files"
     },
     {
       "id": "1793543581913",
       "name": "Image 1",
-      "width": "auto",
-      "height": "auto",
-      "type": "file"
+      "width": "200",
+      "height": "80",
+      "type": "files"
     }
   ],
-  "signatureImageValue": "base64",
+  "signatureImageValue": "dataUrl",
   "timestampFormat": "%d-%m-%Y %H:%M:%S",
   "timezoneOffsetMinutes": 330,
   "timezoneLabel": "IST"
