@@ -2,7 +2,8 @@
 
 Safe for production: real accounts are only signed in to (never modified); every write uses a temporary
 account/record that is removed again; the lockout test uses a non-existent account; Leegality checks are
-read-only (no documents are sent, no credits are used).
+read-only (no documents are sent, no credits are used). The shared-data checks use a temporary "Dummy
+Tester" profile that reports to the Super Admin, so no real team sees its test lead or sale.
 
 Usage:  python deploy/e2e_live.py [BASE_URL]
 Needs secrets/credentials.json (from deploy/generate_credentials.py) for the account passwords.
@@ -162,6 +163,97 @@ if disp.status_code == 200:
 for path in ("/api/leads", "/api/sales", "/api/dispositions", "/api/custom-roles", "/api/document-types", "/api/assignment-instances"):
     r, ms = timed("GET", path, headers=h(sa))
     check(s, f"GET {path}", r.status_code == 200, f"{ms:.0f} ms")
+
+# ---------------------------------------------------------------- shared data (dummy profile)
+s = section("Shared data via a dummy profile (temporary, cleaned up)")
+SYNC = "leads,sales"
+
+
+def pull(tok, since=0):
+    body = client.get("/api/sync", params={"collections": SYNC, "since": since}, headers=h(tok)).json()
+    return body["cursor"], {n: {d["id"]: d for d in c["items"]} for n, c in body["collections"].items()}, \
+        {n: c["deleted"] for n, c in body["collections"].items()}
+
+
+def push(tok, name, upserts=(), deletes=()):
+    body = client.post("/api/sync", headers=h(tok), json={"collections": {name: {"upserts": list(upserts), "deletes": list(deletes)}}}).json()
+    return set(body["saved"][name]), {r["id"]: r["reason"] for r in body["rejected"][name]}
+
+
+# The dummy reports straight to the Super Admin, so no real team ever sees its records
+sa_me = client.get("/api/auth/me", headers=h(sa)).json()
+dummy_pw = f"E2e-{secrets.token_hex(8)}"
+dummy = client.post("/api/users", headers=h(sa), json={
+    "name": f"Dummy Tester {tag}", "mobile": f"91{secrets.randbelow(10**8):08d}", "password": dummy_pw,
+    "email": f"dummy-tester-{tag}@invalid.example", "role": "Executive", "reportingTo": sa_me["name"]})
+check(s, "Super Admin creates the dummy profile", dummy.status_code == 200, f"HTTP {dummy.status_code}")
+if dummy.status_code == 200:
+    did, demail = dummy.json()["id"], dummy.json()["email"]
+    lead_id, other_id, sale_id = f"e2e-lead-{tag}", f"e2e-other-{tag}", f"e2e-sale-{tag}"
+    dtok, d_cursor = "", 0
+    try:
+        r = auth_post("/api/auth/login", {"email": demail, "password": dummy_pw})
+        check(s, "Dummy signs in", r.status_code == 200)
+        dtok = r.json().get("access_token", "")
+        d_cursor, d_data, _ = pull(dtok)
+        check(s, "Dummy starts with no leads or sales", not d_data["leads"] and not d_data["sales"])
+
+        sa_cursor, _, _ = pull(sa)
+        lead = {"id": lead_id, "contactPerson": f"E2E Client {tag}", "phone": "9000000000", "language": "English",
+                "assignedToId": did, "assigned_user_id": did, "assignedToName": dummy.json()["name"],
+                "disposition": "New Lead", "history": [{"date": time.strftime("%Y-%m-%d"), "text": "E2E upload"}]}
+        other = {**lead, "id": other_id, "assignedToId": sa_me["id"], "assigned_user_id": sa_me["id"], "assignedToName": sa_me["name"]}
+        saved, _ = push(sa, "leads", [lead, other])
+        check(s, "Super Admin assigns a lead to the dummy", {lead_id, other_id} <= saved)
+
+        d_cursor, d_data, _ = pull(dtok, d_cursor)
+        check(s, "Dummy receives the lead on its next update check", lead_id in d_data["leads"])
+        check(s, "Dummy doesn't receive someone else's lead", other_id not in d_data["leads"])
+        _, d_full, _ = pull(dtok)
+        check(s, "Dummy's full reload shows only its own lead", set(d_full["leads"]) == {lead_id}, str(sorted(d_full["leads"])))
+        tl_email = next((u["email"] for u in users_ad if u.get("role") == "Team Leader" and u["email"] in tokens), None)
+        for label, email in (("Team Leader", tl_email), ("another Executive", EXEC)):
+            if tokens.get(email):
+                _, data, _ = pull(tokens[email])
+                check(s, f"{label} can't see the dummy's lead", lead_id not in data["leads"])
+
+        worked = {**lead, "disposition": "Interested", "history": [*lead["history"], {"date": time.strftime("%Y-%m-%d"), "text": "E2E call"}]}
+        saved, _ = push(dtok, "leads", [worked])
+        check(s, "Dummy records a call outcome", lead_id in saved)
+        sa_cursor, sa_data, _ = pull(sa, sa_cursor)
+        check(s, "Super Admin sees the dummy's update", sa_data["leads"].get(lead_id, {}).get("disposition") == "Interested")
+        _, rejected = push(dtok, "leads", [{**other, "disposition": "Hacked"}])
+        check(s, "Blocked: dummy edits someone else's lead", other_id in rejected, rejected.get(other_id, ""))
+        _, rejected = push(dtok, "leads", [{**worked, "assignedToId": sa_me["id"], "assigned_user_id": sa_me["id"]}])
+        check(s, "Blocked: dummy hands its lead to someone else", lead_id in rejected, rejected.get(lead_id, ""))
+        _, rejected = push(dtok, "leads", deletes=[lead_id])
+        check(s, "Blocked: dummy deletes a lead", lead_id in rejected, rejected.get(lead_id, ""))
+
+        sale = {"id": sale_id, "leadId": lead_id, "clientName": lead["contactPerson"], "amount": 1,
+                "submittedByUserId": did, "employeeName": dummy.json()["name"], "status": "Pending Super Admin Review"}
+        saved, _ = push(dtok, "sales", [sale])
+        check(s, "Dummy submits a sale", sale_id in saved)
+        _, rejected = push(dtok, "sales", [{**sale, "status": "Approved"}])
+        check(s, "Blocked: dummy approves its own sale", sale_id in rejected, rejected.get(sale_id, ""))
+        _, sa_data, _ = pull(sa, sa_cursor)
+        check(s, "Super Admin sees the submitted sale", sale_id in sa_data["sales"])
+        saved, _ = push(sa, "sales", [{**sale, "status": "Approved", "stage": "Approved"}])
+        check(s, "Super Admin approves the sale", sale_id in saved)
+        d_cursor, d_data, _ = pull(dtok, d_cursor)
+        check(s, "Dummy sees the approval", d_data["sales"].get(sale_id, {}).get("status") == "Approved")
+        _, rejected = push(dtok, "sales", [{**sale, "status": "Approved", "stage": "Approved", "amount": 999}])
+        check(s, "Blocked: dummy edits an approved sale", sale_id in rejected, rejected.get(sale_id, ""))
+    finally:
+        # Cleanup runs even if a check above crashed
+        push(sa, "sales", deletes=[sale_id])
+        saved, _ = push(sa, "leads", deletes=[lead_id, other_id])
+        check(s, "Remove the dummy's test records (cleanup)", {lead_id, other_id} <= saved)
+        if dtok:
+            _, _, gone = pull(dtok, d_cursor)
+            check(s, "Dummy's browser is told the records are gone", lead_id in gone["leads"] and sale_id in gone["sales"])
+        check(s, "Delete the dummy profile (cleanup)", client.delete(f"/api/users/{did}", headers=h(sa)).status_code == 200)
+    check(s, "Deleted dummy's session stops working", client.get("/api/auth/me", headers=h(dtok)).status_code == 401)
+    check(s, "Deleted dummy can't sign in", auth_post("/api/auth/login", {"email": demail, "password": dummy_pw}).status_code == 401)
 
 # ---------------------------------------------------------------- Leegality
 s = section("Leegality integration (read-only)")
