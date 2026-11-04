@@ -57,14 +57,10 @@ def apply_ids(tmap, entries):
     images = [e for e in with_id if _norm(e.get("type")) in ("files", "file", "image")]
     sig_cfgs = tmap["signatureImageFields"]
     if len(images) == len(sig_cfgs):
+        # Only the ids: the download says type "file" sized "auto", but Leegality's API ignores that and only
+        # fills an image sent as type "files" with px width/height (verified live), which the map keeps
         for cfg, entry in zip(sig_cfgs, images):
             cfg["id"] = entry["id"]
-            if entry.get("type"):
-                cfg["type"] = entry["type"]
-            # Sent back as the template has them (e.g. "auto"); the stamp's own canvas size is renderWidth/Height
-            for dim in ("width", "height"):
-                if entry.get(dim):
-                    cfg[dim] = str(entry[dim])
     else:
         missing.append(f"{len(sig_cfgs)} signature image fields (found {len(images)} of type files)")
 

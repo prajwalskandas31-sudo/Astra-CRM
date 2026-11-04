@@ -66,7 +66,8 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 ## e-KYC & E-Sign (Leegality)
 
 "Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with
-Date 1 = today, Checkbox 1 = the Service Tenure (Demo = Option 1, 1 Month = Option 2 … 12 Months = Option 13),
+Date 1 = today, Checkbox 1 = the Service Tenure (as the template orders them: 1 Month = Option 1 … 12 Months =
+Option 12, Demo = Option 13; images must go as type `files`, a data URL, 200x80 px — all verified on a live document),
 and the Primary Signatory from the Digital Signature Storage block in both signature boxes, each stamped
 with the date and 24-hour time (IST) it was sent.
 

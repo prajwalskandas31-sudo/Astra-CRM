@@ -206,8 +206,7 @@ def _signature_fields(tmap, signature_data_url):
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
-        # The template sizes its boxes "auto"; the stamp is still drawn on a fixed canvas and Leegality scales it to the box
-        b64 = _stamp_signature(signature, label, cfg.get("renderWidth", 200), cfg.get("renderHeight", 80))
+        b64 = _stamp_signature(signature, label, cfg["width"], cfg["height"])
         value = f"data:image/png;base64,{b64}" if tmap.get("signatureImageValue") == "dataUrl" else b64
         fields.append(_field(cfg, type=cfg.get("type", "files"), value=value, width=str(cfg["width"]), height=str(cfg["height"])))
         stamps.append({"field": cfg["name"], "timestamp": stamped_at.isoformat(), "label": label})
