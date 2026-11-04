@@ -1,5 +1,5 @@
 {
-  "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only. Verified live 2026-11-04: Checkbox 1 Option N is N Months and Option 13 is Demo (template order, not the Workflow PDF); options and images need their ids; images go as type files (the download says file, which Leegality ignores), a data URL, and 200x80 px.",
+  "_comment": "Maps CRM data onto the form fields of Leegality template kFWn7uC (RA Terms and Conditions - UTFS), sent through workflow profileId. Leegality's API cannot send a one-off template, so profileId must be a workflow whose Create stage uses kFWn7uC; every dispatch reads back the template Leegality used and flags a mismatch. Field IDs come from Leegality Dashboard > Template Editor > Download Form Fields. While an id is null the field is sent by name only. Verified live 2026-11-04: Checkbox 1 Option N is N Months and Option 13 is Demo (template order, not the Workflow PDF); options and images need their ids; images go as type files (the download says file, which Leegality ignores), a data URL, and 200x80 px. The signature boxes are ~149x30 pt, so images are drawn 300x60 (same 5:1 shape); Leegality stretches to the box.",
   "profileId": "KKliSJp",
   "templateId": "kFWn7uC",
   "dateField": {
@@ -121,20 +121,22 @@
     {
       "id": "1793543538337",
       "name": "Image 1",
-      "width": "200",
-      "height": "80",
+      "width": "300",
+      "height": "60",
       "type": "files"
     },
     {
       "id": "1793543581913",
       "name": "Image 1",
-      "width": "200",
-      "height": "80",
+      "width": "300",
+      "height": "60",
       "type": "files"
     }
   ],
   "signatureImageValue": "dataUrl",
   "timestampFormat": "%d-%m-%Y %H:%M:%S",
   "timezoneOffsetMinutes": 330,
-  "timezoneLabel": "IST"
+  "timezoneLabel": "IST",
+  "stampDateFormat": "%d-%m-%Y",
+  "stampTimeFormat": "%H:%M:%S"
 }

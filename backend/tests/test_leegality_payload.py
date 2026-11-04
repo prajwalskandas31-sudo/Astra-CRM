@@ -59,13 +59,13 @@ def test_both_signature_boxes_get_the_stamped_signature(monkeypatch):
 
     assert [f["id"] for f in fields] == ["img-1", "img-2"]
     # Leegality fills an image only as type "files", a data URL and px dimensions
-    assert all(f["type"] == "files" and f["name"] == "Image 1" and (f["width"], f["height"]) == ("200", "80") for f in fields)
+    assert all(f["type"] == "files" and f["name"] == "Image 1" and (f["width"], f["height"]) == ("300", "60") for f in fields)
     # 24-hour clock: 3 PM is 15, not 03
     assert [s["label"] for s in stamps] == ["Signed: 04-11-2026 15:07:09 IST"] * 2
     for f in fields:
         assert f["value"].startswith("data:image/png;base64,")
         img = Image.open(io.BytesIO(base64.b64decode(f["value"].split(",", 1)[1])))
-        assert img.size == (200 * 4, 80 * 4)
+        assert img.size == (300 * 4, 60 * 4)  # the boxes' 5:1 shape
 
 
 def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeypatch):
@@ -127,7 +127,7 @@ def test_importer_fills_every_id_from_the_dashboard_download():
     assert (tmap["dateField"]["id"], tmap["dateField"]["type"]) == ("d1", "date")
     assert [o["id"] for o in tmap["tenureCheckbox"]["options"]] == [f"c{i}" for i in range(1, 14)]
     # Ids only: the download's type "file" / "auto" size is not what the API fills
-    assert [(f["id"], f["type"], f["width"]) for f in tmap["signatureImageFields"]] == [("i1", "files", "200"), ("i2", "files", "200")]
+    assert [(f["id"], f["type"], f["width"]) for f in tmap["signatureImageFields"]] == [("i1", "files", "300"), ("i2", "files", "300")]
 
 
 def test_importer_reports_a_download_with_one_image_box():

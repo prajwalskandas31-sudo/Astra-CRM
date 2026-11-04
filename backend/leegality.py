@@ -162,21 +162,34 @@ def _font(size):
     return ImageFont.load_default()
 
 
-def _stamp_signature(signature, stamp_text, width_px, height_px):
-    """Render the stored signature with its execution timestamp underneath, sized for the template field."""
+def _stamp_signature(signature, stamp_lines, width_px, height_px):
+    """Render the stored signature with its execution date and time beside it, at the template box's shape.
+
+    Leegality stretches the image to fill the box (about 5:1 in kFWn7uC), so the canvas must have the box's
+    aspect ratio or the signature is squashed and the stamp pushed out of view. On a box that wide the stamp
+    goes to the right of the signature, one line per part, as large as the column allows."""
     scale = 4  # render at higher resolution so the stamp stays crisp when Leegality scales it
     w, h = int(width_px) * scale, int(height_px) * scale
-    text_h = int(h * 0.24)
+    pad = scale * 2
     canvas = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(canvas)
+
+    # Largest font at which every stamp line fits a column of up to 36% of the width
+    col_w, line_h = int(w * 0.36) - pad, (h - 2 * pad) / len(stamp_lines)
+    size = int(line_h * 0.62)
+    while size > 6 and max(draw.textlength(t, font=_font(size)) for t in stamp_lines) > col_w:
+        size -= 2
+    font = _font(size)
+    text_w = int(max(draw.textlength(t, font=font) for t in stamp_lines))
 
     sig = signature.copy()
-    sig.thumbnail((w, h - text_h - scale * 2), Image.LANCZOS)
-    canvas.alpha_composite(sig, ((w - sig.width) // 2, max(0, (h - text_h - sig.height) // 2)))
+    sig.thumbnail((w - text_w - 3 * pad, h - 2 * pad), Image.LANCZOS)
+    canvas.alpha_composite(sig, (pad, (h - sig.height) // 2))
 
-    draw = ImageDraw.Draw(canvas)
-    font = _font(int(text_h * 0.7))
-    tw = draw.textlength(stamp_text, font=font)
-    draw.text(((w - tw) / 2, h - text_h), stamp_text, fill=(15, 23, 42, 255), font=font)
+    x = w - text_w - pad
+    for i, line in enumerate(stamp_lines):
+        y = pad + i * line_h + (line_h - size) / 2
+        draw.text((x, y), line, fill=(15, 23, 42, 255), font=font)
 
     out = io.BytesIO()
     canvas.save(out, format="PNG")
@@ -206,7 +219,9 @@ def _signature_fields(tmap, signature_data_url):
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
-        b64 = _stamp_signature(signature, label, cfg["width"], cfg["height"])
+        stamp_lines = [stamped_at.strftime(tmap["stampDateFormat"]),
+                       f"{stamped_at.strftime(tmap['stampTimeFormat'])} {tmap.get('timezoneLabel', '')}".strip()]
+        b64 = _stamp_signature(signature, stamp_lines, cfg["width"], cfg["height"])
         value = f"data:image/png;base64,{b64}" if tmap.get("signatureImageValue") == "dataUrl" else b64
         fields.append(_field(cfg, type=cfg.get("type", "files"), value=value, width=str(cfg["width"]), height=str(cfg["height"])))
         stamps.append({"field": cfg["name"], "timestamp": stamped_at.isoformat(), "label": label})
