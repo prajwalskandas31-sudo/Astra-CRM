@@ -319,6 +319,27 @@ def _delivery_config(document_id, settings, expected_template_id):
     }
 
 
+def _contact_key(name, email, phone):
+    return (" ".join((name or "").split()).casefold(), (email or "").strip().lower(), "".join(ch for ch in (phone or "") if ch.isdigit())[-10:])
+
+
+def _reject_substituted_signer(data, invitee, settings):
+    """A workflow with a saved signer ignores the invitee in the request and sends to its own contact instead.
+    Then the agreement would reach someone other than the client, so delete it before it can be signed."""
+    used = (data.get("invitees") or [{}])[0]
+    if _contact_key(used.get("name"), used.get("email"), used.get("phone")) == _contact_key(**invitee):
+        return
+    _, body = _leegality("DELETE", "/v3.0/sign/request", settings, params={"documentId": data["documentId"]})
+    cancelled = "cancelled" if body.get("status") == 1 else f"NOT cancelled ({_messages(body)}); cancel it in Leegality"
+    raise HTTPException(
+        status_code=409,
+        detail=f"Leegality sent the agreement to the workflow's saved signer ({used.get('name')}, {used.get('email')}, "
+               f"{used.get('phone')}) instead of the client ({invitee['name']}, {invitee['email']}, {invitee['phone']}). "
+               f"Document {data['documentId']} was {cancelled}. Fix: in Leegality, edit workflow KKliSJp and remove the "
+               f"signer's saved name, email and phone so they come from the CRM."
+    )
+
+
 @router.post("/esign/dispatch")
 def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
     settings = _settings()
@@ -356,6 +377,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         raise HTTPException(status_code=422, detail=f"Leegality rejected the request: {_messages(body)}")
 
     data = body["data"]
+    _reject_substituted_signer(data, invitee, settings)
     record = _update_record(data["documentId"], {
         "documentId": data["documentId"],
         "saleId": req.saleId,
