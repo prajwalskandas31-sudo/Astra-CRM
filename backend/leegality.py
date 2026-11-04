@@ -183,15 +183,26 @@ def _stamp_signature(signature, stamp_text, width_px, height_px):
     return base64.b64encode(out.getvalue()).decode("ascii")
 
 
+def _check_signature_ids(tmap):
+    """Both signature boxes in kFWn7uC are named "Image 1", so only their ids tell Leegality which is which.
+    Sending them by name would leave one box empty on a real client's agreement, so refuse instead."""
+    names = [f["name"] for f in tmap["signatureImageFields"]]
+    shared = {n for n in names if names.count(n) > 1}
+    unidentified = [f["name"] for f in tmap["signatureImageFields"] if f["name"] in shared and not f.get("id")]
+    if unidentified:
+        raise HTTPException(
+            status_code=409,
+            detail=f"The {len(names)} signature boxes share the name '{', '.join(sorted(shared))}' and have no field ids yet, "
+                   f"so Leegality cannot fill both. Download the template's form fields (Leegality > Templates > "
+                   f"{tmap['templateId']} > Download Form Fields) and run deploy/import_leegality_fields.py on it."
+        )
+
+
 def _signature_fields(tmap, signature_data_url):
+    _check_signature_ids(tmap)
     signature = _decode_image(signature_data_url)
-    fields, stamps, sent = [], [], set()
+    fields, stamps = [], []
     for cfg in tmap["signatureImageFields"]:
-        # Both placements in kFWn7uC are named "Image 1"; without ids they are one field to Leegality, so send it once
-        key = cfg.get("id") or cfg["name"]
-        if key in sent:
-            continue
-        sent.add(key)
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
