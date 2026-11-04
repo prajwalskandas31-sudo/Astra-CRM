@@ -206,9 +206,10 @@ def _signature_fields(tmap, signature_data_url):
         # Timestamp taken at the moment each placement is generated (24-hour clock)
         stamped_at = _now(tmap)
         label = f"Signed: {stamped_at.strftime(tmap['timestampFormat'])} {tmap.get('timezoneLabel', '')}".strip()
-        b64 = _stamp_signature(signature, label, cfg["width"], cfg["height"])
+        # The template sizes its boxes "auto"; the stamp is still drawn on a fixed canvas and Leegality scales it to the box
+        b64 = _stamp_signature(signature, label, cfg.get("renderWidth", 200), cfg.get("renderHeight", 80))
         value = f"data:image/png;base64,{b64}" if tmap.get("signatureImageValue") == "dataUrl" else b64
-        fields.append(_field(cfg, type="files", value=value, width=str(cfg["width"]), height=str(cfg["height"])))
+        fields.append(_field(cfg, type=cfg.get("type", "files"), value=value, width=str(cfg["width"]), height=str(cfg["height"])))
         stamps.append({"field": cfg["name"], "timestamp": stamped_at.isoformat(), "label": label})
     return fields, stamps
 
@@ -320,7 +321,8 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
 
     fields = [_field(tmap["dateField"], type=tmap["dateField"].get("type", "text"), value=executed_at.strftime(tmap["dateField"]["format"]))]
     for idx, opt in enumerate(tmap["tenureCheckbox"]["options"]):
-        fields.append(_field(opt, type="checkbox", value=opt["label"], checked=idx == option_idx))
+        # Every option is a field named "Checkbox 1"; its value ("Option 1".."Option 13") says which, not the tenure label
+        fields.append(_field({**opt, "name": tmap["tenureCheckbox"]["name"]}, type="checkbox", value=opt["name"], checked=idx == option_idx))
     # The server-stored Primary Signatory wins; the browser's copy is only a fallback until one is stored
     sig_fields, stamps = _signature_fields(tmap, stored_primary_signature() or req.signatureDataUrl)
     fields += sig_fields

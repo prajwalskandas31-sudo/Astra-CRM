@@ -49,6 +49,8 @@ def apply_ids(tmap, entries):
     date = next((e for e in with_id if _norm(e.get("name")) == _norm(tmap["dateField"]["name"])), None)
     if date:
         tmap["dateField"]["id"] = date["id"]
+        if date.get("type"):
+            tmap["dateField"]["type"] = date["type"]
     else:
         missing.append(tmap["dateField"]["name"])
 
@@ -57,6 +59,9 @@ def apply_ids(tmap, entries):
     if len(images) == len(sig_cfgs):
         for cfg, entry in zip(sig_cfgs, images):
             cfg["id"] = entry["id"]
+            if entry.get("type"):
+                cfg["type"] = entry["type"]
+            # Sent back as the template has them (e.g. "auto"); the stamp's own canvas size is renderWidth/Height
             for dim in ("width", "height"):
                 if entry.get(dim):
                     cfg[dim] = str(entry[dim])

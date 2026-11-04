@@ -57,12 +57,44 @@ def test_both_signature_boxes_get_the_stamped_signature(monkeypatch):
     fields, stamps = leegality._signature_fields(_tmap_with_ids(), _png_data_url())
 
     assert [f["id"] for f in fields] == ["img-1", "img-2"]
-    assert all(f["type"] == "files" and f["name"] == "Image 1" for f in fields)
+    assert all(f["type"] == "file" and f["name"] == "Image 1" for f in fields)
     # 24-hour clock: 3 PM is 15, not 03
     assert [s["label"] for s in stamps] == ["Signed: 04-11-2026 15:07:09 IST"] * 2
     for f in fields:
         img = Image.open(io.BytesIO(base64.b64decode(f["value"])))
-        assert img.size == (int(f["width"]) * 4, int(f["height"]) * 4)
+        assert img.size == (200 * 4, 80 * 4)
+
+
+def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeypatch):
+    """The real map: every field by its Download Form Fields id, type and value."""
+    sent = {}
+
+    def fake_leegality(method, path, settings, **kwargs):
+        sent["payload"] = kwargs["json"]
+        return 200, {"status": 1, "data": {"documentId": "DOC-1", "invitees": []}, "messages": []}
+
+    monkeypatch.setattr(leegality, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://x"})
+    monkeypatch.setattr(leegality, "_leegality", fake_leegality)
+    monkeypatch.setattr(leegality, "_wallet", lambda settings: {})
+    monkeypatch.setattr(leegality, "_delivery_config", lambda *a: {})
+    monkeypatch.setattr(leegality, "_update_record", lambda doc_id, record: record)
+    monkeypatch.setattr(leegality, "stored_primary_signature", _png_data_url)
+    monkeypatch.setattr(leegality, "_now", lambda tmap: datetime(2026, 11, 4, 21, 30, 0, tzinfo=IST))
+
+    req = leegality.ESignDispatchRequest(saleId="S1", clientName="Test Client", email="c@example.com",
+                                         phone="+91 98765 43210", serviceTenure="3 Months")
+    leegality.dispatch_esign(req, current_user={"name": "SA"})
+    payload = sent["payload"]
+    by_id = {f["id"]: f for f in payload["file"]["fields"]}
+
+    assert payload["profileId"] == "KKliSJp"
+    assert by_id["1793543330123"] == {"id": "1793543330123", "name": "Date 1", "type": "date", "value": "04/11/2026"}
+    checked = [f for f in by_id.values() if f["type"] == "checkbox" and f["checked"]]
+    assert [(f["name"], f["value"], f["id"]) for f in checked] == [("Checkbox 1", "Option 4", "1793543363860")]
+    assert sum(f["type"] == "checkbox" for f in by_id.values()) == 13
+    images = [by_id["1793543538337"], by_id["1793543581913"]]
+    assert all(f["name"] == "Image 1" and f["type"] == "file" and f["value"] for f in images)
+    assert payload["invitees"] == [{"name": "Test Client", "email": "c@example.com", "phone": "9876543210"}]
 
 
 def test_signature_boxes_without_ids_are_refused_before_sending():
@@ -82,15 +114,16 @@ def test_missing_signature_is_refused():
 
 def test_importer_fills_every_id_from_the_dashboard_download():
     tmap = copy.deepcopy(leegality._template_map())
-    download = [{"id": "d1", "name": "Date 1", "type": "text"}]
+    # Same shape as Leegality's download for kFWn7uC
+    download = [{"id": "d1", "name": "Date 1", "type": "date", "format": "dd/mm/yyyy"}]
     download += [{"id": f"c{i}", "name": "Checkbox 1", "type": "checkbox", "value": f"Option {i}"} for i in range(1, 14)]
-    download += [{"id": "i1", "name": "Image 1", "type": "files", "width": "180", "height": "70"},
-                 {"id": "i2", "name": "Image 1", "type": "files", "width": "180", "height": "70"}]
+    download += [{"id": "i1", "name": "Image 1", "type": "file", "width": "auto", "height": "auto"},
+                 {"id": "i2", "name": "Image 1", "type": "file", "width": "auto", "height": "auto"}]
 
-    assert importer.apply_ids(tmap, importer._entries({"fields": download})) == []
-    assert tmap["dateField"]["id"] == "d1"
+    assert importer.apply_ids(tmap, importer._entries({"templateId": "kFWn7uC", "fields": download})) == []
+    assert (tmap["dateField"]["id"], tmap["dateField"]["type"]) == ("d1", "date")
     assert [o["id"] for o in tmap["tenureCheckbox"]["options"]] == [f"c{i}" for i in range(1, 14)]
-    assert [(f["id"], f["width"]) for f in tmap["signatureImageFields"]] == [("i1", "180"), ("i2", "180")]
+    assert [(f["id"], f["type"], f["width"]) for f in tmap["signatureImageFields"]] == [("i1", "file", "auto"), ("i2", "file", "auto")]
 
 
 def test_importer_reports_a_download_with_one_image_box():
