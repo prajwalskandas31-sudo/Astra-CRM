@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
   const { simulatedRole, sales, leadRequests, eSignRecords = [], paidClients = [], hasPermission } = useCRM();
@@ -61,6 +61,11 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       id: 'paid-block',
       label: 'Paid',
       icon: BadgeIndianRupee
+    },
+    {
+      id: 'telegram-control',
+      label: 'Telegram Control Block',
+      icon: Send
     },
     {
       id: 'lead-reassignment',

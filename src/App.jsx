@@ -51,6 +51,7 @@ import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
+import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { isRealLeegalityDispatch } from './services/leegalityService';
@@ -82,6 +83,7 @@ const AppContent = () => {
       'sale-approvals',
       'esign-block',
       'paid-block',
+      'telegram-control',
       'lead-reassignment',
       'system-settings',
       'custom-roles',
@@ -109,6 +111,7 @@ const AppContent = () => {
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
+    'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'system-settings': 'System Settings & UI Customization',
     'custom-roles': 'Custom Roles Builder (Annexure-I)',
@@ -149,6 +152,8 @@ const AppContent = () => {
         );
       case 'paid-block':
         return <PaidBlock />;
+      case 'telegram-control':
+        return <TelegramControlBlock />;
       case 'lead-reassignment':
         return <LeadReassignmentView />;
       case 'system-settings':

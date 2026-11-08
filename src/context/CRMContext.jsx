@@ -579,6 +579,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
   },
   {
+    id: 'telegram-control',
+    name: 'Telegram Control Block',
+    category: 'Sales & Approvals',
+    description: 'Select clients who completed E-Sign and manage Trade Call Broadcasts sent from the Telegram bots.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'register-sale',
     name: 'Register New Customer Sale',
     category: 'Sales & Approvals',
