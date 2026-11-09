@@ -177,6 +177,7 @@ POLICIES: Dict[str, Policy] = {
     "userPermissions": Policy(read=EVERYONE, write=SUPER_ADMIN, visible=_own_entry),
     "financialSettings": Policy(read=EVERYONE, write=SUPER_ADMIN, redact=_redact_passwords),
     "voiceAgentSettings": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN),
 }
 
 for _collection, _rules in POLICIES.items():
