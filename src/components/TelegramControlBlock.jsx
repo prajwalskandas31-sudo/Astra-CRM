@@ -3,10 +3,17 @@ import { useCRM } from '../context/CRMContext';
 import { TradeCallBroadcasts } from './TradeCallBroadcasts';
 import { Send, Search, X } from 'lucide-react';
 
+// Trading segments a client can be enabled for; stored on the paid client as `segments`
+export const TRADING_SEGMENTS = [
+  'NSE DERIVATIVES',
+  'MCX DERIVATIVES',
+  'BSE DERIVATIVES',
+  'NSE BSE Equity'
+];
+
 export const TelegramControlBlock = () => {
-  const { paidClients = [] } = useCRM();
+  const { paidClients = [], togglePaidClientSegment } = useCRM();
   const [search, setSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   // Paid clients are the ones who completed E-Sign; their details come from the Client Information page
   const clients = useMemo(
@@ -20,25 +27,6 @@ export const TelegramControlBlock = () => {
       .some(v => v && String(v).toLowerCase().includes(q)))
     : clients;
 
-  const selectedCount = clients.filter(p => selectedIds.has(p.id)).length;
-  const allFilteredSelected = filteredClients.length > 0 && filteredClients.every(p => selectedIds.has(p.id));
-
-  const toggleClient = (id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAllFiltered = () => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      filteredClients.forEach(p => (allFilteredSelected ? next.delete(p.id) : next.add(p.id)));
-      return next;
-    });
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div className="directory-card" style={{ overflow: 'hidden' }}>
@@ -49,7 +37,7 @@ export const TelegramControlBlock = () => {
             </h3>
             <p>
               Clients who have completed E-Sign, with details from their Client Information page.
-              {' '}{selectedCount} of {clients.length} selected.
+              {' '}{clients.length} client{clients.length === 1 ? '' : 's'}.
             </p>
           </div>
         </div>
@@ -83,39 +71,36 @@ export const TelegramControlBlock = () => {
             <table className="crm-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px' }}>
-                    <input
-                      type="checkbox"
-                      checked={allFilteredSelected}
-                      onChange={toggleAllFiltered}
-                      aria-label={allFilteredSelected ? 'Deselect all listed clients' : 'Select all listed clients'}
-                    />
-                  </th>
                   <th>Client Name</th>
                   <th>Phone Number</th>
                   <th>PAN ID</th>
                   <th>Service Name</th>
                   <th>Service Tenure</th>
+                  {TRADING_SEGMENTS.map(seg => (
+                    <th key={seg} style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>{seg}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {filteredClients.map(p => {
                   const name = [p.clientPrefix, p.clientName].filter(Boolean).join(' ') || '—';
                   return (
-                    <tr key={p.id} onClick={() => toggleClient(p.id)} style={{ cursor: 'pointer' }}>
-                      <td onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(p.id)}
-                          onChange={() => toggleClient(p.id)}
-                          aria-label={`Select ${name}`}
-                        />
-                      </td>
+                    <tr key={p.id}>
                       <td style={{ fontWeight: 600 }}>{name}</td>
                       <td style={{ fontSize: '0.8rem' }}>{p.phone || '—'}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.panNumber || '—'}</td>
                       <td style={{ fontSize: '0.8rem' }}>{p.serviceName || '—'}</td>
                       <td><span className="badge" style={{ fontSize: '0.74rem' }}>{p.serviceTenure || '—'}</span></td>
+                      {TRADING_SEGMENTS.map(seg => (
+                        <td key={seg} style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={Array.isArray(p.segments) && p.segments.includes(seg)}
+                            onChange={() => togglePaidClientSegment(p.id, seg)}
+                            aria-label={`${seg} for ${name}`}
+                          />
+                        </td>
+                      ))}
                     </tr>
                   );
                 })}

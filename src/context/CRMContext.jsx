@@ -2934,6 +2934,16 @@ export const CRMProvider = ({ children }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // Telegram Control Block: turn one trading segment (NSE/MCX/BSE derivatives, equity) on or off for a client
+  const togglePaidClientSegment = (paidId, segment) => {
+    setPaidClients(prev => prev.map(p => {
+      if (p.id !== paidId) return p;
+      const current = Array.isArray(p.segments) ? p.segments : [];
+      const segments = current.includes(segment) ? current.filter(s => s !== segment) : [...current, segment];
+      return { ...p, segments };
+    }));
+  };
+
   const deletePaidClient = (paidId) => {
     setPaidClients(prev => prev.filter(p => p.id !== paidId));
     if (authToken && isBackendEnabled() && !serverSyncActive) {
@@ -3255,6 +3265,7 @@ export const CRMProvider = ({ children }) => {
       deleteESignRecord,
       paidClients,
       deletePaidClient,
+      togglePaidClientSegment,
       // ─── Leegality API Integration Config & Credentials ────────
       leegalityConfig,
       updateLeegalityConfig
