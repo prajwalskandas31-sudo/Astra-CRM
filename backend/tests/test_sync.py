@@ -98,6 +98,15 @@ def test_admin_only_and_config_collections(crm, tok):
     assert crm.client.get("/api/sync", params={"collections": "users"}, headers=bearer(tok["sa"])).status_code == 404
 
 
+def test_company_profile_is_read_by_all_and_changed_only_by_super_admin(crm, tok):
+    entry = {"id": "sebiRegistrationNumber", "value": "INH000012345"}
+    assert push(crm, tok["admin"], "companyProfile", [entry])["rejected"]["companyProfile"]
+    assert push(crm, tok["exec"], "companyProfile", [entry])["rejected"]["companyProfile"]
+    assert not push(crm, tok["sa"], "companyProfile", [entry])["rejected"]["companyProfile"]
+    seen = {i["id"]: i["value"] for i in pull(crm, tok["exec"], "companyProfile")["collections"]["companyProfile"]["items"]}
+    assert seen["sebiRegistrationNumber"] == "INH000012345"
+
+
 def test_override_passwords_only_reach_admins(crm, tok):
     push(crm, tok["sa"], "financialSettings", [{"id": "adminOverridePassword", "value": "s3cret-override"},
                                                {"id": "maxGrossSales", "value": 200000}])

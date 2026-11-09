@@ -159,6 +159,15 @@ export const DEFAULT_SERVICES = [
 // Bumped when the official list changes, so browsers holding an older saved list switch to it
 const SERVICES_VERSION = '2026-11-official-tiers';
 
+// Company Profile block: the firm's own details, edited by the Super Admin
+export const DEFAULT_COMPANY_PROFILE = {
+  companyName: '',
+  sebiRegistrationNumber: '',
+  contact: '',
+  email: '',
+  website: ''
+};
+
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
   enabled: true,
   botName: 'Astra AI Compliance Voice Bot',
@@ -600,6 +609,13 @@ export const CRM_FEATURES = [
     category: 'Administration & Governance',
     description: 'Access top-level analytics, corporate lead allocation, and fulfillment of rep inbound lead requests.',
     defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'company-profile',
+    name: 'Company Profile',
+    category: 'Administration & Governance',
+    description: 'View the company name, SEBI registration number, contact, email and website. Only a Super Admin can edit them.',
+    defaultForRoles: ['Super Admin', 'Admin']
   },
   {
     id: 'system-settings',
@@ -1044,6 +1060,19 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_voice_agent_settings', JSON.stringify(voiceAgentSettings));
   }, [voiceAgentSettings]);
 
+  // ─── Company Profile ─────────────────────────────────────────────────────
+  const [companyProfile, setCompanyProfile] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_company_profile') || 'null');
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_COMPANY_PROFILE, ...parsed };
+    } catch (e) {}
+    return DEFAULT_COMPANY_PROFILE;
+  });
+
+  useEffect(() => {
+    cacheSet('crm_company_profile', JSON.stringify(companyProfile));
+  }, [companyProfile]);
+
   // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
   const [financialSettings, setFinancialSettings] = useState(() => {
     const saved = localStorage.getItem('crm_financial_settings');
@@ -1148,6 +1177,8 @@ export const CRMProvider = ({ children }) => {
       keepWhenServerEmpty: true, defaults: DEFAULT_FINANCIAL_SETTINGS },
     voiceAgentSettings: { value: voiceAgentSettings, setValue: setVoiceAgentSettings, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_VOICE_AGENT_SETTINGS },
+    companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
+      keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
   }, {
     enabled: serverSyncActive && !!authUser,
     token: authToken,
@@ -2409,6 +2440,10 @@ export const CRMProvider = ({ children }) => {
     setVoiceAgentSettings(prev => ({ ...prev, ...updated }));
   };
 
+  const updateCompanyProfile = (updated) => {
+    setCompanyProfile(prev => ({ ...prev, ...updated }));
+  };
+
   const updateFinancialSettings = (updated) => {
     setFinancialSettings(prev => ({ ...prev, ...updated }));
   };
@@ -3243,6 +3278,9 @@ export const CRMProvider = ({ children }) => {
       // ─── Voice Agent Settings ───────────────────────────────
       voiceAgentSettings,
       updateVoiceAgentSettings,
+      // ─── Company Profile ────────────────────────────────────
+      companyProfile,
+      updateCompanyProfile,
       // ─── Financial Settings & Limits ────────────────────────
       financialSettings,
       updateFinancialSettings,
