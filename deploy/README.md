@@ -54,8 +54,14 @@ read the Paid block from the database. Only one backend worker runs the bots (it
 call is sent once.
 
 Senders post the template values, e.g. `NIFTY 24500 CE Buy 120 SL 100 Tgt 150`; the fixed template words
-(`InvestEQ FNO ALERT:` and the SEBI footer) are optional, so pasting the full approved text works too.
-A call that does not fit the template is refused, and the bot replies with the expected format.
+(`FNO ALERT:`, optionally preceded by `InvestEQ`, and the SEBI footer) are optional, so pasting the full
+approved text works too. A call that does not fit the template is refused, and the bot replies with the expected format.
+
+The SMS must match the template **as registered on DLT** character for character (wappie dashboard →
+SMS → Templates → edit shows it), not the text in any handover document; otherwise wappie accepts and
+charges it but the operator drops it ("Template not matched … content violation in static part", visible
+under SMS → Messages → ⓘ). "Blocked in preferences with MSISDN as PK" there means the recipient has DND /
+commercial-SMS blocking on their number.
 
 Settings in `backend/.env` (restart the backend after changing bots):
 
@@ -63,9 +69,9 @@ Settings in `backend/.env` (restart the backend after changing bots):
 |---|---|
 | `SMS_ACCESS_TOKEN` | wappie Developers → Access Tokens |
 | `SMS_SENDER` | approved DLT sender ID (header) |
-| `SMS_SERVICE` | route for that sender: `SI`, `SE`, `TR` or `PR` |
+| `SMS_SERVICE` | route registered for the template: `SI`, `SE`, `T`, `P` or `OTP` (wappie rejects `TR`/`PR`). Current: `SI` |
 | `SMS_COUNTRY_CODE` | default `+91` |
-| `SMS_MESSAGE_FORMAT` | SMS text; must match the approved DLT template. `{{1}}`…`{{4}}` = template variables read from the Telegram message (or `{call}` = whole message), `{segment}` = bot's segment, `\n` = line break. Default `{call}`. Current: `InvestEQ FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}}\n\nUnite Technologies Financial Service (SEBI Reg: INH000020350) -\nhttps://investeq.in/` (DLT template 1777179206957321210) |
+| `SMS_MESSAGE_FORMAT` | SMS text; must match the approved DLT template. `{{1}}`…`{{4}}` = template variables read from the Telegram message (or `{call}` = whole message), `{segment}` = bot's segment, `\n` = line break. Default `{call}`. Current: `FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}}\n\nUnite Technologies Financial Service (SEBI Reg: INH000020350) - https://investeq.in/` (DLT template 1777179206957321210, verified delivered 9 Nov 2026) |
 | `SMS_MAX_CHARS` | longest SMS allowed, default 480 |
 | `SMS_TEST_RECIPIENT` | comma-separated; while set, every call goes only to these numbers (bot reply says how many clients it would have reached). Super Admins can also send a test from the Trade Call Broadcasts panel |
 | `SMS_DRY_RUN` | `1` = log only, send nothing |
