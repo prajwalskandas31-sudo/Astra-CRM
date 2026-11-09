@@ -38,9 +38,24 @@ Deploy secrets live in the GitHub `production` environment (only `main` can use 
 
 ## Trade Call Broadcasts (Telegram → SMS)
 
-Each service has its own Telegram bot. A call posted to that bot goes out as SMS, through the wappie gateway,
-to every **active** Paid client on that service (expired tenures are skipped). The bots read the Paid block
-from the database. Only one backend worker runs the bots (it holds a database lock), so each call is sent once.
+Each trading segment has its own Telegram bot, matching the four checkboxes per client in the
+**Telegram Control Block**:
+
+| Bot | Segment checkbox |
+|---|---|
+| @Srin_vas_1_bot | NSE DERIVATIVES |
+| @Srin_vas_2_bot | MCX DERIVATIVES |
+| @Srin_vas_3_bot | BSE DERIVATIVES |
+| @Srin_vas_4_bot | NSE BSE EQUITY |
+
+A call posted to a bot goes out as SMS, through the wappie gateway, to every **active** Paid client with that
+segment ticked (expired tenures are skipped; a client with several boxes ticked gets each bot's calls). The bots
+read the Paid block from the database. Only one backend worker runs the bots (it holds a database lock), so each
+call is sent once.
+
+Senders post the template values, e.g. `NIFTY 24500 CE Buy 120 SL 100 Tgt 150`; the fixed template words
+(`InvestEQ FNO ALERT:` and the SEBI footer) are optional, so pasting the full approved text works too.
+A call that does not fit the template is refused, and the bot replies with the expected format.
 
 Settings in `backend/.env` (restart the backend after changing bots):
 
@@ -50,12 +65,12 @@ Settings in `backend/.env` (restart the backend after changing bots):
 | `SMS_SENDER` | approved DLT sender ID (header) |
 | `SMS_SERVICE` | route for that sender: `SI`, `SE`, `TR` or `PR` |
 | `SMS_COUNTRY_CODE` | default `+91` |
-| `SMS_MESSAGE_FORMAT` | SMS text; must match the approved DLT template. `{call}` = Telegram message, `{service}` = service name. Default `{call}` |
+| `SMS_MESSAGE_FORMAT` | SMS text; must match the approved DLT template. `{{1}}`…`{{4}}` = template variables read from the Telegram message (or `{call}` = whole message), `{segment}` = bot's segment, `\n` = line break. Default `{call}`. Current: `InvestEQ FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}}\n\nUnite Technologies Financial Service (SEBI Reg: INH000020350) -\nhttps://investeq.in/` (DLT template 1777179206957321210) |
 | `SMS_MAX_CHARS` | longest SMS allowed, default 480 |
 | `SMS_TEST_RECIPIENT` | comma-separated; while set, every call goes only to these numbers (bot reply says how many clients it would have reached). Super Admins can also send a test from the Trade Call Broadcasts panel |
 | `SMS_DRY_RUN` | `1` = log only, send nothing |
 | `SMS_BLOCKED_HOURS` | IST hours when carriers drop the route's SMS; calls then are refused, not sent. Default `21-10` for `SE`/`PR`, `off` otherwise |
-| `TELEGRAM_BOTS` | JSON: `{"<service name exactly as in the CRM>": "<BotFather token>"}`, e.g. `{"Index Options": "123:abc", "Stock Cash": "456:def"}`. Official names: Stock Cash, Stock Future, Stock Options, Index Futures, Index Options, Bullions, Base Metals, Energy, MCX Derivatives, NSE Derivatives, BSE Derivatives, HNI Options - NSE & BSE (a custom service name typed on the Client Information Page works too) |
+| `TELEGRAM_BOTS` | JSON on one line: `{"<segment>": "<BotFather token>"}` for the segments `NSE DERIVATIVES`, `MCX DERIVATIVES`, `BSE DERIVATIVES`, `NSE BSE EQUITY` (case-insensitive), e.g. `{"NSE DERIVATIVES": "123:abc", "MCX DERIVATIVES": "456:def"}`. Never run the same token on two servers at once: Telegram gives each message to one poller only |
 | `TELEGRAM_ALLOWED_PHONES` | comma-separated numbers allowed to post calls |
 
 A sender verifies once by opening the bot and tapping **Share my number**; only a number listed in
