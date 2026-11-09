@@ -39,6 +39,8 @@ BROADCASTS = "broadcasts"
 DELETED_PAID = "paidClientsDeleted"  # ids deleted from the Paid block; a stale browser can never re-add one
 SENDERS = "telegramSenders"
 OFFSETS = "telegramOffsets"
+POLLER_STATUS = "telegramPollerStatus"
+STATUS_HEARTBEAT_SECONDS = 60
 _POLLER_LOCK_KEY = 7_340_002
 
 ENV_KEYS = ("TELEGRAM_BOTS", "TELEGRAM_ALLOWED_PHONES", "SMS_ACCESS_TOKEN", "SMS_SENDER", "SMS_SERVICE",
@@ -403,6 +405,22 @@ def handle_update(segment: str, token: str, update: dict) -> None:
     _reply(token, chat_id, _summary(record))
 
 
+def _publish_status(segment: str) -> None:
+    """Share this poller's state through the database, since only one backend worker runs the bots
+    and the status request may reach any worker. Written on change, and as a heartbeat each minute."""
+    state = _pollers[segment]
+    now = time.time()
+    current = (state.get("username"), state.get("error"))
+    if current == state.get("published") and now - state.get("publishedAt", 0) < STATUS_HEARTBEAT_SECONDS:
+        return
+    try:
+        with store.update_value(POLLER_STATUS, {}) as status:
+            status[0][segment] = {"username": current[0], "error": current[1], "at": now}
+        state["published"], state["publishedAt"] = current, now
+    except Exception:
+        pass  # status display only; never stop the poller over it
+
+
 def _poll(segment: str, token: str) -> None:
     state = _pollers[segment]
     while not _stop.is_set():
@@ -412,9 +430,11 @@ def _poll(segment: str, token: str) -> None:
             break
         except Exception as err:
             state["error"] = f"Bot token rejected or Telegram unreachable: {err}"
+            _publish_status(segment)
             _stop.wait(60)
 
     while not _stop.is_set():
+        _publish_status(segment)
         try:
             offset = store.get_value(OFFSETS, {}).get(segment)
             # Long poll: Telegram holds the request up to 25 s until a message arrives
@@ -521,13 +541,19 @@ def delete_paid_client(paid_id: str, current_user: dict = Depends(require_roles(
 def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
     cfg = settings()
     segments = []
+    shared = store.get_value(POLLER_STATUS, {})
     for segment in cfg["bots"]:
-        state = _pollers.get(segment, {})
+        if segment in _pollers:
+            state, alive = _pollers[segment], not _stop.is_set()
+        else:
+            # The bots run in another worker: trust its status while the heartbeat is fresh
+            state = shared.get(segment) or {}
+            alive = time.time() - state.get("at", 0) < 2.5 * STATUS_HEARTBEAT_SECONDS
         segments.append({
             "segment": segment,
             "botUsername": state.get("username"),
-            "running": bool(state.get("username")) and not _stop.is_set(),
-            "error": state.get("error"),
+            "running": bool(state.get("username")) and alive,
+            "error": state.get("error") if alive or not state else "No status from the bot worker for over 2 minutes",
             "activeClients": len(active_recipients(segment)),
         })
     senders = store.get_value(SENDERS, {})

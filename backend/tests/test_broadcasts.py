@@ -314,3 +314,20 @@ def test_sync_keeps_segment_ticks_when_a_browser_omits_them(crm, bc):
     # Unticking everything is still saved
     crm.client.post("/api/paid-clients/sync", json={"clients": [client("p1", "9876500001", segments=[])]}, headers=sa)
     assert crm.client.get("/api/paid-clients", headers=sa).json()["clients"][0]["segments"] == []
+
+
+def test_bot_status_is_shared_with_workers_that_do_not_poll(crm, bc):
+    sa = bearer(crm.token(SA))
+    assert crm.client.get("/api/broadcasts", headers=sa).json()["segments"][0]["running"] is False
+    bc._pollers[SEGMENT] = {"username": "Srin_vas_1_bot", "error": None}
+    try:
+        bc._publish_status(SEGMENT)
+    finally:
+        del bc._pollers[SEGMENT]
+    seg = crm.client.get("/api/broadcasts", headers=sa).json()["segments"][0]
+    assert seg["running"] is True and seg["botUsername"] == "Srin_vas_1_bot"
+    # A stale heartbeat (bot worker gone) is not shown as running
+    with bc.store.update_value(bc.POLLER_STATUS, {}) as status:
+        status[0][SEGMENT]["at"] -= 1000
+    seg = crm.client.get("/api/broadcasts", headers=sa).json()["segments"][0]
+    assert seg["running"] is False and "No status" in seg["error"]
