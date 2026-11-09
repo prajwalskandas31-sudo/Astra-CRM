@@ -50,6 +50,13 @@ const toDocs = (spec, value) => {
   return docs;
 };
 
+// The server's data epoch changes when its data is reset (backend/reset_data.py). This browser's cached
+// records predate a new epoch, so they are replaced by the server's copy, never uploaded to it.
+const EPOCH_KEY = 'crm_data_epoch';
+const storedEpoch = () => { try { return localStorage.getItem(EPOCH_KEY); } catch { return null; } };
+const isNewEpoch = (epoch) => !!epoch && storedEpoch() !== epoch;
+const saveEpoch = (epoch) => { try { if (epoch) localStorage.setItem(EPOCH_KEY, epoch); } catch { /* cache only */ } };
+
 const fromDocs = (spec, docs) => {
   if (spec.kind === 'map') {
     const obj = {};
@@ -82,6 +89,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
 
   const applyPull = (body) => {
     const s = state.current;
+    const resetOnServer = isNewEpoch(body.epoch);
     names.forEach(name => {
       const spec = specsRef.current[name];
       const change = body.collections?.[name];
@@ -95,7 +103,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
           baseline.clear();
           return;
         }
-        if (serverDocs.length === 0 && spec.importLocal && optsRef.current.isSuperAdmin) {
+        if (serverDocs.length === 0 && spec.importLocal && optsRef.current.isSuperAdmin && !resetOnServer) {
           // First start on the server: the Super Admin's browser uploads what it held locally
           baseline.clear();
           if (spec.defaultIds) {
@@ -143,6 +151,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
       });
     });
     s.cursor = body.cursor;
+    if (body.full) saveEpoch(body.epoch);
   };
 
   const pull = async (full = false) => {
@@ -153,7 +162,13 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
       const since = full ? 0 : s.cursor;
       const res = await fetch(`${API_BASE_URL}/sync?collections=${encodeURIComponent(namesKey)}&since=${since}`, { headers: headers() });
       if (!res.ok) return;
-      applyPull(await res.json());
+      const body = await res.json();
+      if (!body.full && isNewEpoch(body.epoch)) {
+        // Reset while this tab was open: reload everything from the server before pushing anything
+        s.needFull = true;
+        return;
+      }
+      applyPull(body);
       if (full && !s.ready) {
         s.ready = true;
         schedulePush(0);  // publish anything the first pull decided to keep (imports, defaults)
@@ -167,7 +182,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
 
   const push = async () => {
     const s = state.current;
-    if (!s.ready) return;
+    if (!s.ready || s.needFull) return;
     if (s.pushing) { s.pushAgain = true; return; }
     const pending = [];  // [name, doc|null, id]
     names.forEach(name => {
@@ -243,7 +258,11 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
     let lastFull = Date.now();
     let timer;
     const tick = async () => {
-      if (state.current.ready) {
+      if (state.current.needFull) {
+        state.current.needFull = false;
+        lastFull = Date.now();
+        await pull(true);
+      } else if (state.current.ready) {
         await push();
         if (Date.now() - lastFull > FULL_RESYNC_MS) { lastFull = Date.now(); await pull(true); }
         else await pull(false);

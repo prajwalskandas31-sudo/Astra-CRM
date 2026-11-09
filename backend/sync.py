@@ -234,6 +234,12 @@ class _Viewer:
         return None
 
 
+def _epoch() -> str:
+    """JSON of the data epoch, set when the data is reset (backend/reset_data.py); null before any reset.
+    A browser that sees a new epoch drops its cached copy instead of uploading it to the emptied server."""
+    return json.dumps(store.get_value("dataEpoch"))
+
+
 # ==========================================
 # API
 # ==========================================
@@ -262,7 +268,7 @@ def pull(collections: str = Query(..., description="Comma-separated collection n
                     # (a full lead list is the largest response in the app)
                     items = store.all_json(name, owners)
             parts.append(f'{json.dumps(name)}: {{"items": [{",".join(items)}], "deleted": []}}')
-        body = f'{{"full": true, "cursor": {int(cursor)}, "collections": {{{", ".join(parts)}}}}}'
+        body = f'{{"full": true, "cursor": {int(cursor)}, "epoch": {_epoch()}, "collections": {{{", ".join(parts)}}}}}'
         return Response(body, media_type="application/json")
 
     scopes = {}
@@ -292,7 +298,7 @@ def pull(collections: str = Query(..., description="Comma-separated collection n
                 deleted[name].append(rid)
     parts = [f'{json.dumps(n)}: {{"items": [{",".join(items[n])}], "deleted": {json.dumps(list(dict.fromkeys(deleted[n])))}}}'
              for n in names]
-    body = f'{{"full": false, "cursor": {int(feed["cursor"])}, "collections": {{{", ".join(parts)}}}}}'
+    body = f'{{"full": false, "cursor": {int(feed["cursor"])}, "epoch": {_epoch()}, "collections": {{{", ".join(parts)}}}}}'
     return Response(body, media_type="application/json")
 
 
