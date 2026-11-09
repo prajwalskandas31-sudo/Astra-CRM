@@ -1,8 +1,9 @@
-"""Trade Call Broadcasts: a Telegram bot per service relays each posted call as SMS to that
-service's active Paid clients through the wappie SMS gateway.
+"""Trade Call Broadcasts: a Telegram bot per trading segment relays each posted call as SMS, through
+the wappie SMS gateway, to the active Paid clients who have that segment ticked in the Telegram
+Control Block (NSE DERIVATIVES, MCX DERIVATIVES, BSE DERIVATIVES, NSE BSE Equity).
 
-The Paid block is shared through the database (collection "paidClients"); that copy is what the
-always-on Telegram pollers read when a call comes in.
+The Paid block is shared through the database (collection "paidClients", ticked segments in each
+client's "segments" list); that copy is what the always-on Telegram pollers read when a call comes in.
 
 Only Telegram accounts whose phone number is listed in TELEGRAM_ALLOWED_PHONES can post: the
 sender proves the number once by tapping "Share my number", and their Telegram user id is stored.
@@ -53,7 +54,7 @@ MAX_LOGGED_BROADCASTS = 200
 MAX_CALL_AGE_SECONDS = 300
 SEND_WORKERS = 8
 PAID_FIELDS = ("id", "saleId", "leadId", "clientName", "phone", "serviceName", "serviceTenure",
-               "serviceStartDate", "serviceEndDate", "status")
+               "serviceStartDate", "serviceEndDate", "status", "segments")
 
 router = APIRouter(tags=["broadcasts"])
 # The wappie gateway (GET only) and Telegram both carry their tokens in the URL, and httpx logs full
@@ -61,7 +62,7 @@ router = APIRouter(tags=["broadcasts"])
 logging.getLogger("httpx").setLevel(logging.WARNING)
 _stop = threading.Event()
 _poller_lock_conn = None
-_pollers: dict = {}  # service name -> {"username", "error", "thread"}
+_pollers: dict = {}  # segment -> {"username", "error", "thread"}
 
 
 # ==========================================
@@ -98,7 +99,7 @@ def settings() -> dict:
         "service": env.get("SMS_SERVICE", ""),
         "country_code": env.get("SMS_COUNTRY_CODE", "+91"),
         "api_url": env.get("SMS_API_URL", DEFAULT_SMS_API_URL),
-        # {call} is the text posted in Telegram, {service} the service name; must match the DLT template
+        # {call} is the text posted in Telegram, {segment} the bot's segment; must match the DLT template
         "message_format": env.get("SMS_MESSAGE_FORMAT", "{call}"),
         "max_chars": int(env.get("SMS_MAX_CHARS") or 480),
         # Comma-separated; while set, every call goes only to these numbers
@@ -137,8 +138,14 @@ def mask_phone(phone: str) -> str:
     return phone[:2] + "xxxxx" + phone[-3:] if phone and len(phone) == 10 else "invalid"
 
 
-def _same_service(a: str, b: str) -> bool:
-    return (a or "").strip().lower() == (b or "").strip().lower()
+def _same_segment(a, b) -> bool:
+    return " ".join(str(a or "").split()).lower() == " ".join(str(b or "").split()).lower()
+
+
+def has_segment(client: dict, segment: str) -> bool:
+    """Whether the client's box for this segment is ticked in the Telegram Control Block."""
+    ticked = client.get("segments")
+    return isinstance(ticked, list) and any(_same_segment(s, segment) for s in ticked)
 
 
 def is_active(client: dict, today: Optional[str] = None) -> bool:
@@ -150,12 +157,12 @@ def is_active(client: dict, today: Optional[str] = None) -> bool:
     return not end or today < end
 
 
-def active_recipients(service_name: str) -> List[dict]:
-    """Active Paid clients on a service, one entry per phone number."""
+def active_recipients(segment: str) -> List[dict]:
+    """Active Paid clients with this segment ticked, one entry per phone number."""
     recipients, seen = [], set()
     for client in store.all(PAID_CLIENTS):
         phone = normalize_phone(client.get("phone"))
-        if phone and phone not in seen and _same_service(client.get("serviceName"), service_name) and is_active(client):
+        if phone and phone not in seen and has_segment(client, segment) and is_active(client):
             seen.add(phone)
             recipients.append({"clientName": client.get("clientName") or "", "phone": phone})
     return recipients
@@ -173,8 +180,9 @@ def call_pattern(message_format: str) -> Optional[re.Pattern]:
     """For a DLT format with {{n}} slots, a pattern that reads the slot values from a posted call.
 
     The call is the format's text up to the last slot, e.g. "NIFTY 24500 CE Buy 120 SL 100 Tgt 150"
-    for "FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} <footer>". The words before the first slot are
-    optional, words are case-insensitive, and spaces and line breaks are interchangeable.
+    for "FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} <footer>". The words before the first slot and
+    the footer after the last are optional (so the full template text works too), words are
+    case-insensitive, and spaces and line breaks are interchangeable.
     """
     slots = list(DLT_VAR.finditer(message_format))
     if not slots:
@@ -182,11 +190,13 @@ def call_pattern(message_format: str) -> Optional[re.Pattern]:
     lead = r"\s+".join(re.escape(w) for w in message_format[:slots[0].start()].split())
     parts = [rf"(?:{lead}\s*)?" if lead else ""]
     for i, slot in enumerate(slots):
-        last = i == len(slots) - 1
-        parts.append(rf"(?P<v{slot.group(1)}>.+)" if last else rf"(?P<v{slot.group(1)}>.+?)")
-        if not last:
+        parts.append(rf"(?P<v{slot.group(1)}>.+?)")
+        if i < len(slots) - 1:
             words = message_format[slot.end():slots[i + 1].start()].split()
             parts.append(r"\s+" + r"\s+".join(re.escape(w) for w in words) + r"\s+" if words else r"\s+")
+    footer = message_format[slots[-1].end():].split()
+    if footer:
+        parts.append(r"(?:\s+" + r"\s+".join(re.escape(w) for w in footer) + ")?")
     return re.compile(r"^\s*" + "".join(parts) + r"\s*$", re.I | re.S)
 
 
@@ -197,9 +207,9 @@ def call_example(message_format: str) -> str:
     return " ".join(DLT_VAR.sub(lambda m: next(samples), body).split())
 
 
-def compose_sms(cfg: dict, service_name: str, call_text: str) -> tuple:
+def compose_sms(cfg: dict, segment: str, call_text: str) -> tuple:
     """The SMS text for a call, and an error when the call does not fit the approved template."""
-    fmt = cfg["message_format"].replace("\\n", "\n").replace("{service}", service_name)
+    fmt = cfg["message_format"].replace("\\n", "\n").replace("{segment}", segment).replace("{service}", segment)
     pattern = call_pattern(fmt)
     if not pattern:
         return fmt.replace("{call}", call_text.strip()), None
@@ -253,13 +263,13 @@ def config_problems(cfg: dict) -> List[str]:
     return [f"{name} is not set in backend/.env" for name in missing]
 
 
-def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: bool = False) -> dict:
-    """Send one trade call to every active client on the service and log the result.
+def broadcast(segment: str, call_text: str, posted_by: dict, test_only: bool = False) -> dict:
+    """Send one trade call to every active client with the segment ticked, and log the result.
     test_only sends it to the SMS_TEST_RECIPIENT numbers alone, whatever the mode."""
     cfg = settings()
     record = {
         "id": "bc-" + uuid.uuid4().hex[:12],
-        "service": service_name,
+        "segment": segment,
         "call": call_text,
         "postedBy": posted_by,
         "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -273,12 +283,12 @@ def broadcast(service_name: str, call_text: str, posted_by: dict, test_only: boo
                         f"(it would be charged and never arrive). Post the call again after {end}:00.")
     if test_only and not cfg["test_recipients"]:
         problems.append("SMS_TEST_RECIPIENT is not set in backend/.env.")
-    message, template_error = compose_sms(cfg, service_name, call_text)
+    message, template_error = compose_sms(cfg, segment, call_text)
     if template_error:
         problems.append(template_error)
     elif len(message) > cfg["max_chars"]:
         problems.append(f"Message is {len(message)} characters; the limit is {cfg['max_chars']}.")
-    clients = active_recipients(service_name)
+    clients = active_recipients(segment)
     record.update({"message": message, "activeClients": len(clients)})
 
     if problems:
@@ -341,7 +351,7 @@ def _summary(record: dict) -> str:
     return head
 
 
-def handle_update(service_name: str, token: str, update: dict) -> None:
+def handle_update(segment: str, token: str, update: dict) -> None:
     msg = update.get("message")
     if not msg or (msg.get("chat") or {}).get("type") != "private":
         return
@@ -359,7 +369,7 @@ def handle_update(service_name: str, token: str, update: dict) -> None:
             return
         with store.update_value(SENDERS, {}) as senders:
             senders[0][user_id] = {"phone": phone, "name": sender.get("first_name", ""), "authorizedAt": datetime.now(timezone.utc).isoformat()}
-        _reply(token, chat_id, f"Verified. Messages you post here go out as SMS to active {service_name} clients.",
+        _reply(token, chat_id, f"Verified. Messages you post here go out as SMS to active clients with {segment} ticked.",
                reply_markup={"remove_keyboard": True})
         return
 
@@ -377,22 +387,24 @@ def handle_update(service_name: str, token: str, update: dict) -> None:
     if text.startswith("/"):
         command = text.split()[0].split("@")[0].lower()
         if command == "/status":
-            _reply(token, chat_id, f"{service_name}: {len(active_recipients(service_name))} active client(s) will receive the next call.")
+            _reply(token, chat_id, f"{segment}: {len(active_recipients(segment))} active client(s) will receive the next call.")
         else:
-            _reply(token, chat_id, f"Post a trade call here and it is sent as SMS to every active {service_name} client.\n/status shows how many will receive it.")
+            example = call_example(cfg["message_format"].replace("\\n", "\n"))
+            _reply(token, chat_id, f"Post a trade call here and it is sent as SMS to every active client with {segment} ticked "
+                                   f"in the CRM.\nFormat: {example}\n/status shows how many will receive it.")
         return
     if time.time() - msg.get("date", 0) > MAX_CALL_AGE_SECONDS:
         _reply(token, chat_id, "This call reached the server more than 5 minutes late and was NOT sent. Post it again if it is still valid.")
         return
 
-    _reply(token, chat_id, f"Sending to {service_name} clients...")
-    record = broadcast(service_name, text, {"telegramUserId": user_id, "name": sender.get("first_name", ""),
+    _reply(token, chat_id, f"Sending to {segment} clients...")
+    record = broadcast(segment, text, {"telegramUserId": user_id, "name": sender.get("first_name", ""),
                                              "phone": mask_phone(senders[user_id]["phone"])})
     _reply(token, chat_id, _summary(record))
 
 
-def _poll(service_name: str, token: str) -> None:
-    state = _pollers[service_name]
+def _poll(segment: str, token: str) -> None:
+    state = _pollers[segment]
     while not _stop.is_set():
         try:
             state["username"] = _telegram(token, "getMe")["username"]
@@ -404,7 +416,7 @@ def _poll(service_name: str, token: str) -> None:
 
     while not _stop.is_set():
         try:
-            offset = store.get_value(OFFSETS, {}).get(service_name)
+            offset = store.get_value(OFFSETS, {}).get(segment)
             # Long poll: Telegram holds the request up to 25 s until a message arrives
             res = httpx.post(f"{TELEGRAM_API}/bot{token}/getUpdates",
                              json={"offset": offset, "timeout": 25, "allowed_updates": ["message"]}, timeout=40)
@@ -415,9 +427,9 @@ def _poll(service_name: str, token: str) -> None:
             for update in updates["result"]:
                 # Advance the offset first so a crash in one message can never re-send it
                 with store.update_value(OFFSETS, {}) as offsets:
-                    offsets[0][service_name] = update["update_id"] + 1
+                    offsets[0][segment] = update["update_id"] + 1
                 try:
-                    handle_update(service_name, token, update)
+                    handle_update(segment, token, update)
                 except Exception as err:
                     state["error"] = f"Last message failed: {err}"
         except Exception as err:
@@ -445,12 +457,12 @@ def claim_poller_role() -> bool:
 
 
 def start_pollers() -> None:
-    for service_name, token in settings()["bots"].items():
-        if service_name in _pollers:
+    for segment, token in settings()["bots"].items():
+        if segment in _pollers:
             continue
-        _pollers[service_name] = {"username": None, "error": None}
-        thread = threading.Thread(target=_poll, args=(service_name, token), name=f"telegram-{service_name}", daemon=True)
-        _pollers[service_name]["thread"] = thread
+        _pollers[segment] = {"username": None, "error": None}
+        thread = threading.Thread(target=_poll, args=(segment, token), name=f"telegram-{segment}", daemon=True)
+        _pollers[segment]["thread"] = thread
         thread.start()
 
 
@@ -479,13 +491,13 @@ def sync_paid_clients(req: PaidClientSync, current_user: dict = Depends(require_
     for client in req.clients:
         if not isinstance(client.get("id"), str) or not client["id"]:
             raise HTTPException(status_code=400, detail="Every paid client needs an id.")
-        incoming[client["id"]] = {k: client.get(k) for k in PAID_FIELDS}
+        incoming[client["id"]] = {k: client.get(k) for k in PAID_FIELDS if k != "segments" or k in client}
     with store.transaction():
         for deleted_id in store.get_value(DELETED_PAID, []):
             incoming.pop(deleted_id, None)
         for paid_id, client in incoming.items():
             existing = store.get(PAID_CLIENTS, paid_id)
-            if existing is None or any(existing.get(k) != client.get(k) for k in PAID_FIELDS):
+            if existing is None or any(existing.get(k) != v for k, v in client.items()):
                 store.put(PAID_CLIENTS, paid_id, {**(existing or {}), **client})
         return {"count": store.count(PAID_CLIENTS)}
 
@@ -508,15 +520,15 @@ def delete_paid_client(paid_id: str, current_user: dict = Depends(require_roles(
 @router.get("/api/broadcasts")
 def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
     cfg = settings()
-    services = []
-    for service_name in cfg["bots"]:
-        state = _pollers.get(service_name, {})
-        services.append({
-            "service": service_name,
+    segments = []
+    for segment in cfg["bots"]:
+        state = _pollers.get(segment, {})
+        segments.append({
+            "segment": segment,
             "botUsername": state.get("username"),
             "running": bool(state.get("username")) and not _stop.is_set(),
             "error": state.get("error"),
-            "activeClients": len(active_recipients(service_name)),
+            "activeClients": len(active_recipients(segment)),
         })
     senders = store.get_value(SENDERS, {})
     return {
@@ -531,7 +543,7 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "blockedHours": f"{cfg['blocked_hours'][0]}:00-{cfg['blocked_hours'][1]}:00 IST" if cfg["blocked_hours"] else None,
             "allowedPhones": [mask_phone(p) for p in sorted(cfg["allowed_phones"])],
         },
-        "services": services,
+        "segments": segments,
         "senders": [{"telegramUserId": uid, "name": s.get("name"), "phone": mask_phone(s.get("phone")),
                      "authorizedAt": s.get("authorizedAt"), "stillAllowed": s.get("phone") in cfg["allowed_phones"]}
                     for uid, s in senders.items()],
@@ -540,13 +552,13 @@ def get_broadcasts(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
 
 
 class TestCall(BaseModel):
-    service: str
+    segment: str
     call: str
 
 
 @router.post("/api/broadcasts/test")
 def send_test_call(req: TestCall, current_user: dict = Depends(require_roles(["Super Admin"]))):
     """Send a call from the CRM to the test numbers only, to check the SMS wording before going live."""
-    if not req.call.strip() or not req.service.strip():
-        raise HTTPException(status_code=400, detail="Enter a service and the call text.")
-    return broadcast(req.service.strip(), req.call, {"name": f"{current_user['name']} (CRM test)", "phone": ""}, test_only=True)
+    if not req.call.strip() or not req.segment.strip():
+        raise HTTPException(status_code=400, detail="Enter a segment and the call text.")
+    return broadcast(req.segment.strip(), req.call, {"name": f"{current_user['name']} (CRM test)", "phone": ""}, test_only=True)

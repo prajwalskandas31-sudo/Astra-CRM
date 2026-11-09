@@ -20,15 +20,15 @@ const Tone = ({ tone, children }) => (
 const formatTime = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 
 /**
- * Trade Call Broadcasts: calls posted to each service's Telegram bot go out as SMS to that
- * service's active Paid clients. The sending happens on the server; this panel shows its state.
+ * Trade Call Broadcasts: calls posted to each segment's Telegram bot go out as SMS to the active
+ * Paid clients with that segment ticked above. The sending happens on the server; this panel shows its state.
  */
 export const TradeCallBroadcasts = () => {
-  const { authToken, services: crmServices = [], currentUser, simulatedRole } = useCRM();
+  const { authToken, currentUser, simulatedRole } = useCRM();
   const { showToast } = useToast();
   const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
   const [data, setData] = useState(null);
-  const [testService, setTestService] = useState('');
+  const [testSegment, setTestSegment] = useState('');
   const [testCall, setTestCall] = useState('');
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
@@ -64,7 +64,7 @@ export const TradeCallBroadcasts = () => {
       const res = await fetch(`${API_BASE_URL}/broadcasts/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ service: testService, call: testCall })
+        body: JSON.stringify({ segment: testSegment, call: testCall })
       });
       if (!res.ok) throw new Error(await readErrorDetail(res, `Server returned ${res.status}`));
       const record = await res.json();
@@ -80,7 +80,7 @@ export const TradeCallBroadcasts = () => {
   };
 
   const config = data?.config;
-  const services = data?.services || [];
+  const segments = data?.segments || [];
   const broadcasts = data?.broadcasts || [];
 
   return (
@@ -91,7 +91,7 @@ export const TradeCallBroadcasts = () => {
             <Send size={18} color="var(--accent)" /> Trade Call Broadcasts
           </h3>
           <p>
-            A call posted to a service's Telegram bot goes out as SMS to every active Paid client on that service.
+            A call posted to a segment's Telegram bot goes out as SMS to every client with that segment ticked above.
             Expired clients are skipped.
           </p>
         </div>
@@ -116,9 +116,9 @@ export const TradeCallBroadcasts = () => {
 
         {isSuperAdmin && (
           <form onSubmit={sendTest} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'flex-start' }}>
-            <select value={testService} onChange={e => setTestService(e.target.value)} required aria-label="Service for the test SMS" style={{ fontSize: '0.82rem', padding: '6px 10px', height: '36px' }}>
-              <option value="">Service…</option>
-              {crmServices.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+            <select value={testSegment} onChange={e => setTestSegment(e.target.value)} required aria-label="Segment for the test SMS" style={{ fontSize: '0.82rem', padding: '6px 10px', height: '36px' }}>
+              <option value="">Segment…</option>
+              {segments.map(s => <option key={s.segment} value={s.segment}>{s.segment}</option>)}
             </select>
             <textarea
               value={testCall}
@@ -138,15 +138,15 @@ export const TradeCallBroadcasts = () => {
         <div className="table-responsive">
           <table className="crm-table">
             <thead>
-              <tr><th>Service</th><th>Telegram bot</th><th>Bot status</th><th>Active clients</th></tr>
+              <tr><th>Segment</th><th>Telegram bot</th><th>Bot status</th><th>Clients ticked (active)</th></tr>
             </thead>
             <tbody>
-              {services.length === 0 && (
+              {segments.length === 0 && (
                 <tr><td colSpan={4} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No Telegram bots configured yet (TELEGRAM_BOTS in backend/.env).</td></tr>
               )}
-              {services.map(s => (
-                <tr key={s.service}>
-                  <td style={{ fontWeight: 600 }}>{s.service}</td>
+              {segments.map(s => (
+                <tr key={s.segment}>
+                  <td style={{ fontWeight: 600 }}>{s.segment}</td>
                   <td>{s.botUsername ? <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Bot size={14} /> @{s.botUsername}</span> : '—'}</td>
                   <td>{s.running && !s.error ? <Tone tone="success">Listening</Tone> : <Tone tone="danger">{s.error || 'Starting…'}</Tone>}</td>
                   <td>{s.activeClients}</td>
@@ -170,7 +170,7 @@ export const TradeCallBroadcasts = () => {
         <div className="table-responsive">
           <table className="crm-table">
             <thead>
-              <tr><th aria-label="Details" /><th>Time</th><th>Service</th><th>Call</th><th>Result</th><th>Delivered to gateway</th></tr>
+              <tr><th aria-label="Details" /><th>Time</th><th>Segment</th><th>Call</th><th>Result</th><th>Delivered to gateway</th></tr>
             </thead>
             <tbody>
               {broadcasts.length === 0 && (
@@ -181,7 +181,7 @@ export const TradeCallBroadcasts = () => {
                   <tr style={{ cursor: 'pointer' }} onClick={() => setOpenId(openId === b.id ? null : b.id)}>
                     <td>{openId === b.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
                     <td style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}>{formatTime(b.createdAt)}</td>
-                    <td style={{ fontSize: '0.82rem' }}>{b.service}</td>
+                    <td style={{ fontSize: '0.82rem' }}>{b.segment || b.service}</td>
                     <td style={{ fontSize: '0.82rem', maxWidth: '360px', whiteSpace: 'pre-wrap' }}>{b.call}</td>
                     <td>
                       <Tone tone={STATUS_TONE[b.status] || 'warning'}>{b.status}</Tone>
