@@ -233,11 +233,12 @@ def test_crm_test_send_is_super_admin_only_and_reaches_only_test_numbers(crm, bc
 
 DLT_FORMAT = ("FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} Unite Technologies Financial Service "
               "(SEBI Reg: INH000020350) - https://investeq.in/")
-# The approved InvestEQ template (DLT 1777179206957321210), written in .env with \n for line breaks
-INVESTEQ_ENV = ("InvestEQ FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}}\\n\\nUnite Technologies Financial Service "
-                "(SEBI Reg: INH000020350) -\\nhttps://investeq.in/")
-INVESTEQ_SMS = ("InvestEQ FNO ALERT: NIFTY 24500 CE Buy 120 SL 100 Tgt 150\n\nUnite Technologies Financial Service "
-                "(SEBI Reg: INH000020350) -\nhttps://investeq.in/")
+# The template as registered on DLT (1777179206957321210, read from the wappie dashboard), written in
+# .env with \n for line breaks. Operators reject anything else, e.g. an "InvestEQ" prefix or other breaks.
+INVESTEQ_ENV = ("FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}}\\n\\nUnite Technologies Financial Service "
+                "(SEBI Reg: INH000020350) - https://investeq.in/")
+INVESTEQ_SMS = ("FNO ALERT: NIFTY 24500 CE Buy 120 SL 100 Tgt 150\n\nUnite Technologies Financial Service "
+                "(SEBI Reg: INH000020350) - https://investeq.in/")
 
 
 def test_calls_fill_the_dlt_template_slots(bc):
@@ -282,6 +283,9 @@ def test_investeq_template_accepts_the_values_or_the_full_text(bc):
     authorize(bc)
     message(bc, text="NIFTY 24500 CE Buy 120 SL 100 Tgt 150")
     assert bc.sms[-1]["message"] == INVESTEQ_SMS
+    message(bc, text="FNO ALERT: NIFTY 24500 CE Buy 120 SL 100 Tgt 150")
+    assert bc.sms[-1]["message"] == INVESTEQ_SMS
+    # The handover told senders to start with "InvestEQ FNO ALERT:"; the SMS still uses the registered text
     message(bc, text="InvestEQ FNO ALERT: NIFTY 24500 CE Buy 120 SL 100 Tgt 150")
     assert bc.sms[-1]["message"] == INVESTEQ_SMS
     # The whole approved text pasted in, footer and all, sends the same SMS (footer not doubled)
@@ -289,10 +293,10 @@ def test_investeq_template_accepts_the_values_or_the_full_text(bc):
     assert bc.sms[-1]["message"] == INVESTEQ_SMS
     message(bc, text=INVESTEQ_SMS.replace("\n", " "))
     assert bc.sms[-1]["message"] == INVESTEQ_SMS
-    assert len(bc.sms) == 4
+    assert len(bc.sms) == 5
 
     reply = message(bc, text="Buy NIFTY now")
-    assert "NOT SENT" in reply and len(bc.sms) == 4
+    assert "NOT SENT" in reply and len(bc.sms) == 5
 
 
 def test_help_shows_the_segment_and_format(bc):

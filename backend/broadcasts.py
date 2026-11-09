@@ -184,13 +184,15 @@ def call_pattern(message_format: str) -> Optional[re.Pattern]:
     The call is the format's text up to the last slot, e.g. "NIFTY 24500 CE Buy 120 SL 100 Tgt 150"
     for "FNO ALERT: {{1}} Buy {{2}} SL {{3}} Tgt {{4}} <footer>". The words before the first slot and
     the footer after the last are optional (so the full template text works too), words are
-    case-insensitive, and spaces and line breaks are interchangeable.
+    case-insensitive, and spaces and line breaks are interchangeable. One extra word before the
+    opening words is dropped too: senders were told to type "InvestEQ FNO ALERT: ...", but the
+    registered DLT text starts at "FNO ALERT:" and any other wording is rejected by the operator.
     """
     slots = list(DLT_VAR.finditer(message_format))
     if not slots:
         return None
     lead = r"\s+".join(re.escape(w) for w in message_format[:slots[0].start()].split())
-    parts = [rf"(?:{lead}\s*)?" if lead else ""]
+    parts = [rf"(?:(?:\w+\s+)?{lead}\s*)?" if lead else ""]
     for i, slot in enumerate(slots):
         parts.append(rf"(?P<v{slot.group(1)}>.+?)")
         if i < len(slots) - 1:
