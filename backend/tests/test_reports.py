@@ -115,6 +115,12 @@ CALL = {"symbol": "NIFTY", "underlying": "NIFTY", "instrument": "option", "side"
         "optionType": "CE", "entry": "120", "stopLoss": "100", "targets": ["150", "180"]}
 
 
+def test_option_risk_names_buyer_or_seller_as_posted(reports):
+    fields = {"BUYER": "seller", "CE/PE": "PE"}
+    assert "As a seller of a PE option" in reports._fill(reports.OPTION_RISKS, fields)
+    assert "As a buyer of a CE option" in reports._fill(reports.OPTION_RISKS, {"BUYER": "buyer", "CE/PE": "CE"})
+
+
 def test_pdf_is_three_pages(reports):
     pdf = reports.build_pdf(PROFILE, CALL, candles(), "Nifty 50", "17 Nov 2026", PAGE2, "11 Nov 2026")
     assert pdf.startswith(b"%PDF") and len(pdf) > 3000

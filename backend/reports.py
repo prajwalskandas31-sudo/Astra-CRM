@@ -486,7 +486,7 @@ def fetch_candles(chart_key: str, token: Optional[str], at: Optional[datetime] =
 # PDF
 # ==========================================
 OPTION_RISKS = (
-    "<b>Time Decay (Theta):</b> As a buyer of a [CE/PE] option, the value of your position will erode over time, especially as "
+    "<b>Time Decay (Theta):</b> As a [BUYER] of a [CE/PE] option, the value of your position will erode over time, especially as "
     "the expiry date [EXPIRY] approaches. The trade is unprofitable if [SYMBOL] does not move favorably before expiry. "
     "<b>Volatility Risk:</b> A sudden decrease in Implied Volatility (IV crush) can lead to a drop in the option's premium, even "
     "if the underlying price remains stable or moves slightly in your favor. <b>Market Risk:</b> Unexpected adverse market news "
@@ -663,7 +663,9 @@ def build_pdf(profile: dict, call: dict, chart: dict, chart_label: str, expiry: 
     doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=26 * mm,
                             bottomMargin=20 * mm, title=f"Recommendation Report: {call['symbol']}", author=company)
     fields = {"COMPANY NAME": company, "SEBI NO.": sebi, "SYMBOL": call["symbol"], "WEBSITE": profile.get("website"),
-              "CE/PE": call.get("optionType") or "", "EXPIRY": expiry or "", "STOP-LOSS": call["stopLoss"]}
+              "CE/PE": call.get("optionType") or "", "EXPIRY": expiry or "", "STOP-LOSS": call["stopLoss"],
+              # Buyer or seller, as the call was posted in Telegram
+              "BUYER": "seller" if call["side"].strip().lower() == "sell" else "buyer"}
 
     summary = " ".join(x for x in (call["side"], call["symbol"], call.get("strike") or "", call.get("optionType") or "") if x)
     story = [
