@@ -165,7 +165,9 @@ export const DEFAULT_COMPANY_PROFILE = {
   sebiRegistrationNumber: '',
   contact: '',
   email: '',
-  website: ''
+  website: '',
+  registeredAddress: '',
+  investorCharterUrl: ''
 };
 
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
@@ -609,6 +611,13 @@ export const CRM_FEATURES = [
     category: 'Administration & Governance',
     description: 'Access top-level analytics, corporate lead allocation, and fulfillment of rep inbound lead requests.',
     defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'research-reports',
+    name: 'Research Reports',
+    category: 'Sales & Approvals',
+    description: 'The 3-page research report created for every trade call posted in the Telegram bots, the daily Upstox login, and Retry for held reports.',
+    defaultForRoles: ['Super Admin', 'Admin']
   },
   {
     id: 'company-profile',

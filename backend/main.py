@@ -14,6 +14,7 @@ try:
     from backend.leegality import router as leegality_router
     from backend.signatures import router as signatures_router
     from backend import broadcasts
+    from backend import reports
     from backend import sync
     from backend.db_init import init_database
 except ImportError:
@@ -24,6 +25,7 @@ except ImportError:
     from leegality import router as leegality_router
     from signatures import router as signatures_router
     import broadcasts
+    import reports
     import sync
     from db_init import init_database
 
@@ -46,6 +48,7 @@ app.add_middleware(
 app.include_router(leegality_router)
 app.include_router(signatures_router)
 app.include_router(broadcasts.router)
+app.include_router(reports.router)
 app.include_router(sync.router)
 
 
@@ -55,6 +58,8 @@ def start_broadcast_pollers():
     # With several workers only one may poll Telegram, or every call would be sent once per worker
     if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
+        # Research reports are built one at a time in this same worker
+        reports.start_worker()
 
 
 @app.on_event("shutdown")

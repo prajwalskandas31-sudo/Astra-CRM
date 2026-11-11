@@ -41,3 +41,7 @@ backups/
 secrets/
 CRM_ACCOUNT_CREDENTIALS.txt
 .env
+
+# Client handover documents that contain live API keys and bot tokens
+Developer Spec Telegram Call to Auto-Generated Research Report.docx
+Telegram_Bots_Developer_Handover.pdf

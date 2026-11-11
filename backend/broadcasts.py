@@ -402,9 +402,15 @@ def handle_update(segment: str, token: str, update: dict) -> None:
         return
 
     _reply(token, chat_id, f"Sending to {segment} clients...")
-    record = broadcast(segment, text, {"telegramUserId": user_id, "name": sender.get("first_name", ""),
-                                             "phone": mask_phone(senders[user_id]["phone"])})
-    _reply(token, chat_id, _summary(record))
+    posted_by = {"telegramUserId": user_id, "name": sender.get("first_name", ""), "phone": mask_phone(senders[user_id]["phone"])}
+    record = broadcast(segment, text, posted_by)
+    # Every call also gets a research report, whatever happened to the SMS; built in the background
+    try:
+        from backend import reports
+    except ImportError:
+        import reports
+    reports.submit(segment, text, posted_by, chat_id=chat_id)
+    _reply(token, chat_id, _summary(record) + "\nPreparing the research report...")
 
 
 def _publish_status(segment: str) -> None:
