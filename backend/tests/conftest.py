@@ -42,9 +42,10 @@ def crm(tmp_path_factory):
     import backend.signatures as signatures
     import backend.leegality as leegality
     import backend.broadcasts as broadcasts
+    import backend.reports as reports
     import backend.sync as sync
     import backend.db_init as db_init
-    for module in (store, auth, signatures, leegality, broadcasts, sync, db_init):
+    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
     # Never import the real backend/data files into the test database
@@ -69,7 +70,7 @@ def crm(tmp_path_factory):
         assert res.status_code == 200, res.text
         return res.json()["access_token"]
 
-    return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts,
+    return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts, reports=reports,
                            store=store, login=login, token=token)
 
 

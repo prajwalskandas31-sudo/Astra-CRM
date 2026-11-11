@@ -8,7 +8,9 @@ const FIELDS = [
   { key: 'sebiRegistrationNumber', label: 'SEBI Registration Number', type: 'text', placeholder: 'e.g. INH000000000' },
   { key: 'contact', label: 'Contact', type: 'tel', placeholder: 'e.g. +91 98765 43210', autoComplete: 'tel' },
   { key: 'email', label: 'Email', type: 'email', placeholder: 'e.g. support@company.com', autoComplete: 'email' },
-  { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. www.company.com', autoComplete: 'url' }
+  { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. www.company.com', autoComplete: 'url' },
+  { key: 'registeredAddress', label: 'Registered Address', type: 'textarea', placeholder: 'e.g. 4th Floor, 12 MG Road, Bengaluru 560001', autoComplete: 'street-address' },
+  { key: 'investorCharterUrl', label: 'Investor Charter Link', type: 'url', placeholder: 'e.g. https://www.company.com/investor-charter' }
 ];
 
 const pick = (profile) => Object.fromEntries(FIELDS.map(f => [f.key, profile?.[f.key] ?? DEFAULT_COMPANY_PROFILE[f.key]]));
@@ -51,7 +53,7 @@ export const CompanyProfileBlock = () => {
           </h3>
           <p>
             {canEdit
-              ? 'The company details used across the CRM. Changes are shared with every user.'
+              ? 'The company details used across the CRM and printed on every research report. Changes are shared with every user.'
               : 'The company details used across the CRM. Only a Super Admin can change them.'}
           </p>
         </div>
@@ -60,21 +62,33 @@ export const CompanyProfileBlock = () => {
       <form onSubmit={handleSubmit} style={{ padding: '20px' }}>
         <div className="form-grid">
           {FIELDS.map(f => (
-            <div className="form-group" key={f.key}>
+            <div className="form-group" key={f.key} style={f.type === 'textarea' ? { gridColumn: '1 / -1' } : undefined}>
               <label htmlFor={`company-${f.key}`}>
                 {f.label}{f.key === 'companyName' && canEdit ? ' *' : ''}
               </label>
-              <input
-                id={`company-${f.key}`}
-                type={f.type}
-                value={draft[f.key]}
-                onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                placeholder={canEdit ? f.placeholder : '—'}
-                autoComplete={f.autoComplete}
-                readOnly={!canEdit}
-                required={f.key === 'companyName'}
-                style={f.key === 'sebiRegistrationNumber' ? { textTransform: 'uppercase', fontFamily: 'monospace' } : undefined}
-              />
+              {f.type === 'textarea' ? (
+                <textarea
+                  id={`company-${f.key}`}
+                  rows={2}
+                  value={draft[f.key]}
+                  onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                  placeholder={canEdit ? f.placeholder : '—'}
+                  autoComplete={f.autoComplete}
+                  readOnly={!canEdit}
+                />
+              ) : (
+                <input
+                  id={`company-${f.key}`}
+                  type={f.type}
+                  value={draft[f.key]}
+                  onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                  placeholder={canEdit ? f.placeholder : '—'}
+                  autoComplete={f.autoComplete}
+                  readOnly={!canEdit}
+                  required={f.key === 'companyName'}
+                  style={f.key === 'sebiRegistrationNumber' ? { textTransform: 'uppercase', fontFamily: 'monospace' } : undefined}
+                />
+              )}
             </div>
           ))}
         </div>

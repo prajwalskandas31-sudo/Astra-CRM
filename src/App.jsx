@@ -53,6 +53,7 @@ import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
+import { ResearchReportsBlock } from './components/ResearchReportsBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { isRealLeegalityDispatch } from './services/leegalityService';
@@ -85,6 +86,7 @@ const AppContent = () => {
       'esign-block',
       'paid-block',
       'telegram-control',
+      'research-reports',
       'lead-reassignment',
       'company-profile',
       'system-settings',
@@ -115,6 +117,7 @@ const AppContent = () => {
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
+    'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
     'company-profile': 'Company Profile - Company Name, SEBI Registration & Contact Details',
     'system-settings': 'System Settings & UI Customization',
     'custom-roles': 'Custom Roles Builder (Annexure-I)',
@@ -159,6 +162,8 @@ const AppContent = () => {
         return <TelegramControlBlock />;
       case 'lead-reassignment':
         return <LeadReassignmentView />;
+      case 'research-reports':
+        return <ResearchReportsBlock />;
       case 'company-profile':
         return <CompanyProfileBlock />;
       case 'system-settings':

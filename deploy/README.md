@@ -84,6 +84,40 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## Research Reports (Telegram call → 3-page PDF)
+
+Every call posted in any of the Telegram bots (above) also becomes a 3-page research report, built in
+the background by the same backend worker that runs the bots (`backend/reports.py`):
+
+1. Claude reads the post (symbol, Buy/Sell, strike, CE/PE, entry, stop-loss, targets). Anything missing
+   or unclear holds the report; nothing is guessed, and every number must appear in the post itself.
+2. The CRM works out risk, gains and risk-reward, finds the nearest expiry in Upstox's instrument list,
+   and fetches the 1-minute candles of the underlying (NIFTY 50 for NIFTY, the stock for a stock, the
+   current-month MCX future for a commodity; the last trading day when today has no data yet).
+3. Claude fills the next of the 15 templates (`backend/report_templates.json`, used in turn across all
+   bots; a test report from the CRM does not advance the rotation). The CRM rejects the text if it has a
+   blank, a number that is not in the call or template, a banned word, or a changed call, and asks once more.
+4. The PDF (cover + chart, technical rationale, fixed disclosures) is stored in the database and
+   downloaded from **Research Reports** under the date as its name, e.g. `11 Nov 2026.pdf`.
+
+The sender gets a Telegram reply when the report is ready or held (with the reason); a held report can
+be retried from the CRM once the cause is fixed. Company details come from the **Company Profile**
+block; the report is held until Company Name, SEBI Registration Number, Registered Address, Contact,
+Email and Website are filled in.
+
+Set in `backend/.env` on the server:
+
+| Key | Value |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude API key from the client's Anthropic account (the one holding the report credit) |
+| `REPORT_CLAUDE_MODEL` | Optional; defaults to `claude-opus-5-5` |
+| `UPSTOX_API_KEY` / `UPSTOX_API_SECRET` | From the Upstox developer app "CRM Report Generator" |
+| `UPSTOX_REDIRECT_URI` | `http://<server>:<CRM_PORT>/api/upstox/callback`, e.g. `http://200.234.32.65:8080/api/upstox/callback`. Must be entered exactly the same as the Redirect URL of the Upstox app |
+
+**Daily Upstox login:** Upstox ends every login at 3:30 AM IST. Each morning an Admin opens Research
+Reports and presses **Log in to Upstox**; the block shows whether today's login is valid. Without it the
+CRM still tries Upstox's public market data, and holds the report if Upstox refuses.
+
 ## e-KYC & E-Sign (Leegality)
 
 "Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with
