@@ -84,10 +84,15 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
-## Research Reports (Telegram call → 3-page PDF)
+## Research Reports (Telegram calls → 3-page PDFs, on demand)
 
-Every call posted in any of the Telegram bots (above) also becomes a 3-page research report, built in
-the background by the same backend worker that runs the bots (`backend/reports.py`):
+Calls posted in the Telegram bots (above) are logged as they come in. Reports are not made live: in
+**Research Reports** the team presses **Generate today's reports**, and the CRM builds a report for
+every call posted today (IST) in any of the 4 bots, one at a time in the order the calls were posted
+(`backend/reports.py`). When all are done, the browser downloads `<dd-mm-yyyy>_report.zip`, which
+holds the folder `<dd-mm-yyyy>_report` with `<dd-mm-yyyy> (n) <call>.pdf`, e.g.
+`12-11-2026 (1) NIFTY 25200 CE.pdf`. Pressing again later only builds the new calls (and retries held
+ones); nothing is paid for twice. Test SMS sent from the CRM are not calls and get no report. For each call:
 
 1. Claude reads the post (symbol, Buy/Sell, strike, CE/PE, entry, stop-loss, targets). Anything missing
    or unclear holds the report; nothing is guessed, and every number must appear in the post itself.
@@ -97,11 +102,9 @@ the background by the same backend worker that runs the bots (`backend/reports.p
 3. Claude fills the next of the 15 templates (`backend/report_templates.json`, used in turn across all
    bots; a test report from the CRM does not advance the rotation). The CRM rejects the text if it has a
    blank, a number that is not in the call or template, a banned word, or a changed call, and asks once more.
-4. The PDF (cover + chart, technical rationale, fixed disclosures) is stored in the database and
-   downloaded from **Research Reports** under the date as its name, e.g. `11 Nov 2026.pdf`.
+4. The PDF (cover + chart, technical rationale, fixed disclosures) is stored in the database.
 
-The sender gets a Telegram reply when the report is ready or held (with the reason); a held report can
-be retried from the CRM once the cause is fixed. Company details come from the **Company Profile**
+A held report shows its reason in Research Reports and can be retried once the cause is fixed. Company details come from the **Company Profile**
 block; the report is held until Company Name, SEBI Registration Number, Registered Address, Contact,
 Email and Website are filled in.
 

@@ -403,14 +403,9 @@ def handle_update(segment: str, token: str, update: dict) -> None:
 
     _reply(token, chat_id, f"Sending to {segment} clients...")
     posted_by = {"telegramUserId": user_id, "name": sender.get("first_name", ""), "phone": mask_phone(senders[user_id]["phone"])}
+    # Logged in every case: Research Reports builds the day's reports from this log when the team asks
     record = broadcast(segment, text, posted_by)
-    # Every call also gets a research report, whatever happened to the SMS; built in the background
-    try:
-        from backend import reports
-    except ImportError:
-        import reports
-    reports.submit(segment, text, posted_by, chat_id=chat_id)
-    _reply(token, chat_id, _summary(record) + "\nPreparing the research report...")
+    _reply(token, chat_id, _summary(record))
 
 
 def _publish_status(segment: str) -> None:

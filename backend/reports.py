@@ -14,13 +14,13 @@ import gzip
 import json
 import logging
 import os
-import queue
 import re
 import secrets
 import threading
 import time
 import urllib.parse
 import uuid
+import zipfile
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import List, Literal, Optional
@@ -760,12 +760,33 @@ def generate(record: dict) -> dict:
             "page2": page2, "pdf": pdf, "reportDate": show_date(today), "upstoxConnected": bool(token)}
 
 
+def file_label(details: Optional[dict]) -> str:
+    """NIFTY 25200 CE, GOLD FUT, RELIANCE: the call as it appears in the PDF's name."""
+    details = details or {}
+    parts = [details.get("symbol") or "Report"]
+    if details.get("instrument") == "option":
+        parts += [details.get("strike") or "", details.get("optionType") or ""]
+    elif details.get("instrument") == "future":
+        parts.append("FUT")
+    return re.sub(r'[\\/:*?"<>|]+', "-", " ".join(p for p in parts if p)).strip()
+
+
+def name_date(day) -> str:
+    """12-11-2026: the date in folder and file names."""
+    return f"{day:%d-%m-%Y}"
+
+
+def report_file_name(record: dict) -> str:
+    made = datetime.fromisoformat(record.get("createdReportAt") or record["createdAt"]).astimezone(IST)
+    number = f"({record['callNumber']}) " if record.get("callNumber") else ("test " if record.get("test") else "")
+    return f"{name_date(made)} {number}{file_label(record.get('details'))}.pdf"
+
+
 def run(report_id: str) -> Optional[dict]:
+    """Build one claimed report (status Generating). Ready or Held afterwards, never half-done."""
     record = store.get(REPORTS, report_id)
-    if not record or record.get("status") == STATUS_READY:
+    if not record or record.get("status") != STATUS_WORKING:
         return record
-    record.update({"status": STATUS_WORKING, "startedAt": datetime.now(timezone.utc).isoformat()})
-    store.put(REPORTS, report_id, record)
     try:
         result = generate(record)
     except ReportHeld as held:
@@ -779,81 +800,155 @@ def run(report_id: str) -> Optional[dict]:
             "status": STATUS_READY, "reason": "", "details": result["call"], "math": result["math"],
             "expiry": result["target"]["expiry"], "chartLabel": result["target"]["chartLabel"], "chartDay": result["chartDay"],
             "templateNumber": template["number"], "templateName": template["name"], "page2": result["page2"],
-            "reportDate": result["reportDate"], "fileName": f"{result['reportDate']}.pdf",
-            "upstoxConnected": result["upstoxConnected"], "createdReportAt": datetime.now(timezone.utc).isoformat(),
+            "reportDate": result["reportDate"], "upstoxConnected": result["upstoxConnected"],
+            "createdReportAt": datetime.now(timezone.utc).isoformat(),
         })
+        record["fileName"] = report_file_name(record)
         with store.transaction():
             store.put(REPORT_FILES, report_id, {"id": report_id, "pdf": base64.b64encode(result["pdf"]).decode()})
             store.put(REPORTS, report_id, record)
             if not record.get("test"):
-                # Templates are used one after another across all bots; 15 is followed by 1
+                # Templates are used one after another, in the order the calls were posted; 15 is followed by 1
                 store.set_value(NEXT_TEMPLATE, template["number"] % TEMPLATE_COUNT + 1)
-        _notify(record)
         return record
     store.put(REPORTS, report_id, record)
-    _notify(record)
     return record
 
 
-def _notify(record: dict) -> None:
-    """Tell the sender in the bot the call came from."""
-    chat_id, segment = record.get("chatId"), record.get("segment")
-    token = broadcasts.settings()["bots"].get(segment) if chat_id and segment else None
-    if not token:
-        return
-    if record["status"] == STATUS_READY:
-        text = (f"Research report created: {record['fileName']} (template {record['templateNumber']}). "
-                f"It is in the CRM under Research Reports.")
-        if not record.get("upstoxConnected"):
-            text += ("\nNote: no Upstox Analytics Token is saved (or it has expired), so the chart used Upstox's public "
-                     "data. A Super Admin can save the token in the CRM (Research Reports).")
-    else:
-        text = f"Research report NOT created: {record['reason']}\nOnce fixed, the team can press Retry in the CRM (Research Reports)."
-    broadcasts._reply(token, chat_id, text)
+# ==========================================
+# Generating on demand: one report at a time, in call order, across all backend workers
+# ==========================================
+STALE_SECONDS = 15 * 60  # a report still "Generating" after this was cut off by a restart
 
 
-_queue: "queue.Queue[str]" = queue.Queue()
-_worker = {"thread": None}
+def _order(record: dict) -> str:
+    return record.get("callAt") or record.get("createdAt") or ""
 
 
-def _work() -> None:
-    while not broadcasts._stop.is_set():
-        try:
-            report_id = _queue.get(timeout=5)
-        except queue.Empty:
-            continue
-        try:
+def _fresh(record: dict) -> bool:
+    try:
+        started = datetime.fromisoformat(record.get("startedAt") or "")
+    except ValueError:
+        return False
+    return (datetime.now(timezone.utc) - started).total_seconds() < STALE_SECONDS
+
+
+def claim_next() -> Optional[str]:
+    """Mark the oldest queued report as Generating and return it, or None. Transactions hold the database's
+    write lock, so only one worker builds at a time and the template rotation follows the call order."""
+    with store.transaction():
+        records = store.all(REPORTS)
+        if any(r.get("status") == STATUS_WORKING and _fresh(r) for r in records):
+            return None
+        queued = sorted((r for r in records if r.get("status") == STATUS_QUEUED
+                         or (r.get("status") == STATUS_WORKING and not _fresh(r))), key=_order)
+        if not queued:
+            return None
+        record = queued[0]
+        record.update({"status": STATUS_WORKING, "startedAt": datetime.now(timezone.utc).isoformat()})
+        store.put(REPORTS, record["id"], record)
+        return record["id"]
+
+
+_processor: dict = {"thread": None}
+_processor_lock = threading.Lock()
+
+
+def _process() -> None:
+    try:
+        while True:
+            report_id = claim_next()
+            if not report_id:
+                return
             run(report_id)
-        except Exception:
-            log.exception("Report worker error")
+    except Exception:
+        log.exception("Report processing stopped")
+
+
+def ensure_processing() -> None:
+    """Start building the queued reports in this worker, unless it already is."""
+    with _processor_lock:
+        thread = _processor["thread"]
+        if thread is None or not thread.is_alive():
+            _processor["thread"] = threading.Thread(target=_process, name="research-reports", daemon=True)
+            _processor["thread"].start()
 
 
 def start_worker() -> None:
-    """One report at a time, in the worker that runs the Telegram bots. Reports left unfinished by a
-    restart are picked up again."""
-    if _worker["thread"]:
-        return
-    for record in store.all(REPORTS):
-        if record.get("status") in (STATUS_QUEUED, STATUS_WORKING):
-            _queue.put(record["id"])
-    _worker["thread"] = threading.Thread(target=_work, name="research-reports", daemon=True)
-    _worker["thread"].start()
+    """At startup: finish reports a restart left queued."""
+    ensure_processing()
 
 
-def submit(segment: str, call_text: str, posted_by: dict, chat_id=None, test: bool = False) -> dict:
-    record = {
-        "id": "rr-" + uuid.uuid4().hex[:12],
-        "segment": segment,
-        "call": call_text,
-        "postedBy": posted_by,
-        "chatId": chat_id,
-        "test": test,
-        "status": STATUS_QUEUED,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    }
+def _new_record(segment: str, call_text: str, posted_by: dict, **extra) -> dict:
+    record = {"id": "rr-" + uuid.uuid4().hex[:12], "segment": segment, "call": call_text, "postedBy": posted_by,
+              "test": False, "status": STATUS_QUEUED, "createdAt": datetime.now(timezone.utc).isoformat(), **extra}
     store.put(REPORTS, record["id"], record)
-    _queue.put(record["id"])
     return record
+
+
+def submit(segment: str, call_text: str, posted_by: dict, test: bool = False) -> dict:
+    """Queue one report (used for test reports from the CRM)."""
+    return _new_record(segment, call_text, posted_by, test=test)
+
+
+def ist_day(iso: Optional[str]):
+    try:
+        return datetime.fromisoformat(iso or "").astimezone(IST).date()
+    except ValueError:
+        return None
+
+
+def calls_on(day) -> List[dict]:
+    """The trade calls posted in the Telegram bots on this day (IST), oldest first. Test SMS sent from
+    the CRM are not calls: only Telegram posts carry the sender's Telegram user id."""
+    calls = [b for b in store.all(broadcasts.BROADCASTS)
+             if (b.get("postedBy") or {}).get("telegramUserId") and ist_day(b.get("createdAt")) == day]
+    return sorted(calls, key=lambda b: b.get("createdAt") or "")
+
+
+def queue_day(day) -> dict:
+    """Queue a report for each of the day's calls that does not have one; held reports are tried again."""
+    calls = calls_on(day)
+    with store.transaction():
+        by_call = {r.get("broadcastId"): r for r in store.all(REPORTS) if r.get("broadcastId")}
+        for number, call in enumerate(calls, start=1):
+            record = by_call.get(call["id"])
+            if record is None:
+                _new_record(call.get("segment") or "", call.get("call") or "", call.get("postedBy") or {},
+                            broadcastId=call["id"], callAt=call.get("createdAt"), callNumber=number, day=day.isoformat())
+            elif record.get("status") == STATUS_HELD:
+                record.update({"status": STATUS_QUEUED, "reason": ""})
+                store.put(REPORTS, record["id"], record)
+    return day_summary(day)
+
+
+def day_reports(day) -> List[dict]:
+    return sorted((r for r in store.all(REPORTS) if r.get("day") == day.isoformat() and not r.get("test")),
+                  key=lambda r: r.get("callNumber") or 0)
+
+
+def day_summary(day) -> dict:
+    reports = day_reports(day)
+
+    def count(*statuses):
+        return sum(1 for r in reports if r.get("status") in statuses)
+
+    return {"date": name_date(day), "day": day.isoformat(), "folder": f"{name_date(day)}_report",
+            "calls": len(calls_on(day)), "ready": count(STATUS_READY), "held": count(STATUS_HELD),
+            "pending": count(STATUS_QUEUED, STATUS_WORKING)}
+
+
+def day_zip(day) -> Optional[bytes]:
+    """The day's ready reports in a folder named <date>_report, zipped; None when none is ready."""
+    folder = f"{name_date(day)}_report"
+    out, added = BytesIO(), 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+        for record in day_reports(day):
+            file = store.get(REPORT_FILES, record["id"]) if record.get("status") == STATUS_READY else None
+            if file:
+                archive.writestr(f"{folder}/{record.get('fileName') or report_file_name(record)}", base64.b64decode(file["pdf"]))
+                added += 1
+    return out.getvalue() if added else None
 
 
 # ==========================================
@@ -861,6 +956,11 @@ def submit(segment: str, call_text: str, posted_by: dict, chat_id=None, test: bo
 # ==========================================
 def _public(record: dict) -> dict:
     return {k: v for k, v in record.items() if k not in ("chatId",)}
+
+
+def _attachment(data: bytes, name: str, media_type: str) -> Response:
+    return Response(data, media_type=media_type,
+                    headers={"Content-Disposition": f"attachment; filename=\"{name}\"; filename*=UTF-8''{urllib.parse.quote(name)}"})
 
 
 @router.get("/api/reports")
@@ -883,9 +983,31 @@ def list_reports(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "profileMissing": profile_missing(company_profile()),
             "nextTemplate": store.get_value(NEXT_TEMPLATE, 1),
             "bots": list(broadcasts.settings()["bots"].keys()),
+            "today": day_summary(now_ist().date()),
         },
         "reports": [_public(r) for r in records],
     }
+
+
+@router.post("/api/reports/generate-today")
+def generate_today(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
+    """The button: a report for every call posted today in any of the Telegram bots."""
+    summary = queue_day(now_ist().date())
+    ensure_processing()
+    return summary
+
+
+@router.get("/api/reports/folder")
+def download_folder(day: str = Query("", description="YYYY-MM-DD, default today (IST)"),
+                    current_user: dict = Depends(require_roles(ADMIN_ROLES))):
+    try:
+        when = datetime.strptime(day, "%Y-%m-%d").date() if day else now_ist().date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="day must be YYYY-MM-DD.")
+    data = day_zip(when)
+    if data is None:
+        raise HTTPException(status_code=404, detail="No reports are ready for that day yet.")
+    return _attachment(data, f"{name_date(when)}_report.zip", "application/zip")
 
 
 @router.get("/api/reports/{report_id}/pdf")
@@ -893,24 +1015,20 @@ def download_report(report_id: str, current_user: dict = Depends(require_roles(A
     record, file = store.get(REPORTS, report_id), store.get(REPORT_FILES, report_id)
     if not record or not file:
         raise HTTPException(status_code=404, detail="That report has no PDF.")
-    name = record.get("fileName") or "report.pdf"
-    return Response(base64.b64decode(file["pdf"]), media_type="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename=\"{name}\"; filename*=UTF-8''{urllib.parse.quote(name)}"})
+    return _attachment(base64.b64decode(file["pdf"]), record.get("fileName") or report_file_name(record), "application/pdf")
 
 
 @router.post("/api/reports/{report_id}/retry")
 def retry_report(report_id: str, current_user: dict = Depends(require_roles(ADMIN_ROLES))):
-    record = store.get(REPORTS, report_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Report not found.")
-    if record.get("status") != STATUS_HELD:
-        raise HTTPException(status_code=400, detail="Only a held report can be retried.")
-    record.update({"status": STATUS_QUEUED, "reason": "", "retriedBy": current_user.get("name")})
-    store.put(REPORTS, report_id, record)
-    _queue.put(report_id)
-    if not _worker["thread"]:
-        # This worker does not run the queue (the bots run elsewhere): build it here instead
-        threading.Thread(target=run, args=(report_id,), daemon=True).start()
+    with store.transaction():
+        record = store.get(REPORTS, report_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="Report not found.")
+        if record.get("status") != STATUS_HELD:
+            raise HTTPException(status_code=400, detail="Only a held report can be retried.")
+        record.update({"status": STATUS_QUEUED, "reason": "", "retriedBy": current_user.get("name")})
+        store.put(REPORTS, report_id, record)
+    ensure_processing()
     return _public(record)
 
 
@@ -925,8 +1043,7 @@ def test_report(req: TestReport, current_user: dict = Depends(require_roles(["Su
     if not req.call.strip():
         raise HTTPException(status_code=400, detail="Enter the call text.")
     record = submit(req.segment.strip(), req.call.strip(), {"name": f"{current_user['name']} (CRM test)", "phone": ""}, test=True)
-    if not _worker["thread"]:
-        threading.Thread(target=run, args=(record["id"],), daemon=True).start()
+    ensure_processing()
     return _public(record)
 
 
