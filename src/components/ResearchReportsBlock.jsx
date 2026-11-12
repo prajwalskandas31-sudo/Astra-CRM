@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { API_BASE_URL, isBackendEnabled, readErrorDetail } from '../services/backendConfig';
-import { FileText, RefreshCw, Download, RotateCcw, LogIn, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, RefreshCw, Download, RotateCcw, KeyRound, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 
 const STATUS_TONE = { Ready: 'success', Held: 'danger', Queued: 'warning', Generating: 'warning' };
 
@@ -14,6 +14,8 @@ const Tone = ({ tone, children }) => (
     {children}
   </span>
 );
+
+const formatDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 
 const formatTime = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 
@@ -34,6 +36,8 @@ export const ResearchReportsBlock = () => {
   const [testSegment, setTestSegment] = useState('');
   const [testCall, setTestCall] = useState('');
   const [testing, setTesting] = useState(false);
+  const [tokenDraft, setTokenDraft] = useState('');
+  const [savingToken, setSavingToken] = useState(false);
 
   const api = useCallback(async (path, options = {}) => {
     const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -99,16 +103,23 @@ export const ResearchReportsBlock = () => {
     }
   };
 
-  const upstoxLogin = async () => {
-    // Open the tab first (browsers block pop-ups opened after an await), then send it to Upstox
-    const tab = window.open('', '_blank');
+  // The Upstox Analytics Token (read-only, valid one year) replaces the daily login, which needs an https Redirect URL
+  const saveToken = async (e) => {
+    e.preventDefault();
+    setSavingToken(true);
     try {
-      const { url } = await (await api('/upstox/login-url')).json();
-      if (tab) tab.location.href = url;
-      else window.location.href = url;
+      await api('/upstox/analytics-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenDraft })
+      });
+      setTokenDraft('');
+      showToast('Upstox Analytics Token checked with Upstox and saved.', 'success');
+      load();
     } catch (err) {
-      if (tab) tab.close();
-      showToast(err.message || 'Could not start the Upstox login.', 'error');
+      showToast(err.message || 'Could not save the token.', 'error');
+    } finally {
+      setSavingToken(false);
     }
   };
 
@@ -132,7 +143,8 @@ export const ResearchReportsBlock = () => {
   };
 
   const status = data?.status;
-  const upstox = status?.upstox;
+  const analytics = status?.analyticsToken;
+  const daysLeft = analytics?.saved ? Math.floor((new Date(analytics.expiresAt) - Date.now()) / 86400000) : null;
 
   return (
     <div className="directory-card" style={{ overflow: 'hidden' }}>
@@ -143,7 +155,7 @@ export const ResearchReportsBlock = () => {
           </h3>
           <p>
             Every trade call posted in the Telegram bots becomes a 3-page report: the 1-minute chart from Upstox, the technical
-            rationale written by Claude from the next template, and the disclosures. A report that cannot be completed is held,
+            rationale written by Claude from the next template, and the disclosures. Files are named by date. A report that cannot be completed is held,
             never created half-done.
           </p>
         </div>
@@ -157,19 +169,9 @@ export const ResearchReportsBlock = () => {
 
         {status && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', fontSize: '0.82rem' }}>
-            {upstox?.loggedIn
-              ? <Tone tone="success">Upstox logged in{upstox.userName ? ` as ${upstox.userName}` : ''} until {formatTime(upstox.expiresAt)}</Tone>
-              : <Tone tone="danger">Upstox not logged in today</Tone>}
-            <button
-              type="button"
-              className={upstox?.loggedIn ? 'btn-secondary' : 'btn-primary'}
-              onClick={upstoxLogin}
-              disabled={!status.upstoxConfigured}
-              title={status.upstoxConfigured ? 'Log in once a day; Upstox ends every login at 3:30 AM' : 'Set UPSTOX_API_KEY, UPSTOX_API_SECRET and UPSTOX_REDIRECT_URI in backend/.env'}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', fontSize: '0.8rem' }}
-            >
-              <LogIn size={13} /> {upstox?.loggedIn ? 'Log in again' : 'Log in to Upstox'}
-            </button>
+            {analytics?.saved
+              ? <Tone tone="success">Upstox token saved (…{analytics.ending}) · valid until {formatDate(analytics.expiresAt)}</Tone>
+              : <Tone tone="danger">{analytics?.expired ? 'Upstox token expired' : 'Upstox token not saved'}</Tone>}
             {status.claudeReady ? <Tone tone="success">Claude ready ({status.model})</Tone> : <Tone tone="danger">Claude API key not set</Tone>}
             <span>Next template: <strong>{status.nextTemplate}</strong> of 15</span>
             {status.profileMissing.length > 0 && (
@@ -178,6 +180,30 @@ export const ResearchReportsBlock = () => {
               </span>
             )}
           </div>
+        )}
+
+        {isSuperAdmin && (!analytics?.saved || daysLeft < 30) && (
+          <form onSubmit={saveToken} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.82rem' }}>
+            <span style={{ flex: '1 1 100%', color: 'var(--text-muted)' }}>
+              {analytics?.saved
+                ? `The Upstox token expires in ${daysLeft} day(s). Generate a new one in Upstox (Apps, Analytics tab) and paste it here.`
+                : 'Paste the Upstox Analytics Token (Upstox, Apps, Analytics tab). It is read-only and lasts one year, so no daily login is needed.'}
+            </span>
+            <input
+              type="password"
+              value={tokenDraft}
+              onChange={e => setTokenDraft(e.target.value)}
+              required
+              autoComplete="off"
+              placeholder="Upstox Analytics Token"
+              aria-label="Upstox Analytics Token"
+              style={{ flex: '1 1 260px', minWidth: 0, fontSize: '0.82rem', padding: '6px 10px', height: '36px' }}
+            />
+            <button type="submit" className="btn-primary" disabled={savingToken || !tokenDraft.trim()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <KeyRound size={14} /> {savingToken ? 'Checking…' : 'Save token'}
+            </button>
+          </form>
         )}
 
         {isSuperAdmin && (
