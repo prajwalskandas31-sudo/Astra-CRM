@@ -205,3 +205,51 @@ def test_upstox_token_expires_at_half_past_three(reports):
     ist = reports.IST
     assert reports._token_expiry(datetime(2026, 11, 11, 9, 0, tzinfo=ist)) == datetime(2026, 11, 12, 3, 30, tzinfo=ist)
     assert reports._token_expiry(datetime(2026, 11, 12, 1, 0, tzinfo=ist)) == datetime(2026, 11, 12, 3, 30, tzinfo=ist)
+
+
+# ---------- Upstox Analytics Token (replaces the daily login) ----------
+class FakeUpstox:
+    def __init__(self, status):
+        self.status, self.calls = status, []
+
+    def __call__(self, url, params=None, headers=None, timeout=None):
+        self.calls.append(headers.get("Authorization"))
+        import httpx
+        return httpx.Response(self.status, json={"status": "success" if self.status == 200 else "error"})
+
+
+def test_analytics_token_is_checked_saved_and_never_shown(crm, reports, monkeypatch):
+    from backend.tests.test_broadcasts import ADMIN
+    token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.analytics-token-abcd"
+    sa = bearer(crm.token(SA))
+
+    # Upstox rejects it: nothing is saved
+    monkeypatch.setattr(reports.httpx, "get", FakeUpstox(401))
+    res = crm.client.post("/api/upstox/analytics-token", json={"token": token}, headers=sa)
+    assert res.status_code == 400 and reports.analytics_token() is None
+
+    # Only a Super Admin may save it
+    monkeypatch.setattr(reports.httpx, "get", FakeUpstox(200))
+    assert crm.client.post("/api/upstox/analytics-token", json={"token": token}, headers=bearer(crm.token(ADMIN))).status_code == 403
+
+    fake = FakeUpstox(200)
+    monkeypatch.setattr(reports.httpx, "get", fake)
+    res = crm.client.post("/api/upstox/analytics-token", json={"token": f"Bearer {token} "}, headers=sa)
+    assert res.status_code == 200 and fake.calls == [f"Bearer {token}"]
+    assert reports.upstox_token() == token
+
+    status = crm.client.get("/api/reports", headers=sa).json()["status"]["analyticsToken"]
+    assert status["saved"] and status["ending"] == "abcd" and token not in str(status)
+
+    assert crm.client.delete("/api/upstox/analytics-token", headers=sa).status_code == 200
+    assert reports.upstox_token() is None
+
+
+def test_report_charts_with_the_saved_token(crm, reports, monkeypatch):
+    fake_pipeline(reports, monkeypatch)
+    used = []
+    monkeypatch.setattr(reports, "fetch_candles", lambda key, token: used.append(token) or candles())
+    set_profile(crm, PROFILE)
+    crm.store.set_value(reports.UPSTOX_ANALYTICS, {"token": "tok-1234567890abcdefghij", "expiresAt": "2099-01-01T00:00:00+05:30"})
+    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})["id"])
+    assert record["status"] == "Ready" and record["upstoxConnected"] and used == ["tok-1234567890abcdefghij"]

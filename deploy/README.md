@@ -114,9 +114,12 @@ Set in `backend/.env` on the server:
 | `UPSTOX_API_KEY` / `UPSTOX_API_SECRET` | From the Upstox developer app "CRM Report Generator" |
 | `UPSTOX_REDIRECT_URI` | `http://<server>:<CRM_PORT>/api/upstox/callback`, e.g. `http://200.234.32.65:8080/api/upstox/callback`. Must be entered exactly the same as the Redirect URL of the Upstox app |
 
-**Daily Upstox login:** Upstox ends every login at 3:30 AM IST. Each morning an Admin opens Research
-Reports and presses **Log in to Upstox**; the block shows whether today's login is valid. Without it the
-CRM still tries Upstox's public market data, and holds the report if Upstox refuses.
+**Upstox Analytics Token:** Upstox only accepts an https Redirect URL, and this server runs plain HTTP,
+so the daily login is not used here. Instead the Upstox account owner generates an Analytics Token
+(Upstox, Apps, Analytics tab: read-only, valid one year) and a Super Admin pastes it into Research
+Reports. The CRM checks it with Upstox before saving, never shows it again, and warns 30 days before it
+expires. Without a token the CRM uses Upstox's public market data and notes this in the Telegram reply.
+The daily login (`/api/upstox/login-url`, `/api/upstox/callback`) stays in the code for a server with HTTPS.
 
 ## e-KYC & E-Sign (Leegality)
 

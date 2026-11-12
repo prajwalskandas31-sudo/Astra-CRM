@@ -51,6 +51,8 @@ REPORTS = "researchReports"          # one record per call: status, details, rea
 REPORT_FILES = "researchReportFiles"  # the PDF of each Ready report, base64, kept apart so lists stay small
 NEXT_TEMPLATE = "reportNextTemplate"  # 1..15, advanced only when a report is created
 UPSTOX_SESSION = "upstoxSession"
+UPSTOX_ANALYTICS = "upstoxAnalyticsToken"
+ANALYTICS_TOKEN_DAYS = 365
 UPSTOX_LOGIN_STATES = "upstoxLoginStates"
 
 ENV_KEYS = ("ANTHROPIC_API_KEY", "REPORT_CLAUDE_MODEL", "UPSTOX_API_KEY", "UPSTOX_API_SECRET", "UPSTOX_REDIRECT_URI")
@@ -351,6 +353,26 @@ def upstox_session() -> Optional[dict]:
     except (KeyError, ValueError):
         return None
     return session
+
+
+def analytics_token() -> Optional[dict]:
+    """The Upstox Analytics Token a Super Admin pasted into the CRM: read-only, valid for one year, so no
+    daily login is needed (the daily login needs an https Redirect URL, which this server does not have)."""
+    saved = store.get_value(UPSTOX_ANALYTICS)
+    if not saved or not saved.get("token"):
+        return None
+    try:
+        if datetime.fromisoformat(saved["expiresAt"]) <= now_ist():
+            return None
+    except (KeyError, ValueError):
+        return None
+    return saved
+
+
+def upstox_token() -> Optional[str]:
+    """The token for Upstox requests: the Analytics Token, else today's login, else none (public data)."""
+    saved, session = analytics_token(), upstox_session()
+    return (saved or {}).get("token") or (session or {}).get("accessToken")
 
 
 def _token_expiry(at: datetime) -> datetime:
@@ -724,8 +746,8 @@ def generate(record: dict) -> dict:
     call = parse_call(cfg, record["call"])
     math = trade_math(call["side"], call["entry"], call["stopLoss"], call["targets"])
     target = resolve_instrument(instruments(), call, record.get("segment") or "")
-    session = upstox_session()
-    chart = fetch_candles(target["chartKey"], session["accessToken"] if session else None)
+    token = upstox_token()
+    chart = fetch_candles(target["chartKey"], token)
 
     templates = load_templates()
     # A test report uses the next template too, but does not advance the rotation (see run)
@@ -735,7 +757,7 @@ def generate(record: dict) -> dict:
     today = now_ist()
     pdf = build_pdf(profile, call, chart, target["chartLabel"], target["expiry"], page2, show_date(today))
     return {"call": call, "math": math, "target": target, "chartDay": chart["dayLabel"], "template": template,
-            "page2": page2, "pdf": pdf, "reportDate": show_date(today), "upstoxLoggedIn": bool(session)}
+            "page2": page2, "pdf": pdf, "reportDate": show_date(today), "upstoxConnected": bool(token)}
 
 
 def run(report_id: str) -> Optional[dict]:
@@ -758,7 +780,7 @@ def run(report_id: str) -> Optional[dict]:
             "expiry": result["target"]["expiry"], "chartLabel": result["target"]["chartLabel"], "chartDay": result["chartDay"],
             "templateNumber": template["number"], "templateName": template["name"], "page2": result["page2"],
             "reportDate": result["reportDate"], "fileName": f"{result['reportDate']}.pdf",
-            "upstoxLoggedIn": result["upstoxLoggedIn"], "createdReportAt": datetime.now(timezone.utc).isoformat(),
+            "upstoxConnected": result["upstoxConnected"], "createdReportAt": datetime.now(timezone.utc).isoformat(),
         })
         with store.transaction():
             store.put(REPORT_FILES, report_id, {"id": report_id, "pdf": base64.b64encode(result["pdf"]).decode()})
@@ -782,8 +804,9 @@ def _notify(record: dict) -> None:
     if record["status"] == STATUS_READY:
         text = (f"Research report created: {record['fileName']} (template {record['templateNumber']}). "
                 f"It is in the CRM under Research Reports.")
-        if not record.get("upstoxLoggedIn"):
-            text += "\nNote: Upstox is not logged in today. Please log in from the CRM (Research Reports)."
+        if not record.get("upstoxConnected"):
+            text += ("\nNote: no Upstox Analytics Token is saved (or it has expired), so the chart used Upstox's public "
+                     "data. A Super Admin can save the token in the CRM (Research Reports).")
     else:
         text = f"Research report NOT created: {record['reason']}\nOnce fixed, the team can press Retry in the CRM (Research Reports)."
     broadcasts._reply(token, chat_id, text)
@@ -843,7 +866,8 @@ def _public(record: dict) -> dict:
 @router.get("/api/reports")
 def list_reports(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
     cfg = settings()
-    session = upstox_session()
+    session, saved = upstox_session(), analytics_token()
+    stored = store.get_value(UPSTOX_ANALYTICS) or {}
     records = sorted(store.all(REPORTS), key=lambda r: r.get("createdAt") or "", reverse=True)[:MAX_LISTED_REPORTS]
     return {
         "status": {
@@ -852,6 +876,10 @@ def list_reports(current_user: dict = Depends(require_roles(ADMIN_ROLES))):
             "upstoxConfigured": bool(cfg["upstox_key"] and cfg["upstox_secret"] and cfg["upstox_redirect"]),
             "upstox": {"loggedIn": bool(session), "userName": (session or {}).get("userName"),
                        "loggedInAt": (session or {}).get("loggedInAt"), "expiresAt": (session or {}).get("expiresAt")},
+            # Never the token itself: only whether one is saved, when, by whom, and its last characters
+            "analyticsToken": {"saved": bool(saved), "expired": bool(stored.get("token")) and not saved,
+                               "savedAt": stored.get("savedAt"), "savedBy": stored.get("savedBy"),
+                               "expiresAt": stored.get("expiresAt"), "ending": (stored.get("token") or "")[-4:]},
             "profileMissing": profile_missing(company_profile()),
             "nextTemplate": store.get_value(NEXT_TEMPLATE, 1),
             "bots": list(broadcasts.settings()["bots"].keys()),
@@ -900,6 +928,39 @@ def test_report(req: TestReport, current_user: dict = Depends(require_roles(["Su
     if not _worker["thread"]:
         threading.Thread(target=run, args=(record["id"],), daemon=True).start()
     return _public(record)
+
+
+class AnalyticsToken(BaseModel):
+    token: str
+
+
+@router.post("/api/upstox/analytics-token")
+def save_analytics_token(req: AnalyticsToken, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    """Save the Upstox Analytics Token after checking it with Upstox (a read-only quote request)."""
+    token = "".join(req.token.split())
+    if token.lower().startswith("bearer"):
+        token = token[6:]
+    if len(token) < 20 or len(token) > 4000:
+        raise HTTPException(status_code=400, detail="That does not look like an Upstox Analytics Token.")
+    try:
+        res = httpx.get(f"{UPSTOX_API}/v3/market-quote/ltp", params={"instrument_key": "NSE_INDEX|Nifty 50"},
+                        headers={"Accept": "application/json", "Authorization": f"Bearer {token}"}, timeout=20)
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Upstox could not be reached to check the token. Try again.")
+    if res.status_code in (401, 403):
+        raise HTTPException(status_code=400, detail="Upstox rejected this token. Copy the Analytics Token again from Upstox (Apps, Analytics tab).")
+    if res.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Upstox answered {res.status_code} while checking the token. Try again.")
+    at = now_ist()
+    store.set_value(UPSTOX_ANALYTICS, {"token": token, "savedAt": at.isoformat(), "savedBy": current_user.get("name"),
+                                       "expiresAt": (at + timedelta(days=ANALYTICS_TOKEN_DAYS)).isoformat()})
+    return {"saved": True, "expiresAt": (at + timedelta(days=ANALYTICS_TOKEN_DAYS)).isoformat(), "ending": token[-4:]}
+
+
+@router.delete("/api/upstox/analytics-token")
+def delete_analytics_token(current_user: dict = Depends(require_roles(["Super Admin"]))):
+    store.set_value(UPSTOX_ANALYTICS, {})
+    return {"saved": False}
 
 
 @router.get("/api/upstox/login-url")
