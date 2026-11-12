@@ -127,6 +127,14 @@ def test_pdf_is_three_pages(reports):
 
 
 # ---------- the whole pipeline ----------
+def build(reports, *args, **kwargs):
+    """Queue one report and build it straight away, as the processing thread would."""
+    record = reports.submit(*args, **kwargs)
+    record.update({"status": "Generating", "startedAt": datetime.now(reports.timezone.utc).isoformat()})
+    reports.store.put(reports.REPORTS, record["id"], record)
+    return reports.run(record["id"])
+
+
 def fake_pipeline(reports, monkeypatch, parsed=None):
     claude_calls = []
 
@@ -147,7 +155,7 @@ def fake_pipeline(reports, monkeypatch, parsed=None):
 def test_report_is_held_until_the_company_profile_is_complete(crm, reports, monkeypatch):
     fake_pipeline(reports, monkeypatch)
     set_profile(crm, {**PROFILE, "registeredAddress": ""})
-    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})["id"])
+    record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})
     assert record["status"] == "Held" and "Registered Address" in record["reason"]
 
 
@@ -155,18 +163,21 @@ def test_report_created_named_by_date_and_rotates_templates(crm, reports, monkey
     fake_pipeline(reports, monkeypatch)
     set_profile(crm, PROFILE)
     crm.store.set_value(reports.NEXT_TEMPLATE, 15)
-    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})["id"])
+    record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})
     assert record["status"] == "Ready", record.get("reason")
     assert record["templateNumber"] == 15 and crm.store.get_value(reports.NEXT_TEMPLATE) == 1
-    assert record["fileName"] == f"{record['reportDate']}.pdf" and record["expiry"]
+    today = datetime.now(reports.IST).strftime("%d-%m-%Y")
+    assert record["fileName"] == f"{today} NIFTY 24500 CE.pdf" and record["expiry"]
     pdf = base64.b64decode(crm.store.get(reports.REPORT_FILES, record["id"])["pdf"])
     assert pdf.startswith(b"%PDF")
 
     # A test report from the CRM does not use up a template
-    test = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"}, test=True)["id"])
+    test = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"}, test=True)
     assert test["status"] == "Ready" and test["templateNumber"] == 1 and crm.store.get_value(reports.NEXT_TEMPLATE) == 1
 
-    # The PDF downloads under the date as its name
+    assert test["fileName"] == f"{today} test NIFTY 24500 CE.pdf"
+
+    # The PDF downloads under its name
     res = crm.client.get(f"/api/reports/{record['id']}/pdf", headers=bearer(crm.token(SA)))
     assert res.status_code == 200 and res.content == pdf
     assert record["fileName"] in res.headers["content-disposition"]
@@ -180,7 +191,7 @@ def test_incomplete_call_is_held_and_never_guessed(crm, reports, monkeypatch):
                                 entry="120", stop_loss="", targets=["150"], missing_or_unclear=["stop-loss"])
     fake_pipeline(reports, monkeypatch, parsed)
     set_profile(crm, PROFILE)
-    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 Tgt 150", {"name": "t"})["id"])
+    record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 Tgt 150", {"name": "t"})
     assert record["status"] == "Held" and "stop-loss" in record["reason"]
 
 
@@ -190,7 +201,7 @@ def test_value_not_in_post_is_rejected(crm, reports, monkeypatch):
                                 entry="125", stop_loss="100", targets=["150"], missing_or_unclear=[])
     fake_pipeline(reports, monkeypatch, parsed)
     set_profile(crm, PROFILE)
-    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150", {"name": "t"})["id"])
+    record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150", {"name": "t"})
     assert record["status"] == "Held" and "entry" in record["reason"]
 
 
@@ -251,5 +262,70 @@ def test_report_charts_with_the_saved_token(crm, reports, monkeypatch):
     monkeypatch.setattr(reports, "fetch_candles", lambda key, token: used.append(token) or candles())
     set_profile(crm, PROFILE)
     crm.store.set_value(reports.UPSTOX_ANALYTICS, {"token": "tok-1234567890abcdefghij", "expiresAt": "2099-01-01T00:00:00+05:30"})
-    record = reports.run(reports.submit("NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})["id"])
+    record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})
     assert record["status"] == "Ready" and record["upstoxConnected"] and used == ["tok-1234567890abcdefghij"]
+
+
+# ---------- on demand: the button builds today's calls into a <date>_report folder ----------
+def log_call(crm, reports, text, when, telegram=True):
+    import uuid
+    record = {"id": "bc-" + uuid.uuid4().hex[:8], "segment": "NSE DERIVATIVES", "call": text, "createdAt": when.isoformat(),
+              "postedBy": {"telegramUserId": "42", "name": "Analyst"} if telegram else {"name": "Admin (CRM test)"}}
+    crm.store.put(reports.broadcasts.BROADCASTS, record["id"], record)
+    return record
+
+
+def test_button_builds_todays_calls_into_a_dated_folder(crm, reports, monkeypatch):
+    import io
+    import zipfile
+    from datetime import timedelta
+    fake_pipeline(reports, monkeypatch)
+    set_profile(crm, PROFILE)
+    # Build synchronously in the test instead of in a background thread
+    monkeypatch.setattr(reports, "ensure_processing", reports._process)
+    crm.store.set_value(reports.NEXT_TEMPLATE, 4)
+    now = datetime.now(reports.IST).replace(hour=12, minute=0, second=0, microsecond=0)
+    first = log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(hours=2))
+    second = log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(hours=1))
+    log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(hours=1), telegram=False)  # CRM test SMS
+    log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(days=1))  # yesterday
+    sa = bearer(crm.token(SA))
+
+    summary = crm.client.post("/api/reports/generate-today", headers=sa).json()
+    date = now.strftime("%d-%m-%Y")
+    assert summary["calls"] == 2 and summary["folder"] == f"{date}_report"
+    today = {r["broadcastId"]: r for r in reports.day_reports(now.date())}
+    assert set(today) == {first["id"], second["id"]}
+    a, b = today[first["id"]], today[second["id"]]
+    # Numbered and templated in the order the calls were posted
+    assert (a["callNumber"], a["templateNumber"], b["callNumber"], b["templateNumber"]) == (1, 4, 2, 5)
+    assert a["fileName"] == f"{date} (1) NIFTY 24500 CE.pdf" and b["fileName"] == f"{date} (2) NIFTY 24500 CE.pdf"
+
+    # Pressing again later makes nothing twice
+    again = crm.client.post("/api/reports/generate-today", headers=sa).json()
+    assert again["ready"] == 2 and again["pending"] == 0 and len(reports.day_reports(now.date())) == 2
+
+    res = crm.client.get("/api/reports/folder", headers=sa)
+    assert res.status_code == 200 and f"{date}_report.zip" in res.headers["content-disposition"]
+    names = zipfile.ZipFile(io.BytesIO(res.content)).namelist()
+    assert names == [f"{date}_report/{date} (1) NIFTY 24500 CE.pdf", f"{date}_report/{date} (2) NIFTY 24500 CE.pdf"]
+    assert crm.client.get("/api/reports/folder", headers=bearer(crm.token(EXEC))).status_code == 403
+
+
+def test_button_retries_held_reports_and_folder_needs_a_ready_report(crm, reports, monkeypatch):
+    from datetime import timedelta
+    fake_pipeline(reports, monkeypatch)
+    monkeypatch.setattr(reports, "ensure_processing", reports._process)
+    day = datetime.now(reports.IST).date() + timedelta(days=3)
+    assert crm.client.get(f"/api/reports/folder?day={day}", headers=bearer(crm.token(SA))).status_code == 404
+
+    # Held while the Company Profile is incomplete; the next press builds it once the profile is filled in
+    set_profile(crm, {**PROFILE, "website": ""})
+    log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", datetime.combine(day, datetime.min.time(), reports.IST).replace(hour=11))
+    assert reports.queue_day(day)["pending"] == 1
+    reports._process()
+    assert reports.day_summary(day)["held"] == 1
+    set_profile(crm, PROFILE)
+    reports.queue_day(day)
+    reports._process()
+    assert reports.day_summary(day)["ready"] == 1

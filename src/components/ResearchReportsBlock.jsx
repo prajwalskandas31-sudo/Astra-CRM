@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { API_BASE_URL, isBackendEnabled, readErrorDetail } from '../services/backendConfig';
-import { FileText, RefreshCw, Download, RotateCcw, KeyRound, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, RefreshCw, Download, RotateCcw, KeyRound, FolderDown, PlayCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 
 const STATUS_TONE = { Ready: 'success', Held: 'danger', Queued: 'warning', Generating: 'warning' };
 
@@ -21,8 +21,8 @@ const formatTime = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: 
 
 /**
  * Research Reports: every trade call posted in a Telegram bot becomes a 3-page PDF on the server
- * (chart from Upstox, rationale written by Claude, fixed disclosures). This block lists them, holds
- * the daily Upstox login, and lets the team retry a report that was held.
+ * (chart from Upstox, rationale written by Claude, fixed disclosures) when the team presses Generate:
+ * every call posted today in the 4 bots, downloaded as a <date>_report folder (ZIP). Held reports can be retried.
  */
 export const ResearchReportsBlock = () => {
   const { authToken, currentUser, simulatedRole } = useCRM();
@@ -38,6 +38,8 @@ export const ResearchReportsBlock = () => {
   const [testing, setTesting] = useState(false);
   const [tokenDraft, setTokenDraft] = useState('');
   const [savingToken, setSavingToken] = useState(false);
+  // True from pressing Generate until every one of today's reports is Ready or Held; then the folder downloads
+  const [generating, setGenerating] = useState(false);
 
   const api = useCallback(async (path, options = {}) => {
     const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -63,26 +65,67 @@ export const ResearchReportsBlock = () => {
 
   const reports = data?.reports || [];
   const pending = reports.some(r => r.status === 'Queued' || r.status === 'Generating');
+  const today = data?.status?.today;
 
-  // Faster refresh while a report is being built, so it appears as soon as it is ready
+  // Faster refresh while reports are being built, so progress shows as each one finishes
   useEffect(() => {
     load();
-    const timer = setInterval(load, pending ? 5000 : 30000);
+    const timer = setInterval(load, pending || generating ? 3000 : 30000);
     return () => clearInterval(timer);
-  }, [load, pending]);
+  }, [load, pending, generating]);
+
+  const saveFile = async (path, name) => {
+    const blob = await (await api(path)).blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
+  const downloadFolder = useCallback(async (summary) => {
+    try {
+      await saveFile(`/reports/folder?day=${summary.day}`, `${summary.folder}.zip`);
+    } catch (err) {
+      showToast(err.message || 'Could not download the folder.', 'error');
+    }
+  }, [api]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const finishRun = useCallback((summary) => {
+    setGenerating(false);
+    if (!summary.calls) {
+      showToast('No calls have been posted in the Telegram bots today.', 'info');
+      return;
+    }
+    const held = summary.held ? ` ${summary.held} held (see the reason below and press Retry).` : '';
+    showToast(`${summary.ready} of ${summary.calls} report(s) ready.${held}`, summary.held ? 'warning' : 'success');
+    if (summary.ready) downloadFolder(summary);
+  }, [downloadFolder, showToast]);
+
+  // When the last of today's reports is done, download the folder
+  useEffect(() => {
+    if (generating && today && today.pending === 0) finishRun(today);
+  }, [generating, today, finishRun]);
+
+  const generateToday = async () => {
+    setGenerating(true);
+    try {
+      const summary = await (await api('/reports/generate-today', { method: 'POST' })).json();
+      if (summary.pending === 0) finishRun(summary);
+      else load();
+    } catch (err) {
+      setGenerating(false);
+      showToast(err.message || 'Could not start generating the reports.', 'error');
+    }
+  };
 
   const download = async (report) => {
     setBusyId(report.id);
     try {
-      const blob = await (await api(`/reports/${report.id}/pdf`)).blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = report.fileName || 'report.pdf';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      await saveFile(`/reports/${report.id}/pdf`, report.fileName || 'report.pdf');
     } catch (err) {
       showToast(err.message || 'Download failed.', 'error');
     } finally {
@@ -154,9 +197,9 @@ export const ResearchReportsBlock = () => {
             <FileText size={18} color="var(--accent)" /> Research Reports
           </h3>
           <p>
-            Every trade call posted in the Telegram bots becomes a 3-page report: the 1-minute chart from Upstox, the technical
-            rationale written by Claude from the next template, and the disclosures. Files are named by date. A report that cannot be completed is held,
-            never created half-done.
+            Press <strong>Generate today's reports</strong> to make a 3-page report for every call posted today in the 4 Telegram
+            bots (1-minute chart from Upstox, technical rationale written by Claude from the next template, disclosures). They
+            download as one folder named after today's date. A report that cannot be completed is held, never created half-done.
           </p>
         </div>
         <button type="button" className="btn-secondary" onClick={load} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -166,6 +209,28 @@ export const ResearchReportsBlock = () => {
 
       <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {error && <div style={{ color: 'var(--status-danger)', fontSize: '0.85rem' }}><AlertTriangle size={14} /> {error}</div>}
+
+        {today && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', padding: '14px 16px', border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '10px' }}>
+            <div style={{ flex: '1 1 260px', fontSize: '0.85rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>Today ({today.date})</div>
+              <div style={{ color: 'var(--text-muted)' }}>
+                {today.calls} call{today.calls === 1 ? '' : 's'} posted · {today.ready} ready · {today.held} held
+                {today.pending ? ` · ${today.pending} in progress` : ''}
+              </div>
+            </div>
+            <button type="button" className="btn-primary" onClick={generateToday} disabled={generating || !today.calls}
+              title={today.calls ? '' : 'No calls have been posted in the Telegram bots today'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <PlayCircle size={15} />
+              {generating ? `Generating… ${today.ready + today.held} of ${today.calls}` : "Generate today's reports"}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => downloadFolder(today)} disabled={!today.ready || generating}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <FolderDown size={15} /> {today.folder}
+            </button>
+          </div>
+        )}
 
         {status && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', fontSize: '0.82rem' }}>
