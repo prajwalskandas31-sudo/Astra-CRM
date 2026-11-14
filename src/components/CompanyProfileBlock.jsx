@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useCRM, DEFAULT_COMPANY_PROFILE } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { Building2, Save, RotateCcw } from 'lucide-react';
+import { CompanyBankAccounts } from './CompanyBankAccounts';
 
 const FIELDS = [
   { key: 'companyName', label: 'Company Name', type: 'text', placeholder: 'e.g. Astra Research Pvt. Ltd.', autoComplete: 'organization' },
@@ -115,6 +116,12 @@ export const CompanyProfileBlock = () => {
           </div>
         )}
       </form>
+
+      <CompanyBankAccounts
+        accounts={Array.isArray(companyProfile?.bankAccounts) ? companyProfile.bankAccounts : []}
+        canEdit={canEdit}
+        onChange={(bankAccounts) => updateCompanyProfile({ bankAccounts })}
+      />
     </div>
   );
 };
