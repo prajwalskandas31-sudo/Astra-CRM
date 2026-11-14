@@ -627,6 +627,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'branch-profiles',
+    name: 'Branch Profiles',
+    category: 'Administration & Governance',
+    description: 'View the branches (name, address, managers, phone) users are assigned to. Only a Super Admin can add, edit or delete them.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'system-settings',
     name: 'System Settings & UI Customization',
     category: 'Administration & Governance',
@@ -1082,6 +1089,19 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_company_profile', JSON.stringify(companyProfile));
   }, [companyProfile]);
 
+  // ─── Branch Profiles (Super Admin managed; users are assigned by branchId) ─
+  const [branches, setBranches] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_branches') || 'null');
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    cacheSet('crm_branches', JSON.stringify(branches));
+  }, [branches]);
+
   // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
   const [financialSettings, setFinancialSettings] = useState(() => {
     const saved = localStorage.getItem('crm_financial_settings');
@@ -1188,6 +1208,7 @@ export const CRMProvider = ({ children }) => {
       keepWhenServerEmpty: true, defaults: DEFAULT_VOICE_AGENT_SETTINGS },
     companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
+    branches: { value: branches, setValue: setBranches, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_branches') },
   }, {
     enabled: serverSyncActive && !!authUser,
     token: authToken,
@@ -2453,6 +2474,28 @@ export const CRMProvider = ({ children }) => {
     setCompanyProfile(prev => ({ ...prev, ...updated }));
   };
 
+  // ─── Branch Profiles CRUD ────────────────────────────────────────────────
+  const cleanBranch = (data) => ({
+    name: (data.name || '').trim(),
+    address: (data.address || '').trim(),
+    managerIds: Array.isArray(data.managerIds) ? data.managerIds : [],
+    phone: (data.phone || '').trim()
+  });
+
+  const addBranch = (data) => {
+    const branch = { id: 'br-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900), ...cleanBranch(data) };
+    setBranches(prev => [...prev, branch]);
+    return branch;
+  };
+
+  const updateBranch = (id, data) => {
+    setBranches(prev => prev.map(b => b.id === id ? { ...b, ...cleanBranch(data) } : b));
+  };
+
+  const deleteBranch = (id) => {
+    setBranches(prev => prev.filter(b => b.id !== id));
+  };
+
   const updateFinancialSettings = (updated) => {
     setFinancialSettings(prev => ({ ...prev, ...updated }));
   };
@@ -3290,6 +3333,11 @@ export const CRMProvider = ({ children }) => {
       // ─── Company Profile ────────────────────────────────────
       companyProfile,
       updateCompanyProfile,
+      // ─── Branch Profiles ────────────────────────────────────
+      branches,
+      addBranch,
+      updateBranch,
+      deleteBranch,
       // ─── Financial Settings & Limits ────────────────────────
       financialSettings,
       updateFinancialSettings,

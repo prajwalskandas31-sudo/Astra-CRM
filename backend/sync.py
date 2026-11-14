@@ -178,6 +178,8 @@ POLICIES: Dict[str, Policy] = {
     "financialSettings": Policy(read=EVERYONE, write=SUPER_ADMIN, redact=_redact_passwords),
     "voiceAgentSettings": Policy(read=EVERYONE, write=SUPER_ADMIN),
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    # Branch Profiles block; every user creator picks from these names
+    "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
 }
 
 for _collection, _rules in POLICIES.items():

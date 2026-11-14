@@ -136,3 +136,16 @@ def test_identity_fields_must_be_unique(crm, tokens):
 def test_weak_passwords_rejected(crm, tokens, password):
     body = {"name": f"Weak {password}", "mobile": "9222222222", "password": password, "email": f"w{password}@x.com", "reportingTo": "x"}
     assert crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"])).status_code == 400
+
+
+# ---- Branch assignment
+
+def test_branch_is_saved_on_create_and_set_by_admins_only(crm, tokens):
+    body = {"name": "Branch Person", "mobile": "9333333333", "password": STRONG, "email": "bp@x.com",
+            "reportingTo": "x", "branchId": "br-hyd"}
+    created = crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"]))
+    assert created.status_code == 200 and created.json()["branchId"] == "br-hyd"
+
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"branchId": "br-blr"}) == 403
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"branchId": "br-blr"}) == 200
+    assert crm.store.get("users", EXEC_ID)["branchId"] == "br-blr"
