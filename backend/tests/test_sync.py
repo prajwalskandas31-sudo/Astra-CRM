@@ -107,6 +107,18 @@ def test_company_profile_is_read_by_all_and_changed_only_by_super_admin(crm, tok
     assert seen["sebiRegistrationNumber"] == "INH000012345"
 
 
+def test_company_bank_accounts_sync_as_a_list(crm, tok):
+    accounts = [{"id": "bank-1", "bankName": "HDFC Bank", "accountNumber": "50200012345678", "ifscCode": "HDFC0001234",
+                 "accountType": "Current", "bankBranch": "Surat", "upiId": "co@hdfcbank", "paymentGatewayLink": ""}]
+    entry = {"id": "bankAccounts", "value": accounts}
+    assert push(crm, tok["admin"], "companyProfile", [entry])["rejected"]["companyProfile"]
+    assert not push(crm, tok["sa"], "companyProfile", [entry])["rejected"]["companyProfile"]
+    seen = {i["id"]: i["value"] for i in pull(crm, tok["exec"], "companyProfile")["collections"]["companyProfile"]["items"]}
+    assert seen["bankAccounts"] == accounts
+    script_link = {"id": "bankAccounts", "value": [{**accounts[0], "paymentGatewayLink": "javascript:alert(1)"}]}
+    assert push(crm, tok["sa"], "companyProfile", [script_link])["rejected"]["companyProfile"]
+
+
 def test_branches_are_read_by_all_and_changed_only_by_super_admin(crm, tok):
     branch = {"id": "br-1", "name": "Hyderabad", "address": "Ameerpet", "managerIds": ["usr-2"], "phone": "040 1234 5678"}
     assert push(crm, tok["admin"], "branches", [branch])["rejected"]["branches"]

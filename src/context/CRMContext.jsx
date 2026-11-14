@@ -167,7 +167,9 @@ export const DEFAULT_COMPANY_PROFILE = {
   email: '',
   website: '',
   registeredAddress: '',
-  investorCharterUrl: ''
+  investorCharterUrl: '',
+  // [{id, bankName, accountNumber, ifscCode, accountType, bankBranch, upiId, paymentGatewayLink}]
+  bankAccounts: []
 };
 
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
@@ -623,7 +625,7 @@ export const CRM_FEATURES = [
     id: 'company-profile',
     name: 'Company Profile',
     category: 'Administration & Governance',
-    description: 'View the company name, SEBI registration number, contact, email and website. Only a Super Admin can edit them.',
+    description: 'View the company name, SEBI registration number, contact, email, website and bank accounts. Only a Super Admin can edit them.',
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {

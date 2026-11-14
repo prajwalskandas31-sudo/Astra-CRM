@@ -114,6 +114,20 @@ def _sale_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optiona
     return None
 
 
+def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    # Bank account links are rendered as clickable links for every user, so only web links are accepted
+    if new is None or new.get("id") != "bankAccounts":
+        return None
+    accounts = new.get("value")
+    if not isinstance(accounts, list) or not all(isinstance(a, dict) for a in accounts):
+        return "Bank accounts must be a list of accounts."
+    for account in accounts:
+        link = str(account.get("paymentGatewayLink") or "").strip().lower()
+        if link and not link.startswith(("https://", "http://")):
+            return "Payment Gateway Link must start with https://"
+    return None
+
+
 def _paid_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
     # Telegram trade calls go to every stored Paid client, so a deleted one must stay deleted
     if new is not None and new.get("id") in store.get_value(DELETED_PAID, []):
@@ -177,7 +191,7 @@ POLICIES: Dict[str, Policy] = {
     "userPermissions": Policy(read=EVERYONE, write=SUPER_ADMIN, visible=_own_entry),
     "financialSettings": Policy(read=EVERYONE, write=SUPER_ADMIN, redact=_redact_passwords),
     "voiceAgentSettings": Policy(read=EVERYONE, write=SUPER_ADMIN),
-    "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
     # Branch Profiles block; every user creator picks from these names
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
 }
