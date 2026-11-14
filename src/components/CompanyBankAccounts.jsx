@@ -160,11 +160,11 @@ export const CompanyBankAccounts = ({ accounts = [], canEdit, onChange }) => {
                   {a.upiId ? (isLink(a.upiId) ? <a href={a.upiId} target="_blank" rel="noopener noreferrer">{a.upiId}</a> : a.upiId) : muted}
                 </td>
                 <td>
-                  {a.paymentGatewayLink ? (
+                  {isLink(a.paymentGatewayLink) ? (
                     <a href={a.paymentGatewayLink} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                       Open <ExternalLink size={12} />
                     </a>
-                  ) : muted}
+                  ) : (a.paymentGatewayLink || muted)}
                 </td>
                 {canEdit && (
                   <td>

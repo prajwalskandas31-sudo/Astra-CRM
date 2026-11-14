@@ -115,6 +115,8 @@ def test_company_bank_accounts_sync_as_a_list(crm, tok):
     assert not push(crm, tok["sa"], "companyProfile", [entry])["rejected"]["companyProfile"]
     seen = {i["id"]: i["value"] for i in pull(crm, tok["exec"], "companyProfile")["collections"]["companyProfile"]["items"]}
     assert seen["bankAccounts"] == accounts
+    script_link = {"id": "bankAccounts", "value": [{**accounts[0], "paymentGatewayLink": "javascript:alert(1)"}]}
+    assert push(crm, tok["sa"], "companyProfile", [script_link])["rejected"]["companyProfile"]
 
 
 def test_branches_are_read_by_all_and_changed_only_by_super_admin(crm, tok):
