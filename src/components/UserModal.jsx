@@ -72,6 +72,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     deleteUserCustomField, 
     simulatedRole,
     currentUser,
+    branches = [],
     addUser, 
     updateUser, 
     downloadUserDocument 
@@ -93,7 +94,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     ifscCode: userToEdit ? (userToEdit.ifscCode || '') : '',
     bankNameAndBranch: userToEdit ? (userToEdit.bankNameAndBranch || '') : '',
     familyReferenceNumber: userToEdit ? (userToEdit.familyReferenceNumber || '') : '',
-    referredBy: userToEdit ? (userToEdit.referredBy || '') : ''
+    referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
+    branchId: userToEdit ? (userToEdit.branchId || '') : ''
   });
 
   // Attached Documents State (Direct upload on user creation/edit)
@@ -125,6 +127,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   const [fileError, setFileError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  // Branch for every uploaded row; a "Branch" column in the sheet overrides it per row
+  const [bulkBranchId, setBulkBranchId] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -142,7 +146,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           ifscCode: userToEdit.ifscCode || '',
           bankNameAndBranch: userToEdit.bankNameAndBranch || '',
           familyReferenceNumber: userToEdit.familyReferenceNumber || '',
-          referredBy: userToEdit.referredBy || ''
+          referredBy: userToEdit.referredBy || '',
+          branchId: userToEdit.branchId || ''
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
         setCustomFieldValues(userToEdit.customFieldValues ? { ...userToEdit.customFieldValues } : {});
@@ -159,7 +164,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           ifscCode: '',
           bankNameAndBranch: '',
           familyReferenceNumber: '',
-          referredBy: ''
+          referredBy: '',
+          branchId: ''
         });
         setAttachedDocs([]);
         setCustomFieldValues({});
@@ -168,6 +174,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
         setUploadedFileSize('');
         setFileError('');
         setShowPreview(false);
+        setBulkBranchId('');
       }
       setIsAddingCustomField(false);
       setEditingFieldId(null);
@@ -345,6 +352,16 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const branchName = (id) => (id && branches.find(b => b.id === id)?.name) || '';
+
+  // A row's "Branch" column (matched by name) wins over the upload-wide dropdown
+  const resolveBranch = (cell) => {
+    const name = (cell || '').trim();
+    if (!name) return { branchId: bulkBranchId };
+    const match = branches.find(b => (b.name || '').trim().toLowerCase() === name.toLowerCase());
+    return match ? { branchId: match.id } : { branchId: '', unknownBranch: name };
+  };
+
   // Parse bulkText into user objects with real-time feedback
   const parsedRecords = useMemo(() => {
     if (!bulkText.trim()) return [];
@@ -367,12 +384,18 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           ifscCode: parts[7] || '',
           bankNameAndBranch: parts[8] || '',
           familyReferenceNumber: parts[9] || '',
-          referredBy: parts[10] || ''
+          referredBy: parts[10] || '',
+          ...resolveBranch(parts[11])
         });
       }
     });
     return records;
-  }, [bulkText]);
+  }, [bulkText, bulkBranchId, branches]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const unknownBranchNames = useMemo(
+    () => [...new Set(parsedRecords.filter(r => r.unknownBranch).map(r => r.unknownBranch))],
+    [parsedRecords]
+  );
 
   // Check if first line in textarea looks like a header
   const hasDetectedHeader = useMemo(() => {
@@ -469,7 +492,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           'IFSC Code': 'HDFC0000456',
           'Bank Name and Branch': 'HDFC Bank, HSR Layout Branch',
           'Family Reference Number': '+91 98765 43223',
-          'Referred By': 'Priya Nair (TL-201)'
+          'Referred By': 'Priya Nair (TL-201)',
+          'Branch': ''
         },
         {
           'Name': 'AJAY',
@@ -482,7 +506,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           'IFSC Code': 'KKBK0000987',
           'Bank Name and Branch': 'Kotak Mahindra Bank, Jayanagar Branch',
           'Family Reference Number': '+91 98765 43224',
-          'Referred By': 'Priya Nair (TL-201)'
+          'Referred By': 'Priya Nair (TL-201)',
+          'Branch': ''
         },
         {
           'Name': 'RAHUL SHARMA',
@@ -495,7 +520,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           'IFSC Code': 'SBIN0004521',
           'Bank Name and Branch': 'State Bank of India, Koramangala',
           'Family Reference Number': '+91 98765 43228',
-          'Referred By': 'Rajesh Kumar (EMP-002)'
+          'Referred By': 'Rajesh Kumar (EMP-002)',
+          'Branch': ''
         }
       ];
 
@@ -511,7 +537,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
         { wch: 14 },
         { wch: 32 },
         { wch: 24 },
-        { wch: 24 }
+        { wch: 24 },
+        { wch: 22 }
       ];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Bulk_Users_Template');
@@ -525,7 +552,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
 
   // Populate sample CSV data
   const handleLoadSampleCSV = () => {
-    const sample = `Name, Contact Number, Email, Role, Reporting To, Employee ID, Bank Account Number, IFSC Code, Bank Name and Branch, Family Reference Number, Referred By
+    const sample = `Name, Contact Number, Email, Role, Reporting To, Employee ID, Bank Account Number, IFSC Code, Bank Name and Branch, Family Reference Number, Referred By, Branch
 ABHINAYA M, +91 98765 43214, abhinaya@company.com, Executive, Priya Nair, EXEC-301, 91234567890127, HDFC0000456, "HDFC Bank, HSR Layout Branch", +91 98765 43223, Priya Nair (TL-201)
 AJAY, +91 98765 43215, ajay@company.com, Executive, Priya Nair, EXEC-302, 91234567890128, KKBK0000987, "Kotak Mahindra Bank, Jayanagar Branch", +91 98765 43224, Priya Nair (TL-201)
 RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-306, 91234567890132, SBIN0004521, "State Bank of India, Koramangala", +91 98765 43228, Rajesh Kumar (EMP-002)`;
@@ -594,7 +621,12 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         return;
       }
 
-      const results = await Promise.allSettled(parsedRecords.map(userRecord => addUser(userRecord)));
+      if (unknownBranchNames.length > 0) {
+        showToast(`Unknown branch: ${unknownBranchNames.join(', ')}. Add it in Branch Profiles or fix the Branch column.`, 'warning');
+        return;
+      }
+
+      const results = await Promise.allSettled(parsedRecords.map(({ unknownBranch, ...userRecord }) => addUser(userRecord)));
       const failed = results.filter(r => r.status === 'rejected');
       if (failed.length > 0) {
         showToast(`${failed.length} of ${parsedRecords.length} users were rejected: ${failed[0].reason?.message || 'server error'}`, 'error');
@@ -726,6 +758,19 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     onChange={handleChange}
                     placeholder="e.g. EMP-105"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Branch</label>
+                  <select name="branchId" value={formData.branchId} onChange={handleChange}>
+                    <option value="">{branches.length ? '-- No branch --' : '-- No branches set up yet --'}</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                    {formData.branchId && !branches.some(b => b.id === formData.branchId) && (
+                      <option value={formData.branchId}>(deleted branch)</option>
+                    )}
+                  </select>
                 </div>
 
                 {formData.role === 'Executive' && (
@@ -1352,6 +1397,19 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontWeight: 600 }}>Branch for these users</label>
+                  <select value={bulkBranchId} onChange={e => setBulkBranchId(e.target.value)}>
+                    <option value="">{branches.length ? '-- No branch --' : '-- No branches set up yet --'}</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Applies to every row. A row with its own Branch column value uses that branch instead.
+                  </div>
+                </div>
+
                 {/* Provision to Add Excel File (.xlsx, .xls) or CSV */}
                 <div style={{
                   border: `2px dashed ${isDragging ? 'var(--accent-primary)' : 'var(--border-color)'}`,
@@ -1549,7 +1607,8 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                   </div>
 
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.4 }}>
-                    Columns: <code>Name, Contact Number, Email, Role, Reporting To, Employee ID, Bank Account Number, IFSC Code, Bank Name and Branch, Family Reference Number, Referred By</code>
+                    Columns: <code>Name, Contact Number, Email, Role, Reporting To, Employee ID, Bank Account Number, IFSC Code, Bank Name and Branch, Family Reference Number, Referred By, Branch</code>
+                    <br />The optional <code>Branch</code> column must match a name in Branch Profiles; leave it blank to use the Branch selected above.
                   </div>
 
                   <textarea
@@ -1560,6 +1619,14 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     style={{ fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.4' }}
                   />
                 </div>
+
+                {unknownBranchNames.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--status-danger)', fontSize: '0.8rem',
+                    background: 'var(--status-danger-bg)', padding: '6px 10px', borderRadius: '6px' }}>
+                    <AlertTriangle size={14} />
+                    <span>Branch not found in Branch Profiles: <strong>{unknownBranchNames.join(', ')}</strong>. Fix the Branch column or add the branch first.</span>
+                  </div>
+                )}
 
                 {/* Optional Parsed Table Preview */}
                 {showPreview && parsedRecords.length > 0 && (
@@ -1593,6 +1660,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                             <th>Email</th>
                             <th>Role</th>
                             <th>Reporting To</th>
+                            <th>Branch</th>
                             <th>Bank Account</th>
                           </tr>
                         </thead>
@@ -1605,6 +1673,9 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                               <td>{rec.email || '-'}</td>
                               <td><span className="badge">{rec.role}</span></td>
                               <td>{rec.reportingTo || '-'}</td>
+                              <td style={rec.unknownBranch ? { color: 'var(--status-danger)', fontWeight: 600 } : undefined}>
+                                {rec.unknownBranch ? `${rec.unknownBranch} (not found)` : (branchName(rec.branchId) || '-')}
+                              </td>
                               <td>{rec.bankAccountNumber || '-'}</td>
                             </tr>
                           ))}

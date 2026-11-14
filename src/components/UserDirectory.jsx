@@ -24,6 +24,7 @@ import {
 export const UserDirectory = () => {
   const { 
     users, 
+    branches = [],
     currentUser,
     leads,
     simulatedRole, 
@@ -36,6 +37,8 @@ export const UserDirectory = () => {
     CRM_FEATURES = []
   } = useCRM();
   const { showToast } = useToast();
+
+  const branchName = (id) => (id && branches.find(b => b.id === id)?.name) || '';
 
   const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
 
@@ -255,6 +258,7 @@ export const UserDirectory = () => {
                 <th>Name</th>
                 <th>Mobile Number</th>
                 <th>Reporting To</th>
+                <th>Branch</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Expiry Date</th>
@@ -267,7 +271,7 @@ export const UserDirectory = () => {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={isSuperAdmin ? 12 : 11} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No user accounts matched the filter criteria.
                   </td>
                 </tr>
@@ -324,6 +328,7 @@ export const UserDirectory = () => {
                     </td>
                     <td>{u.mobile}</td>
                     <td>{u.reportingTo || '—'}</td>
+                    <td style={{ color: branchName(u.branchId) ? undefined : 'var(--text-muted)' }}>{branchName(u.branchId) || '—'}</td>
                     <td style={{ color: u.email ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {u.email || '—'}
                     </td>

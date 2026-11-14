@@ -107,6 +107,14 @@ def test_company_profile_is_read_by_all_and_changed_only_by_super_admin(crm, tok
     assert seen["sebiRegistrationNumber"] == "INH000012345"
 
 
+def test_branches_are_read_by_all_and_changed_only_by_super_admin(crm, tok):
+    branch = {"id": "br-1", "name": "Hyderabad", "address": "Ameerpet", "managerIds": ["usr-2"], "phone": "040 1234 5678"}
+    assert push(crm, tok["admin"], "branches", [branch])["rejected"]["branches"]
+    assert push(crm, tok["exec"], "branches", [branch])["rejected"]["branches"]
+    assert not push(crm, tok["sa"], "branches", [branch])["rejected"]["branches"]
+    assert "br-1" in ids(pull(crm, tok["exec"], "branches"), "branches")
+
+
 def test_override_passwords_only_reach_admins(crm, tok):
     push(crm, tok["sa"], "financialSettings", [{"id": "adminOverridePassword", "value": "s3cret-override"},
                                                {"id": "maxGrossSales", "value": 200000}])

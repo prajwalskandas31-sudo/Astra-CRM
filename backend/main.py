@@ -84,6 +84,7 @@ class UserCreate(BaseModel):
     bankNameAndBranch: Optional[str] = ""
     familyReferenceNumber: Optional[str] = ""
     referredBy: Optional[str] = ""
+    branchId: Optional[str] = ""
     documents: Optional[List[dict]] = []
 
 class UserUpdate(BaseModel):
@@ -97,6 +98,7 @@ class UserUpdate(BaseModel):
     bankNameAndBranch: Optional[str] = None
     familyReferenceNumber: Optional[str] = None
     referredBy: Optional[str] = None
+    branchId: Optional[str] = None
     documents: Optional[List[dict]] = None
 
 class PasswordChange(BaseModel):
@@ -306,6 +308,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "bankNameAndBranch": req.bankNameAndBranch or "",
         "familyReferenceNumber": req.familyReferenceNumber or "",
         "referredBy": req.referredBy or "",
+        "branchId": req.branchId or "",
         "documents": req.documents or []
     }
     set_user_password(new_user, req.password)
@@ -331,7 +334,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -357,6 +360,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch
     if req.familyReferenceNumber is not None: user["familyReferenceNumber"] = req.familyReferenceNumber
     if req.referredBy is not None: user["referredBy"] = req.referredBy
+    if req.branchId is not None: user["branchId"] = req.branchId
     if req.documents is not None: user["documents"] = req.documents
 
     _save_user(user)
