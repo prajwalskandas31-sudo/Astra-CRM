@@ -182,7 +182,7 @@ def test_signed_agreement_is_attached_once_esign_is_completed(crm, sa, smtp, mon
         calls.append((doc_id, kind))
         return "COMPLETED", b"%PDF signed"
     monkeypatch.setattr(crm.leegality, "fetch_completed_pdf", fake_fetch)
-    monkeypatch.setattr(crm.leegality, "kyc_documents", lambda doc, name: [
+    monkeypatch.setattr(crm.leegality, "kyc_documents", lambda doc, name, email: [
         (f"e-KYC Audit Trail - {name}.pdf", "application/pdf", b"%PDF audit"),
         ("KYC - ../PAN Card.jpg", "image/jpeg", b"pan")])
 
@@ -310,7 +310,7 @@ class FakeResponse:
 def fake_leegality(crm, monkeypatch):
     """A Leegality whose COMPLETED document returns `state['invitation']` and serves files from `state['cdn']`."""
     lg = crm.leegality
-    state = {"invitation": {"inviteeType": "Signer", "invitationUrl": "https://sign/abc"}, "cdn": {}, "fetch": {}, "fetch_calls": []}
+    state = {"invitation": {"inviteeType": "SIGNER", "email": "ravi@example.com", "invitationUrl": "https://sign/abc"}, "cdn": {}, "fetch": {}, "fetch_calls": []}
     monkeypatch.setattr(lg, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://lg"})
     monkeypatch.setattr(lg, "fetch_completed_pdf", lambda doc, kind: ("COMPLETED", b"%PDF audit") if kind == "auditTrail" else ("COMPLETED", b"x"))
 
@@ -331,7 +331,7 @@ def test_virtual_sign_gives_only_the_audit_trail(crm, fake_leegality):
     # What Leegality really returns for a Virtual Sign signer: the typed name, nothing verified
     fake_leegality["invitation"].update(usedSignatureType="Virtual Sign", certificateData={"name": "Ravi", "yob": None},
                                         verificationResponse={"nameVerification": None})
-    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar")
+    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar", "Ravi@Example.com")
     assert [(n, t) for n, t, _ in files] == [("e-KYC Audit Trail - Ravi Kumar.pdf", "application/pdf")]
 
 
@@ -340,7 +340,7 @@ def test_aadhaar_esign_adds_an_ekyc_certificate_built_from_leegality_values(crm,
     fake_leegality["invitation"]["certificateData"] = {"name": "RAVI KUMAR", "yob": "1990", "gender": "M", "title": "XXXXXXXX1234",
                                                        "state": "Karnataka", "uid": None, "photoHash": "abc"}
     fake_leegality["invitation"]["verificationResponse"] = {"nameVerification": True}
-    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar")
+    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar", "Ravi@Example.com")
     assert [n for n, _, _ in files] == ["e-KYC Audit Trail - Ravi Kumar.pdf", "Aadhaar e-KYC Certificate - Ravi Kumar.pdf"]
     assert files[1][2].startswith(b"%PDF")
 
@@ -349,7 +349,7 @@ def test_client_kyc_uploads_are_downloaded_from_leegality(crm, fake_leegality):
     fake_leegality["invitation"]["supportingDocuments"] = [{"name": "PAN.jpg"}, {"name": "Aadhaar.pdf", "file": "https://cdn/direct"}]
     fake_leegality["fetch"] = {1: "https://cdn/pan"}  # index starts at 1 on this Leegality
     fake_leegality["cdn"] = {"https://cdn/pan": FakeResponse(b"pan", "image/jpeg"), "https://cdn/direct": FakeResponse(b"aad")}
-    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar")
+    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar", "Ravi@Example.com")
     assert [(n, t, c) for n, t, c in files[1:]] == [("KYC - PAN.jpg", "image/jpeg", b"pan"), ("KYC - Aadhaar.pdf", "application/pdf", b"aad")]
     assert fake_leegality["fetch_calls"] == [0, 1]
 
@@ -357,5 +357,18 @@ def test_client_kyc_uploads_are_downloaded_from_leegality(crm, fake_leegality):
 def test_a_listed_kyc_upload_that_cannot_be_fetched_stops_the_send(crm, fake_leegality):
     fake_leegality["invitation"]["supportingDocuments"] = [{"name": "PAN.jpg"}]
     with pytest.raises(HTTPException) as err:
-        crm.leegality.kyc_documents("DOC", "Ravi Kumar")
+        crm.leegality.kyc_documents("DOC", "Ravi Kumar", "Ravi@Example.com")
     assert err.value.status_code == 502 and "PAN.jpg" in err.value.detail
+
+
+def test_ekyc_files_only_come_from_the_recipients_own_signer_entry(crm, fake_leegality):
+    fake_leegality["invitation"].update(email="other@example.com", usedSignatureType="Aadhaar eSign",
+                                        certificateData={"name": "SOMEONE ELSE", "yob": "1980"},
+                                        supportingDocuments=[{"name": "Their PAN.jpg"}])
+    files = crm.leegality.kyc_documents("DOC", "Ravi Kumar", "ravi@example.com")
+    assert [n for n, _, _ in files] == ["e-KYC Audit Trail - Ravi Kumar.pdf"]
+
+
+def test_certificate_text_is_escaped(crm):
+    pdf = crm.leegality._certificate_pdf('<img src="/etc/passwd" width="9" height="9"/>Ravi', "DOC<b>", {"name": "R<i>"}, {}, None)
+    assert pdf.startswith(b"%PDF")

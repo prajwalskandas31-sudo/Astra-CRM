@@ -545,6 +545,7 @@ def _certificate_pdf(client_name, document_id, certificate, verification, signed
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape
 
     def rows_of(data, labels=None):
         rows = []
@@ -569,7 +570,9 @@ def _certificate_pdf(client_name, document_id, certificate, verification, signed
     ])
     story = [
         Paragraph("Aadhaar e-KYC Certificate", styles["Title"]),
-        Paragraph(f"Client: {client_name}<br/>Leegality document: {document_id}<br/>Signed: {signed_at or 'not returned'}", styles["Normal"]),
+        # Paragraph text is markup, so every value is escaped (a client name must never become a tag)
+        Paragraph(f"Client: {escape(str(client_name))}<br/>Leegality document: {escape(str(document_id))}<br/>"
+                  f"Signed: {escape(str(signed_at or 'not returned'))}", styles["Normal"]),
         Spacer(1, 14),
         Paragraph("Details from the Aadhaar eSign certificate", styles["Heading3"]),
         Table(rows_of(certificate, _CERTIFICATE_LABELS), colWidths=[170, 300], style=table_style),
@@ -585,10 +588,11 @@ def _certificate_pdf(client_name, document_id, certificate, verification, signed
     return out.getvalue()
 
 
-def kyc_documents(document_id, client_name):
+def kyc_documents(document_id, client_name, signer_email):
     """The client's e-KYC files for a COMPLETED document, as (filename, content type, bytes):
     the audit trail always, the Aadhaar e-KYC certificate when the client signed with Aadhaar eSign,
-    and every KYC document the client uploaded while signing. Raises rather than returning a partial set."""
+    and every KYC document the client uploaded while signing. Raises rather than returning a partial set.
+    Only the signer whose email is `signer_email` (the Welcome Kit's recipient) is read; other invitees are skipped."""
     safe = "".join(ch if ch.isalnum() or ch in " .-_" else "_" for ch in (client_name or "Client")).strip() or "Client"
     status, audit = fetch_completed_pdf(document_id, "auditTrail")
     if audit is None:
@@ -602,7 +606,9 @@ def kyc_documents(document_id, client_name):
     if body.get("status") != 1:
         raise HTTPException(status_code=502, detail=f"Leegality: {_messages(body)}")
     for invitation in (body.get("data") or {}).get("invitations") or []:
-        if (invitation.get("inviteeType") or "").upper() not in ("", "SIGNER"):
+        if (invitation.get("inviteeType") or "").upper() != "SIGNER":
+            continue
+        if (invitation.get("email") or "").strip().lower() != (signer_email or "").strip().lower():
             continue
         certificate = invitation.get("certificateData")
         # Virtual Sign also returns certificateData, holding only the typed name; that is no e-KYC

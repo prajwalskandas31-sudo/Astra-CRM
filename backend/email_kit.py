@@ -443,7 +443,7 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
             attachments.append((f"Signed Agreement - {safe_client}.pdf", "application/pdf", pdf))
             agreement["attached"] = True
             # The client's e-KYC record from Leegality: audit trail, Aadhaar e-KYC certificate, KYC uploads
-            kyc = leegality.kyc_documents(doc_id, client["name"] or "Client")
+            kyc = leegality.kyc_documents(doc_id, client["name"] or "Client", client["email"])
             attachments += [(_safe_filename(name), ctype, content) for name, ctype, content in kyc]
             agreement["kycFiles"] = [_safe_filename(name) for name, _, _ in kyc]
 
