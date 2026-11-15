@@ -52,6 +52,7 @@ export const EmailBlock = () => {
   const [files, setFiles] = useState({ slots: [], totalBytes: 0, maxFileBytes: 0, maxTotalBytes: 0 });
   const [busySlot, setBusySlot] = useState(null);
   const [busy, setBusy] = useState('');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [log, setLog] = useState([]);
 
   const load = useCallback(async () => {
@@ -121,7 +122,7 @@ export const EmailBlock = () => {
   };
 
   const handleClearPassword = async () => {
-    if (!window.confirm('Remove the saved SMTP password? No email can be sent until a new one is saved.')) return;
+    if (!window.confirm('Remove the saved mailbox password? No email can be sent until a new one is saved.')) return;
     try {
       const saved = await clearSmtpPassword();
       setSettings(s => ({ ...s, ...saved }));
@@ -174,6 +175,8 @@ export const EmailBlock = () => {
   }
 
   const filledCount = files.slots.filter(s => s.filled).length;
+  // The mail server details are set once; keep them out of sight unless they are missing or asked for
+  const showAdvanced = advancedOpen || !settings?.smtpHost;
   const fieldProps = (key, extra = {}) => ({
     id: `email-${key}`,
     value: sender[key],
@@ -192,7 +195,7 @@ export const EmailBlock = () => {
           </h3>
           <p>
             The address client emails are sent from and the Welcome Kit files. "Send Welcome Kit" emails the client every uploaded
-            file and, once they have completed the Leegality e-sign, their signed agreement.
+            file and, once they have completed the Leegality e-sign, their signed agreement and e-KYC documents.
           </p>
         </div>
       </div>
@@ -200,7 +203,7 @@ export const EmailBlock = () => {
       {/* ─── Sender Email ID ─── */}
       <SectionHeader icon={AtSign} title="Sender Email ID">
         {canEdit
-          ? 'Every Welcome Kit is sent from this address. Enter the mailbox\'s SMTP login so the CRM can send as it (Gmail / Microsoft 365: use an App Password).'
+          ? 'Every Welcome Kit is sent from this address.'
           : 'The address Welcome Kits are sent from. Only a Super Admin can change it.'}
       </SectionHeader>
       <form onSubmit={saveSender} style={{ padding: '16px 20px 20px' }}>
@@ -213,35 +216,39 @@ export const EmailBlock = () => {
             <label htmlFor="email-senderName">Sender Name</label>
             <input type="text" placeholder="e.g. Company Welcome Desk" {...fieldProps('senderName')} />
           </div>
-          <div className="form-group">
-            <label htmlFor="email-smtpHost">SMTP Server{canEdit ? ' *' : ''}</label>
-            <input type="text" placeholder="e.g. smtp.gmail.com" {...fieldProps('smtpHost')} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="email-smtpSecurity">Security</label>
-            <select
-              id="email-smtpSecurity"
-              value={sender.smtpSecurity}
-              disabled={!canEdit}
-              onChange={e => {
-                const mode = SECURITY.find(m => m.value === e.target.value);
-                setSender(d => ({ ...d, smtpSecurity: mode.value, smtpPort: mode.port }));
-              }}
-            >
-              {SECURITY.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="email-smtpPort">SMTP Port</label>
-            <input type="number" min="1" max="65535" {...fieldProps('smtpPort')} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="email-smtpUsername">SMTP Username</label>
-            <input type="text" placeholder={sender.senderEmail || 'Same as Sender Email ID'} {...fieldProps('smtpUsername')} />
-          </div>
+          {showAdvanced && (
+            <>
+            <div className="form-group">
+              <label htmlFor="email-smtpHost">SMTP Server{canEdit ? ' *' : ''}</label>
+              <input type="text" placeholder="e.g. smtp.gmail.com" {...fieldProps('smtpHost')} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="email-smtpSecurity">Security</label>
+              <select
+                id="email-smtpSecurity"
+                value={sender.smtpSecurity}
+                disabled={!canEdit}
+                onChange={e => {
+                  const mode = SECURITY.find(m => m.value === e.target.value);
+                  setSender(d => ({ ...d, smtpSecurity: mode.value, smtpPort: mode.port }));
+                }}
+              >
+                {SECURITY.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="email-smtpPort">SMTP Port</label>
+              <input type="number" min="1" max="65535" {...fieldProps('smtpPort')} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="email-smtpUsername">SMTP Username</label>
+              <input type="text" placeholder={sender.senderEmail || 'Same as Sender Email ID'} {...fieldProps('smtpUsername')} />
+            </div>
+            </>
+          )}
           {canEdit && (
             <div className="form-group">
-              <label htmlFor="email-smtpPassword">SMTP Password / App Password{settings?.passwordSet ? '' : ' *'}</label>
+              <label htmlFor="email-smtpPassword">Mailbox Password{settings?.passwordSet ? '' : ' *'}</label>
               <input
                 id="email-smtpPassword"
                 type="password"
@@ -253,9 +260,15 @@ export const EmailBlock = () => {
             </div>
           )}
         </div>
+        {settings?.smtpHost && (
+          <button type="button" onClick={() => setAdvancedOpen(o => !o)}
+            style={{ background: 'none', border: 'none', padding: 0, marginTop: '10px', color: 'var(--text-muted)', fontSize: '0.76rem', cursor: 'pointer' }}>
+            {advancedOpen ? '▾ Hide mail server settings' : '▸ Advanced mail server settings'}
+          </button>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.78rem', color: settings?.passwordSet ? '#10b981' : 'var(--text-muted)', ...btn }}>
-            <KeyRound size={13} /> {settings?.passwordSet ? 'SMTP password saved on the server' : 'No SMTP password saved yet'}
+            <KeyRound size={13} /> {settings?.passwordSet ? 'Mailbox password saved on the server' : 'No mailbox password saved yet'}
             {canEdit && settings?.passwordSet && (
               <button type="button" onClick={handleClearPassword} className="btn-secondary" style={{ padding: '2px 8px', fontSize: '0.72rem', marginLeft: '6px' }}>
                 Remove
