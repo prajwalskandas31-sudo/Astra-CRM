@@ -122,7 +122,7 @@ export const ESignManagementBlock = () => {
       showToast("This record is not linked to a sale, so the client's email is unknown.", 'error');
       return;
     }
-    if (!window.confirm(`Email the Welcome Kit and the signed agreement to ${rec.clientName}${rec.email ? ` (${rec.email})` : ''}?`)) return;
+    if (!window.confirm(`Email the Welcome Kit, the signed agreement and the e-KYC documents to ${rec.clientName}${rec.email ? ` (${rec.email})` : ''}?`)) return;
     setSendingKitFor(rec.id);
     try {
       showToast(describeSend(await sendWelcomeKit(rec.saleId)), 'success');

@@ -442,6 +442,10 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
             safe_client = _safe_filename(client["name"] or "Client")
             attachments.append((f"Signed Agreement - {safe_client}.pdf", "application/pdf", pdf))
             agreement["attached"] = True
+            # The client's e-KYC record from Leegality: audit trail, Aadhaar e-KYC certificate, KYC uploads
+            kyc = leegality.kyc_documents(doc_id, client["name"] or "Client", client["email"])
+            attachments += [(_safe_filename(name), ctype, content) for name, ctype, content in kyc]
+            agreement["kycFiles"] = [_safe_filename(name) for name, _, _ in kyc]
 
     if not attachments:
         raise HTTPException(status_code=400, detail="Nothing to send: no Welcome Kit files are uploaded and the client has not completed the e-sign.")
@@ -449,6 +453,8 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
     values = {"clientName": client["name"] or "Client", "companyName": _company_name()}
     msg = _message(settings, client["email"], _render(settings["subject"], values), _render(settings["body"], values))
     for name, content_type, content in attachments:
+        if not re.match(r"^[a-z0-9.+-]+/[a-z0-9.+-]+$", content_type or ""):
+            content_type = "application/octet-stream"
         maintype, subtype = content_type.split("/", 1)
         msg.add_attachment(content, maintype=maintype, subtype=subtype, filename=name)
 
@@ -465,6 +471,7 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
         "agreementAttached": agreement["attached"],
         "agreementDocumentId": doc_id,
         "agreementStatus": agreement["status"],
+        "kycFiles": agreement.get("kycFiles", []),
         "sentAt": _now(),
         "sentBy": current_user.get("name"),
         **sent_copy,
