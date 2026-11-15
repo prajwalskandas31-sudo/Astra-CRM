@@ -6,6 +6,7 @@ import { DigitalSignatureVault } from './DigitalSignatureVault';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
 import { downloadLeegalityFile } from '../services/leegalityService';
+import { sendWelcomeKit, describeSend } from '../services/emailService';
 import {
   FileSignature,
   ShieldCheck,
@@ -32,7 +33,8 @@ import {
   Zap,
   Lock,
   Unlock,
-  KeyRound
+  KeyRound,
+  Mail
 } from 'lucide-react';
 
 export const ESignManagementBlock = () => {
@@ -53,6 +55,7 @@ export const ESignManagementBlock = () => {
   const [primarySignatory, setPrimarySignatory] = useState(() => getPrimarySignatory());
   const [liveDispatchData, setLiveDispatchData] = useState(null);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [sendingKitFor, setSendingKitFor] = useState(null);
 
   // Listen to signature/signatory profile updates in real time
   useEffect(() => {
@@ -111,6 +114,22 @@ export const ESignManagementBlock = () => {
       await downloadLeegalityFile(rec.documentId, 'signed-pdf');
     } catch (err) {
       showToast(`Download failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleSendWelcomeKit = async (rec) => {
+    if (!rec.saleId) {
+      showToast("This record is not linked to a sale, so the client's email is unknown.", 'error');
+      return;
+    }
+    if (!window.confirm(`Email the Welcome Kit and the signed agreement to ${rec.clientName}${rec.email ? ` (${rec.email})` : ''}?`)) return;
+    setSendingKitFor(rec.id);
+    try {
+      showToast(describeSend(await sendWelcomeKit(rec.saleId)), 'success');
+    } catch (err) {
+      showToast(`Welcome Kit not sent: ${err.message}`, 'error');
+    } finally {
+      setSendingKitFor(null);
     }
   };
 
@@ -710,6 +729,17 @@ export const ESignManagementBlock = () => {
                         >
                           <Download size={13} />
                         </button>
+                        {rec.verifiedByLeegality && (
+                          <button
+                            onClick={() => handleSendWelcomeKit(rec)}
+                            disabled={sendingKitFor === rec.id}
+                            className="btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title="Email the Welcome Kit files and this signed agreement to the client (Email Block)"
+                          >
+                            <Mail size={13} /> {sendingKitFor === rec.id ? 'Sending…' : 'Send Welcome Kit'}
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             if (window.confirm(`Delete E-Sign record for '${rec.clientName}'?`)) {

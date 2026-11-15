@@ -65,7 +65,7 @@ export const maskToken = (token, leadChars = 6, tailChars = 4) => {
 };
 
 // ─── Backend transport ──────────────────────────────────────────────────────
-const backendFetch = async (path, options = {}) => {
+export const backendFetch = async (path, options = {}) => {
   const token = localStorage.getItem('crm_token');
   if (!token) {
     throw new Error('Not signed in to the CRM backend. Start the backend (port 8000) and sign in again as Super Admin.');
