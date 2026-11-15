@@ -456,7 +456,9 @@ def esign_details(document_id: str, current_user: dict = Depends(require_roles([
     return {**details, "crmRecord": record}
 
 
-def _download(document_id, kind):
+def fetch_completed_pdf(document_id, kind="file"):
+    """(document status, PDF bytes) for a document; the bytes are None unless Leegality reports it COMPLETED.
+    Raises when Leegality cannot be asked or the PDF cannot be downloaded."""
     settings = _settings()
     params = {"documentId": document_id, kind: "true"}
     _, body = _leegality("GET", "/v3.3/document/details", settings, params=params)
@@ -465,16 +467,32 @@ def _download(document_id, kind):
     doc_status = ((body.get("data") or {}).get("document") or {}).get("status")
     if doc_status != "COMPLETED":
         # Leegality also returns the unsigned PDF for drafts/in-progress documents; never pass that off as signed.
-        raise HTTPException(status_code=409, detail=f"Document is {doc_status or 'unknown'}; the signed copy is available only once it is COMPLETED.")
+        return doc_status, None
     cdn_url = (body.get("data") or {}).get(kind)
     if not cdn_url:
         raise HTTPException(status_code=409, detail=f"Leegality has no {kind} for this document yet (it is only available once signing is complete).")
     # The CDN link is valid for ~15 seconds, so fetch it immediately.
-    pdf = httpx.get(cdn_url, timeout=60)
+    try:
+        pdf = httpx.get(cdn_url, timeout=60)
+    except httpx.HTTPError as err:
+        raise HTTPException(status_code=502, detail=f"Downloading the {kind} from Leegality's CDN failed: {err}")
     if pdf.status_code != 200:
         raise HTTPException(status_code=502, detail=f"Downloading the {kind} from Leegality's CDN failed (HTTP {pdf.status_code}).")
+    return doc_status, pdf.content
+
+
+def documents_for_sale(sale_id):
+    """Leegality documents dispatched for a sale, newest first."""
+    docs = [r for r in _read_records().values() if r.get("saleId") == sale_id and r.get("documentId")]
+    return sorted(docs, key=lambda r: r.get("dispatchedAt") or "", reverse=True)
+
+
+def _download(document_id, kind):
+    doc_status, content = fetch_completed_pdf(document_id, kind)
+    if content is None:
+        raise HTTPException(status_code=409, detail=f"Document is {doc_status or 'unknown'}; the signed copy is available only once it is COMPLETED.")
     filename = f"{document_id}_{'signed' if kind == 'file' else 'audit_trail'}.pdf"
-    return Response(content=pdf.content, media_type="application/pdf",
+    return Response(content=content, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 

@@ -54,6 +54,7 @@ import { PaidBlock } from './components/PaidBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
 import { BranchProfilesBlock } from './components/BranchProfilesBlock';
+import { EmailBlock } from './components/EmailBlock';
 import { ResearchReportsBlock } from './components/ResearchReportsBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
@@ -91,6 +92,7 @@ const AppContent = () => {
       'lead-reassignment',
       'company-profile',
       'branch-profiles',
+      'email-block',
       'system-settings',
       'custom-roles',
       'feature-access'
@@ -122,6 +124,7 @@ const AppContent = () => {
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
     'company-profile': 'Company Profile - Company Name, SEBI Registration & Contact Details',
     'branch-profiles': 'Branch Profiles - Branch Details, Managers & Contact Numbers',
+    'email-block': 'Email Block - Sender Email ID & Welcome Kit',
     'system-settings': 'System Settings & UI Customization',
     'custom-roles': 'Custom Roles Builder (Annexure-I)',
     'feature-access': 'Feature Access & Permissions Master Block'
@@ -171,6 +174,8 @@ const AppContent = () => {
         return <CompanyProfileBlock />;
       case 'branch-profiles':
         return <BranchProfilesBlock />;
+      case 'email-block':
+        return <EmailBlock />;
       case 'system-settings':
         return <SystemSettings />;
       case 'custom-roles':

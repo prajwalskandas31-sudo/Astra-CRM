@@ -636,6 +636,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'email-block',
+    name: 'Email Block (Sender Email ID & Welcome Kit)',
+    category: 'Administration & Governance',
+    description: 'The Sender Email ID and up to 19 Welcome Kit files; send a client their Welcome Kit with the signed Leegality agreement. Only a Super Admin can change the sender or the files.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'system-settings',
     name: 'System Settings & UI Customization',
     category: 'Administration & Governance',

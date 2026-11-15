@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
   const { simulatedRole, sales, leadRequests, eSignRecords = [], paidClients = [], hasPermission } = useCRM();
@@ -86,6 +86,11 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       id: 'branch-profiles',
       label: 'Branch Profiles',
       icon: GitBranch
+    },
+    {
+      id: 'email-block',
+      label: 'Email Block',
+      icon: Mail
     },
     {
       id: 'system-settings',

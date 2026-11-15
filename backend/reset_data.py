@@ -23,7 +23,7 @@ BUSINESS_COLLECTIONS = (
     "masterRecords", "eSignRecords", "paidClients", "broadcasts", "login_failures",
 )
 # Single values (collection "kv") that hold business data, and their empty value
-BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": []}
+BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": []}
 EPOCH = "dataEpoch"
 
 
