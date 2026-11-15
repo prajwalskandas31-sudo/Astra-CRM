@@ -56,7 +56,8 @@ export const getWelcomeKitLog = () => json('/email/welcome-kit/log');
 /** One-line summary of a completed send, for toasts. */
 export const describeSend = (r) => {
   const files = r.attachments.length;
-  const agreement = r.agreementAttached ? ' including the signed agreement' : '';
+  const kyc = r.kycFiles?.length ? ` and ${r.kycFiles.length} e-KYC document${r.kycFiles.length === 1 ? '' : 's'}` : '';
+  const agreement = r.agreementAttached ? ` including the signed agreement${kyc}` : '';
   const copy = r.savedToSent === false ? ` (Note: no copy was saved in the mailbox's Sent folder: ${r.sentCopyError})` : '';
   return `Welcome Kit sent to ${r.to} from ${r.from} with ${files} attachment${files === 1 ? '' : 's'}${agreement}.${copy}`;
 };

@@ -354,7 +354,9 @@ export const EmailBlock = () => {
                     <td>{e.from}</td>
                     <td title={e.attachments.join('\n')}>{e.attachments.length}</td>
                     <td>{e.agreementAttached
-                      ? <span style={{ color: '#10b981', ...btn }}><CheckCircle2 size={13} /> Attached</span>
+                      ? <span style={{ color: '#10b981', ...btn }} title={(e.kycFiles || []).join('\n')}>
+                          <CheckCircle2 size={13} /> Attached{e.kycFiles?.length ? ` + ${e.kycFiles.length} e-KYC` : ''}
+                        </span>
                       : <span style={{ color: 'var(--text-muted)' }}>{e.agreementDocumentId ? `Not signed yet (${e.agreementStatus || 'pending'})` : 'No e-sign sent'}</span>}
                     </td>
                     <td>{e.sentBy}</td>
@@ -504,6 +506,15 @@ const WelcomeKitSender = ({ sales, onSent }) => {
                 ? `attached (document ${preview.agreement.documentId}, fetched from Leegality when sending)`
                 : `attached only if the client has completed the e-sign by then (document ${preview.agreement.documentId}, ${preview.agreement.status || 'awaiting signature'})`}
           </div>
+          {preview.agreement.documentId && (
+            <div style={{ ...btn }}>
+              <CheckCircle2 size={14} color={preview.agreement.signed ? '#10b981' : 'var(--text-muted)'} />
+              <strong>e-KYC documents:</strong>{' '}
+              {preview.agreement.signed
+                ? 'attached with the agreement: the Leegality audit trail, the Aadhaar e-KYC certificate (when signed with Aadhaar eSign) and any KYC documents the client uploaded'
+                : 'attached once the client completes the e-sign'}
+            </div>
+          )}
           {preview.lastSent && (
             <div style={{ color: '#f59e0b' }}>
               Already sent on {new Date(preview.lastSent.sentAt).toLocaleString('en-IN')} by {preview.lastSent.sentBy}

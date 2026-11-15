@@ -15,6 +15,7 @@ import hmac
 import io
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -479,6 +480,141 @@ def fetch_completed_pdf(document_id, kind="file"):
     if pdf.status_code != 200:
         raise HTTPException(status_code=502, detail=f"Downloading the {kind} from Leegality's CDN failed (HTTP {pdf.status_code}).")
     return doc_status, pdf.content
+
+
+# ==========================================
+# e-KYC documents (attached to the Welcome Kit)
+# ==========================================
+_CERTIFICATE_LABELS = {
+    "name": "Name (as per Aadhaar)",
+    "yob": "Year of Birth",
+    "gender": "Gender",
+    "state": "State",
+    "pincode": "PIN Code",
+    "title": "Aadhaar (last 4 digits)",
+    "serialNumber": "Certificate Serial Number",
+}
+_SKIP_CERTIFICATE_FIELDS = {"photoHash", "uid"}
+_VERIFICATION_LABELS = {
+    "nameVerification": "Name match",
+    "yobVerification": "Year of birth match",
+    "genderVerification": "Gender match",
+    "stateVerification": "State match",
+    "pincodeVerification": "PIN code match",
+    "titleVerification": "Aadhaar last 4 digits match",
+}
+
+
+def _cdn_get(url, what):
+    try:
+        res = httpx.get(url, timeout=60)
+    except httpx.HTTPError as err:
+        raise HTTPException(status_code=502, detail=f"Downloading {what} from Leegality failed: {err}")
+    if res.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Downloading {what} from Leegality failed (HTTP {res.status_code}).")
+    return res
+
+
+def _supporting_document(document_id, invitation, item, index, settings):
+    """One file the signer uploaded while signing. Leegality's details response may carry a short-lived
+    link to it directly; otherwise it is fetched with fetchDocument (SUPPORTING_DOCUMENT)."""
+    name = (item.get("name") or f"KYC Document {index + 1}") if isinstance(item, dict) else f"KYC Document {index + 1}"
+    url = item.get("file") if isinstance(item, dict) else None
+    if not (isinstance(url, str) and url.startswith("http")):
+        ref = invitation.get("invitationUrl") or ""
+        body = {}
+        # Leegality's docs do not say whether the index starts at 0 or 1, so try 0 first
+        for idx in (index, index + 1):
+            _, body = _leegality("GET", "/v3.3/document/fetchDocument", settings, params={
+                "documentId": document_id, "documentDownloadType": "SUPPORTING_DOCUMENT",
+                "supportDocumentUrl": ref, "index": idx})
+            url = (body.get("data") or {}).get("file") if body.get("status") == 1 else None
+            if url:
+                break
+        if not url:
+            raise HTTPException(status_code=502, detail=f"Leegality listed the client's KYC upload '{name}' but would not "
+                                                        f"return the file: {_messages(body)}. The Welcome Kit was not sent.")
+    res = _cdn_get(url, f"the client's KYC upload '{name}'")
+    content_type = (res.headers.get("content-type") or "").split(";")[0].strip().lower() or "application/octet-stream"
+    return name, content_type, res.content
+
+
+def _certificate_pdf(client_name, document_id, certificate, verification, signed_at):
+    """A one-page record of the Aadhaar e-KYC details Leegality returned. Only Leegality's values are printed."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    def rows_of(data, labels=None):
+        rows = []
+        for key, value in data.items():
+            if key in _SKIP_CERTIFICATE_FIELDS or value in (None, "", [], {}) or isinstance(value, (dict, list)):
+                continue
+            label = (labels or {}).get(key) or re.sub(r"(?<!^)(?=[A-Z])", " ", key).capitalize()
+            if isinstance(value, bool):
+                value = "Matched" if value else "Did not match"
+            rows.append([label, str(value)])
+        return rows
+
+    styles = getSampleStyleSheet()
+    out = io.BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, title=f"Aadhaar e-KYC Certificate - {client_name}")
+    table_style = TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f1f5f9")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ])
+    story = [
+        Paragraph("Aadhaar e-KYC Certificate", styles["Title"]),
+        Paragraph(f"Client: {client_name}<br/>Leegality document: {document_id}<br/>Signed: {signed_at or 'not returned'}", styles["Normal"]),
+        Spacer(1, 14),
+        Paragraph("Details from the Aadhaar eSign certificate", styles["Heading3"]),
+        Table(rows_of(certificate, _CERTIFICATE_LABELS), colWidths=[170, 300], style=table_style),
+    ]
+    checks = rows_of(verification or {}, _VERIFICATION_LABELS)
+    if checks:
+        story += [Spacer(1, 14), Paragraph("Verification results", styles["Heading3"]),
+                  Table(checks, colWidths=[170, 300], style=table_style)]
+    story += [Spacer(1, 18), Paragraph(
+        "These details were returned by Leegality from the client's Aadhaar eSign of the document above. "
+        "The full signing record is in the attached Leegality audit trail.", styles["Italic"])]
+    doc.build(story)
+    return out.getvalue()
+
+
+def kyc_documents(document_id, client_name):
+    """The client's e-KYC files for a COMPLETED document, as (filename, content type, bytes):
+    the audit trail always, the Aadhaar e-KYC certificate when the client signed with Aadhaar eSign,
+    and every KYC document the client uploaded while signing. Raises rather than returning a partial set."""
+    safe = "".join(ch if ch.isalnum() or ch in " .-_" else "_" for ch in (client_name or "Client")).strip() or "Client"
+    status, audit = fetch_completed_pdf(document_id, "auditTrail")
+    if audit is None:
+        raise HTTPException(status_code=409, detail=f"Document is {status}; its e-KYC record is available only once it is COMPLETED.")
+    files = [(f"e-KYC Audit Trail - {safe}.pdf", "application/pdf", audit)]
+
+    settings = _settings()
+    _, body = _leegality("GET", "/v3.3/document/details", settings, params={
+        "documentId": document_id, "invitations_certificateData": "true",
+        "invitations_verificationResponse": "true", "invitations_supportingDocuments": "true"})
+    if body.get("status") != 1:
+        raise HTTPException(status_code=502, detail=f"Leegality: {_messages(body)}")
+    for invitation in (body.get("data") or {}).get("invitations") or []:
+        if (invitation.get("inviteeType") or "").upper() not in ("", "SIGNER"):
+            continue
+        certificate = invitation.get("certificateData")
+        # Virtual Sign also returns certificateData, holding only the typed name; that is no e-KYC
+        aadhaar = "aadhaar" in (invitation.get("usedSignatureType") or "").lower()
+        if aadhaar and isinstance(certificate, dict) and any(v for k, v in certificate.items() if k not in _SKIP_CERTIFICATE_FIELDS):
+            signed_at = (invitation.get("invitationStatus") or {}).get("signDate")
+            files.append((f"Aadhaar e-KYC Certificate - {safe}.pdf", "application/pdf",
+                          _certificate_pdf(client_name, document_id, certificate, invitation.get("verificationResponse"), signed_at)))
+        for index, item in enumerate(invitation.get("supportingDocuments") or []):
+            name, content_type, content = _supporting_document(document_id, invitation, item, index, settings)
+            files.append((f"KYC - {name}", content_type, content))
+    return files
 
 
 def documents_for_sale(sale_id):
