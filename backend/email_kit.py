@@ -17,7 +17,7 @@ import ssl
 import uuid
 from datetime import datetime, timezone
 from email.message import EmailMessage
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr, formatdate, make_msgid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -67,7 +67,8 @@ DEFAULTS = {
     "smtpPassword": "",
     "subject": DEFAULT_SUBJECT,
     "body": DEFAULT_BODY,
-    "imapHost": "",  # blank: the SMTP server with "smtp." replaced by "imap."
+    "imapHost": "",
+    "replyTo": "",  # blank: the Company Profile email  # blank: the SMTP server with "smtp." replaced by "imap."
 }
 
 read_roles = require_roles(["Super Admin", "Admin"])
@@ -100,6 +101,7 @@ class EmailSettingsUpdate(BaseModel):
     smtpSecurity: Optional[str] = None
     smtpUsername: Optional[str] = None
     smtpPassword: Optional[str] = None  # blank keeps the saved one
+    replyTo: Optional[str] = None
     subject: Optional[str] = None
     body: Optional[str] = None
 
@@ -119,6 +121,10 @@ def update_settings(req: EmailSettingsUpdate, current_user: dict = Depends(write
     for key in ("senderName", "smtpUsername", "subject"):
         if key in changes:
             changes[key] = _one_line(changes[key])
+    if "replyTo" in changes:
+        changes["replyTo"] = changes["replyTo"].strip().lower()
+        if changes["replyTo"] and not EMAIL_RE.match(changes["replyTo"]):
+            raise HTTPException(status_code=400, detail="Reply-To is not a valid email address.")
     if "smtpHost" in changes:
         changes["smtpHost"] = changes["smtpHost"].strip().lower()
         if changes["smtpHost"] and not re.match(r"^[a-z0-9.-]+$", changes["smtpHost"]):
@@ -375,12 +381,25 @@ def _smtp_send(settings: dict, message: EmailMessage):
         raise HTTPException(status_code=502, detail=f"The mail server refused: {', '.join(refused)}.")
 
 
+def _reply_to(settings: dict) -> str:
+    """Where client replies go: the Reply-To setting, else the Company Profile email."""
+    if settings.get("replyTo"):
+        return settings["replyTo"]
+    company = ((store.get("companyProfile", "email") or {}).get("value") or "").strip()
+    return company if EMAIL_RE.match(company) else ""
+
+
 def _message(settings: dict, to_email: str, subject: str, body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["From"] = formataddr((_one_line(settings.get("senderName") or ""), settings["senderEmail"]))
     msg["To"] = to_email
     msg["Subject"] = _one_line(subject)
+    # Spam filters penalise mail without a Date header; smtplib does not add one
+    msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain=settings["senderEmail"].split("@", 1)[1])
+    reply_to = _reply_to(settings)
+    if reply_to and reply_to != settings["senderEmail"]:
+        msg["Reply-To"] = reply_to
     msg.set_content(body)
     return msg
 

@@ -17,7 +17,7 @@ const SECURITY = [
   { value: 'none', label: 'None (port 25)', port: 25 }
 ];
 
-const SENDER_FIELDS = ['senderEmail', 'senderName', 'smtpHost', 'smtpPort', 'smtpSecurity', 'smtpUsername'];
+const SENDER_FIELDS = ['senderEmail', 'senderName', 'replyTo', 'smtpHost', 'smtpPort', 'smtpSecurity', 'smtpUsername'];
 const MESSAGE_FIELDS = ['subject', 'body'];
 
 const formatBytes = (n) => {
@@ -215,6 +215,10 @@ export const EmailBlock = () => {
           <div className="form-group">
             <label htmlFor="email-senderName">Sender Name</label>
             <input type="text" placeholder="e.g. Company Welcome Desk" {...fieldProps('senderName')} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="email-replyTo">Replies go to</label>
+            <input type="email" placeholder="Company Profile email (leave blank to use it)" {...fieldProps('replyTo')} />
           </div>
           {showAdvanced && (
             <>

@@ -168,6 +168,21 @@ def test_send_attaches_only_uploaded_files_from_the_configured_sender(crm, sa, s
     assert smtp.logins[-1] == ("welcome@firm.in", "app-pass")
     assert attachments(msg) == [("Welcome Letter.pdf", b"letter"), ("Risk Disclosure.pdf", b"risk"), ("Brochure.png", b"png")]
     assert "Ravi Kumar" in msg.get_body(("plain",)).get_content()
+    assert msg["Date"] and msg["Message-ID"].endswith("@firm.in>")
+
+
+def test_replies_go_to_reply_to_or_the_company_email(crm, sa, smtp):
+    configure(crm, sa, replyTo="")
+    upload(crm, sa, 1, "Kit.pdf", b"kit")
+    add_sale(crm, "sale-reply")
+    crm.store.put("companyProfile", "email", {"id": "email", "value": "support@firm.in"})
+    crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-reply"}, headers=sa)
+    assert smtp.sent[-1]["Reply-To"] == "support@firm.in"
+
+    configure(crm, sa, replyTo="Help@Firm.in")
+    crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-reply"}, headers=sa)
+    assert smtp.sent[-1]["Reply-To"] == "help@firm.in"
+    assert crm.client.put("/api/email/settings", json={"replyTo": "nope"}, headers=sa).status_code == 400
 
 
 def test_signed_agreement_is_attached_once_esign_is_completed(crm, sa, smtp, monkeypatch):
