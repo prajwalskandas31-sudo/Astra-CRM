@@ -267,12 +267,16 @@ def _client(sale: dict) -> dict:
     return {"name": name, "email": email, "emailValid": bool(EMAIL_RE.match(email))}
 
 
-def _agreement_document_id(sale: dict) -> Optional[str]:
-    explicit = sale.get("eSignDocumentId") or (sale.get("eSignDetails") or {}).get("documentId")
-    if explicit:
-        return explicit
+def _agreement_record(sale: dict) -> Optional[dict]:
+    """The Leegality dispatch the backend itself recorded for this sale. The sale's own eSignDocumentId is
+    browser-synced data that the submitter can edit while the sale is open, so it is never trusted here:
+    it could point at another client's signed agreement."""
     docs = leegality.documents_for_sale(sale["id"])
-    return docs[0]["documentId"] if docs else None
+    return docs[0] if docs else None
+
+
+def _signed_by(record: dict) -> str:
+    return ((record.get("sentContact") or {}).get("email") or "").strip().lower()
 
 
 def _render(template: str, values: dict) -> str:
@@ -336,9 +340,9 @@ def preview(sale_id: str, current_user: dict = Depends(read_roles)):
     """What a send would do, from the CRM's own records (Leegality itself is asked only when sending)."""
     sale = _sale_or_404(sale_id)
     slots = _slots()
-    doc_id = _agreement_document_id(sale)
-    record = leegality._read_records().get(doc_id, {}) if doc_id else {}
-    signed = sale.get("eSignStatus") == "Completed" or record.get("documentStatus") == "COMPLETED"
+    record = _agreement_record(sale) or {}
+    doc_id = record.get("documentId")
+    signed = bool(doc_id) and (sale.get("eSignStatus") == "Completed" or record.get("documentStatus") == "COMPLETED")
     last = next((e for e in reversed(store.get_value(LOG, []) or []) if e.get("saleId") == sale_id), None)
     return {
         "client": _client(sale),
@@ -368,8 +372,15 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
 
     # The signed agreement, straight from Leegality. If a document exists but Leegality cannot be asked,
     # fail instead of sending a kit that silently lacks the agreement.
-    doc_id = _agreement_document_id(sale)
+    record = _agreement_record(sale)
+    doc_id = record["documentId"] if record else None
     agreement = {"documentId": doc_id, "attached": False, "status": None}
+    if record and _signed_by(record) and _signed_by(record) != client["email"].lower():
+        # The agreement only ever goes to the person Leegality asked to sign it
+        raise HTTPException(
+            status_code=409,
+            detail=f"The client's Email ID ({client['email']}) differs from the address the agreement was sent to for e-sign "
+                   f"({_signed_by(record)}). Correct the Client Information Page before sending the Welcome Kit.")
     if doc_id:
         status, pdf = leegality.fetch_completed_pdf(doc_id, "file")
         agreement["status"] = status

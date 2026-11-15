@@ -74,6 +74,13 @@ def add_sale(crm, sale_id, email="client@example.com", **extra):
     crm.store.put("sales", sale_id, {"id": sale_id, "clientName": "Ravi Kumar", "email": email, **extra})
 
 
+def dispatched(crm, sale_id, doc_id, email="client@example.com", status="SENT"):
+    """What backend/leegality.py records when the Super Admin dispatches the e-sign."""
+    with crm.store.update_value("leegalityDocuments", {}) as box:
+        box[0][doc_id] = {"documentId": doc_id, "saleId": sale_id, "documentStatus": status,
+                          "dispatchedAt": "2026-11-15T10:00:00", "sentContact": {"email": email, "phone": "9876543210"}}
+
+
 def attachments(msg):
     return [(p.get_filename(), p.get_content()) for p in msg.iter_attachments()]
 
@@ -138,6 +145,7 @@ def test_signed_agreement_is_attached_once_esign_is_completed(crm, sa, smtp, mon
     clear_slots(crm, sa)
     upload(crm, sa, 1, "Welcome Letter.pdf", b"letter")
     add_sale(crm, "sale-signed", eSignStatus="Completed", eSignDocumentId="DOC-1")
+    dispatched(crm, "sale-signed", "DOC-1", status="COMPLETED")
     calls = []
 
     def fake_fetch(doc_id, kind):
@@ -159,7 +167,8 @@ def test_document_not_yet_signed_sends_files_without_agreement(crm, sa, smtp, mo
     configure(crm, sa)
     clear_slots(crm, sa)
     upload(crm, sa, 5, "Kit.pdf", b"kit")
-    add_sale(crm, "sale-pending", eSignDocumentId="DOC-2")
+    add_sale(crm, "sale-pending")
+    dispatched(crm, "sale-pending", "DOC-2")
     monkeypatch.setattr(crm.leegality, "fetch_completed_pdf", lambda *a: ("SENT", None))
 
     res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-pending"}, headers=sa)
@@ -170,7 +179,8 @@ def test_document_not_yet_signed_sends_files_without_agreement(crm, sa, smtp, mo
 def test_nothing_is_sent_when_leegality_cannot_be_asked(crm, sa, smtp, monkeypatch):
     configure(crm, sa)
     upload(crm, sa, 1, "Kit.pdf", b"kit")
-    add_sale(crm, "sale-down", eSignStatus="Completed", eSignDocumentId="DOC-3")
+    add_sale(crm, "sale-down", eSignStatus="Completed")
+    dispatched(crm, "sale-down", "DOC-3", status="COMPLETED")
 
     def down(*a):
         raise HTTPException(status_code=502, detail="Could not reach Leegality")
@@ -200,3 +210,33 @@ def test_send_refuses_without_recipient_or_sender_or_files(crm, sa, smtp):
     res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-empty"}, headers=sa)
     assert res.status_code == 400 and "SMTP Password" in res.json()["detail"]
     assert smtp.sent == []
+
+
+def test_a_document_id_on_the_sale_itself_is_never_trusted(crm, sa, smtp, monkeypatch):
+    """A submitter can edit their open sale; pointing it at another client's agreement must not leak that PDF."""
+    configure(crm, sa)
+    clear_slots(crm, sa)
+    upload(crm, sa, 1, "Kit.pdf", b"kit")
+    dispatched(crm, "victim-sale", "DOC-VICTIM", email="victim@example.com", status="COMPLETED")
+    add_sale(crm, "forged-sale", email="attacker@example.com", eSignStatus="Completed", eSignDocumentId="DOC-VICTIM",
+             eSignDetails={"documentId": "DOC-VICTIM"})
+    monkeypatch.setattr(crm.leegality, "fetch_completed_pdf", lambda *a: pytest.fail("the victim's agreement must not be fetched"))
+
+    preview = crm.client.get("/api/email/welcome-kit/preview/forged-sale", headers=sa).json()
+    assert preview["agreement"]["documentId"] is None and preview["agreement"]["signed"] is False
+
+    res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "forged-sale"}, headers=sa)
+    assert res.status_code == 200 and res.json()["agreementAttached"] is False
+    assert attachments(smtp.sent[-1]) == [("Kit.pdf", b"kit")]
+
+
+def test_agreement_only_goes_to_the_address_it_was_sent_to_for_signing(crm, sa, smtp, monkeypatch):
+    configure(crm, sa)
+    upload(crm, sa, 1, "Kit.pdf", b"kit")
+    dispatched(crm, "sale-moved", "DOC-MOVED", email="signer@example.com", status="COMPLETED")
+    add_sale(crm, "sale-moved", email="someone-else@example.com", eSignStatus="Completed")
+    monkeypatch.setattr(crm.leegality, "fetch_completed_pdf", lambda *a: pytest.fail("must refuse before fetching"))
+    before = len(smtp.sent)
+    res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-moved"}, headers=sa)
+    assert res.status_code == 409 and "signer@example.com" in res.json()["detail"]
+    assert len(smtp.sent) == before
