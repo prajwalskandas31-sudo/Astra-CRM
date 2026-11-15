@@ -9,7 +9,9 @@ Everything here stays on the server: the SMTP password is never returned to a br
 not part of the synced CRM data, and the recipient is read from the sale, not taken from the request.
 """
 import base64
+import imaplib
 import re
+import time
 import smtplib
 import ssl
 import uuid
@@ -65,6 +67,7 @@ DEFAULTS = {
     "smtpPassword": "",
     "subject": DEFAULT_SUBJECT,
     "body": DEFAULT_BODY,
+    "imapHost": "",  # blank: the SMTP server with "smtp." replaced by "imap."
 }
 
 read_roles = require_roles(["Super Admin", "Admin"])
@@ -293,6 +296,57 @@ def _require_sender(settings: dict):
         raise HTTPException(status_code=400, detail=f"Set the {', '.join(missing)} in the Email Block's Sender Email ID section first.")
 
 
+SENT_FALLBACK_NAMES = ("Sent", "INBOX.Sent", "Sent Items", "Sent Messages", "INBOX.Sent Items")
+
+
+def _imap_host(settings: dict) -> str:
+    if settings.get("imapHost"):
+        return settings["imapHost"]
+    host = settings.get("smtpHost") or ""
+    return "imap." + host[len("smtp."):] if host.startswith("smtp.") else host
+
+
+def _sent_folder(imap) -> Optional[str]:
+    """The mailbox's Sent folder: the one with the IMAP Sent flag, else a commonly used name."""
+    status, rows = imap.list()
+    if status != "OK":
+        return None
+    names = []
+    for row in rows or []:
+        line = row.decode("utf-8", "replace") if isinstance(row, bytes) else str(row)
+        m = re.match(r'^\((?P<flags>[^)]*)\) (?:"[^"]*"|NIL) (?P<name>.+)$', line)
+        if not m:
+            continue
+        name = m.group("name").strip()
+        if r"\sent" in m.group("flags").lower():
+            return name
+        names.append(name.strip('"'))
+    for candidate in SENT_FALLBACK_NAMES:
+        if candidate in names:
+            return f'"{candidate}"' if " " in candidate else candidate
+    return None
+
+
+def _save_to_sent(settings: dict, message: EmailMessage) -> dict:
+    """Put a copy of a sent email in the mailbox's Sent folder (SMTP alone never does that), so it shows
+    up under Sent in webmail. The email has already gone out, so a failure here is reported, not raised."""
+    host = _imap_host(settings)
+    if not host:
+        return {"savedToSent": False, "sentCopyError": "No IMAP server known for this mailbox."}
+    try:
+        with imaplib.IMAP4_SSL(host, 993, timeout=30, ssl_context=ssl.create_default_context()) as imap:
+            imap.login(settings.get("smtpUsername") or settings["senderEmail"], settings["smtpPassword"])
+            folder = _sent_folder(imap)
+            if not folder:
+                return {"savedToSent": False, "sentCopyError": "The mailbox has no Sent folder."}
+            status, data = imap.append(folder, r"(\Seen)",imaplib.Time2Internaldate(time.time()), message.as_bytes())
+            if status != "OK":
+                return {"savedToSent": False, "sentCopyError": f"IMAP refused the copy: {data}"}
+            return {"savedToSent": True, "sentFolder": folder.strip('"')}
+    except (imaplib.IMAP4.error, OSError) as err:
+        return {"savedToSent": False, "sentCopyError": f"Could not save a copy to Sent via {host}: {err}"}
+
+
 def _smtp_send(settings: dict, message: EmailMessage):
     host, port, mode = settings["smtpHost"], int(settings["smtpPort"]), settings["smtpSecurity"]
     username = settings.get("smtpUsername") or settings["senderEmail"]
@@ -399,6 +453,7 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
         msg.add_attachment(content, maintype=maintype, subtype=subtype, filename=name)
 
     _smtp_send(settings, msg)
+    sent_copy = _save_to_sent(settings, msg)
 
     entry = {
         "id": uuid.uuid4().hex,
@@ -412,6 +467,7 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
         "agreementStatus": agreement["status"],
         "sentAt": _now(),
         "sentBy": current_user.get("name"),
+        **sent_copy,
     }
     with store.update_value(LOG, []) as box:
         box[0] = (box[0] or [])[-(LOG_LIMIT - 1):] + [entry]
@@ -439,4 +495,4 @@ def send_test(req: TestEmail, current_user: dict = Depends(write_roles)):
                    f"This is a test email from the CRM, sent from {settings['senderEmail']}.\n\n"
                    f"Welcome Kits to clients will be sent from this address.")
     _smtp_send(settings, msg)
-    return {"sent": True, "to": to, "from": settings["senderEmail"]}
+    return {"sent": True, "to": to, "from": settings["senderEmail"], **_save_to_sent(settings, msg)}
