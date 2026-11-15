@@ -35,11 +35,41 @@ class FakeSMTP:
         return {}
 
 
+class FakeIMAP:
+    """Stands in for imaplib.IMAP4_SSL: a mailbox whose Sent folder is flagged like Hostinger's."""
+    appended = []
+    folders = [b'(\HasNoChildren) "." "INBOX"', b'(\HasNoChildren \Sent) "." "INBOX.Sent"']
+    fail = False
+
+    def __init__(self, host, port, timeout=None, ssl_context=None):
+        if FakeIMAP.fail:
+            raise OSError("connection refused")
+        self.host = host
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def login(self, user, password):
+        pass
+
+    def list(self):
+        return "OK", list(FakeIMAP.folders)
+
+    def append(self, folder, flags, date, message):
+        FakeIMAP.appended.append((self.host, folder, flags, message))
+        return "OK", [b"APPEND completed"]
+
+
 @pytest.fixture
 def smtp(crm, monkeypatch):
     FakeSMTP.sent, FakeSMTP.logins = [], []
+    FakeIMAP.appended, FakeIMAP.fail = [], False
     monkeypatch.setattr(crm.email_kit.smtplib, "SMTP_SSL", FakeSMTP)
     monkeypatch.setattr(crm.email_kit.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(crm.email_kit.imaplib, "IMAP4_SSL", FakeIMAP)
     return FakeSMTP
 
 
@@ -240,3 +270,26 @@ def test_agreement_only_goes_to_the_address_it_was_sent_to_for_signing(crm, sa, 
     res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-moved"}, headers=sa)
     assert res.status_code == 409 and "signer@example.com" in res.json()["detail"]
     assert len(smtp.sent) == before
+
+
+def test_a_copy_of_every_sent_kit_is_saved_to_the_sent_folder(crm, sa, smtp):
+    configure(crm, sa)
+    clear_slots(crm, sa)
+    upload(crm, sa, 1, "Kit.pdf", b"kit")
+    add_sale(crm, "sale-sentcopy")
+    res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-sentcopy"}, headers=sa)
+    assert res.status_code == 200, res.text
+    assert res.json()["savedToSent"] is True and res.json()["sentFolder"] == "INBOX.Sent"
+    host, folder, flags, raw = FakeIMAP.appended[-1]
+    assert host == "imap.firm.in" and "Seen" in flags
+    assert raw == smtp.sent[-1].as_bytes()
+
+
+def test_a_failed_sent_copy_does_not_fail_the_send(crm, sa, smtp):
+    configure(crm, sa)
+    upload(crm, sa, 1, "Kit.pdf", b"kit")
+    add_sale(crm, "sale-imapdown")
+    FakeIMAP.fail = True
+    res = crm.client.post("/api/email/welcome-kit/send", json={"saleId": "sale-imapdown"}, headers=sa)
+    assert res.status_code == 200 and len(smtp.sent) == 1
+    assert res.json()["savedToSent"] is False and "connection refused" in res.json()["sentCopyError"]

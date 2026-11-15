@@ -57,5 +57,6 @@ export const getWelcomeKitLog = () => json('/email/welcome-kit/log');
 export const describeSend = (r) => {
   const files = r.attachments.length;
   const agreement = r.agreementAttached ? ' including the signed agreement' : '';
-  return `Welcome Kit sent to ${r.to} from ${r.from} with ${files} attachment${files === 1 ? '' : 's'}${agreement}.`;
+  const copy = r.savedToSent === false ? ` (Note: no copy was saved in the mailbox's Sent folder: ${r.sentCopyError})` : '';
+  return `Welcome Kit sent to ${r.to} from ${r.from} with ${files} attachment${files === 1 ? '' : 's'}${agreement}.${copy}`;
 };
