@@ -61,3 +61,17 @@ export const describeSend = (r) => {
   const copy = r.savedToSent === false ? ` (Note: no copy was saved in the mailbox's Sent folder: ${r.sentCopyError})` : '';
   return `Welcome Kit sent to ${r.to} from ${r.from} with ${files} attachment${files === 1 ? '' : 's'}${agreement}.${copy}`;
 };
+
+// ─── Service Expiry Email (backend/service_expiry.py) ───
+export const getServiceExpiry = () => json('/email/service-expiry');
+
+export const saveServiceExpiry = (changes) =>
+  json('/email/service-expiry', { method: 'PUT', body: JSON.stringify(changes) });
+
+export const runServiceExpiryCheck = () => json('/email/service-expiry/run', { method: 'POST' });
+
+export const sendServiceExpiryTest = (to) =>
+  json('/email/service-expiry/test', { method: 'POST', body: JSON.stringify({ to: to || null }) });
+
+export const resendServiceExpiryEmail = (paidId) =>
+  json(`/email/service-expiry/send/${encodeURIComponent(paidId)}`, { method: 'POST' });
