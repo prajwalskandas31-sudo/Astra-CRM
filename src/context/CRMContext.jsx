@@ -14,6 +14,7 @@ import { useServerSync } from '../services/serverSync';
 
 // Which crm_* keys this browser held before the app wrote anything (the server import needs to know
 // whether local data is real or just defaults saved on first render).
+export const MAX_COMPANY_ASSETS = 10;
 const LOCAL_KEYS_AT_START = typeof window !== 'undefined' ? new Set(Object.keys(localStorage)) : new Set();
 
 // localStorage is only a cache of the server data; a full browser quota must never crash the app.
@@ -1114,6 +1115,19 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_branches', JSON.stringify(branches));
   }, [branches]);
 
+  // ─── Company Assets Provided (Super Admin managed list, max 10; users keep asset ids) ─
+  const [companyAssets, setCompanyAssets] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_company_assets') || 'null');
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    cacheSet('crm_company_assets', JSON.stringify(companyAssets));
+  }, [companyAssets]);
+
   // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
   const [financialSettings, setFinancialSettings] = useState(() => {
     const saved = localStorage.getItem('crm_financial_settings');
@@ -1221,6 +1235,7 @@ export const CRMProvider = ({ children }) => {
     companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
     branches: { value: branches, setValue: setBranches, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_branches') },
+    companyAssets: { value: companyAssets, setValue: setCompanyAssets, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_company_assets') },
   }, {
     enabled: serverSyncActive && !!authUser,
     token: authToken,
@@ -2527,6 +2542,36 @@ export const CRMProvider = ({ children }) => {
     setBranches(prev => prev.filter(b => b.id !== id));
   };
 
+  // Returns an error message instead of saving when the name is blank, repeated or the list is full
+  const companyAssetError = (name, exceptId = null) => {
+    const clean = (name || '').trim();
+    if (!clean) return 'Enter an asset name.';
+    if (companyAssets.some(a => a.id !== exceptId && (a.name || '').trim().toLowerCase() === clean.toLowerCase())) {
+      return `'${clean}' is already in the list.`;
+    }
+    if (!exceptId && companyAssets.length >= MAX_COMPANY_ASSETS) return `Only ${MAX_COMPANY_ASSETS} asset items can be set up.`;
+    return null;
+  };
+
+  const addCompanyAsset = (name) => {
+    const error = companyAssetError(name);
+    if (error) return { success: false, error };
+    const asset = { id: 'ast-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900), name: name.trim() };
+    setCompanyAssets(prev => [...prev, asset]);
+    return { success: true, asset };
+  };
+
+  const updateCompanyAsset = (id, name) => {
+    const error = companyAssetError(name, id);
+    if (error) return { success: false, error };
+    setCompanyAssets(prev => prev.map(a => a.id === id ? { ...a, name: name.trim() } : a));
+    return { success: true };
+  };
+
+  const deleteCompanyAsset = (id) => {
+    setCompanyAssets(prev => prev.filter(a => a.id !== id));
+  };
+
   const updateFinancialSettings = (updated) => {
     setFinancialSettings(prev => ({ ...prev, ...updated }));
   };
@@ -3386,6 +3431,11 @@ export const CRMProvider = ({ children }) => {
       addBranch,
       updateBranch,
       deleteBranch,
+      // ─── Company Assets Provided ────────────────────────────
+      companyAssets,
+      addCompanyAsset,
+      updateCompanyAsset,
+      deleteCompanyAsset,
       // ─── Financial Settings & Limits ────────────────────────
       financialSettings,
       updateFinancialSettings,

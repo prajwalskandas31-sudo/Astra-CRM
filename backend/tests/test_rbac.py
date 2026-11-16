@@ -149,3 +149,14 @@ def test_branch_is_saved_on_create_and_set_by_admins_only(crm, tokens):
     assert put_user(crm, tokens["exec"], EXEC_ID, {"branchId": "br-blr"}) == 403
     assert put_user(crm, tokens["admin"], EXEC_ID, {"branchId": "br-blr"}) == 200
     assert crm.store.get("users", EXEC_ID)["branchId"] == "br-blr"
+
+
+def test_company_assets_are_saved_on_create_and_set_by_admins_only(crm, tokens):
+    body = {"name": "Asset Person", "mobile": "9444444444", "password": STRONG, "email": "ap@x.com",
+            "reportingTo": "x", "companyAssets": ["ast-1", " ", "ast-2", "ast-1"]}
+    created = crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"]))
+    assert created.status_code == 200 and created.json()["companyAssets"] == ["ast-1", "ast-2"]
+
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"companyAssets": ["ast-3"]}) == 403
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"companyAssets": ["ast-3"]}) == 200
+    assert crm.store.get("users", EXEC_ID)["companyAssets"] == ["ast-3"]
