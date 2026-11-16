@@ -17,6 +17,9 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import sale_review
+    from backend import client_info_telegram
+    from backend import service_expiry
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -29,6 +32,9 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import sale_review
+    import client_info_telegram
+    import service_expiry
     from db_init import init_database
 
 
@@ -53,6 +59,9 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(sale_review.router)
+app.include_router(client_info_telegram.router)
+app.include_router(service_expiry.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -61,13 +70,19 @@ def start_broadcast_pollers():
     # With several workers only one may poll Telegram, or every call would be sent once per worker
     if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
+        # Client Information review group (Approve / Reject before the Sale Approval queue)
+        sale_review.start()
         # Research reports are built one at a time in this same worker
         reports.start_worker()
+        # Expired services: disabled in the Telegram Control Block and sent the Service Expiry Email
+        service_expiry.start_worker()
 
 
 @app.on_event("shutdown")
 def stop_broadcast_pollers():
     broadcasts.stop_pollers()
+    sale_review.stop()
+    service_expiry.stop_worker()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
@@ -82,6 +97,8 @@ class UserCreate(BaseModel):
     email: Optional[str] = ""
     reportingTo: Optional[str] = "Sreenivasulu"
     employeeId: Optional[str] = None
+    officeNumber: Optional[str] = ""
+    officialEmail: Optional[str] = ""
     bankAccountNumber: Optional[str] = ""
     ifscCode: Optional[str] = ""
     bankNameAndBranch: Optional[str] = ""
@@ -97,6 +114,8 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     email: Optional[str] = None
     reportingTo: Optional[str] = None
+    officeNumber: Optional[str] = None
+    officialEmail: Optional[str] = None
     bankAccountNumber: Optional[str] = None
     ifscCode: Optional[str] = None
     bankNameAndBranch: Optional[str] = None
@@ -306,6 +325,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "email": email,
         "reportingTo": req.reportingTo or "Sreenivasulu",
         "employeeId": req.employeeId or f"EMP-{store.count('users') + 100}",
+        "officeNumber": (req.officeNumber or "").strip(),
+        "officialEmail": (req.officialEmail or "").strip().lower(),
         "status": "Active",
         "expiryDate": "27-07-2027",
         "bankAccountNumber": req.bankAccountNumber or "",
@@ -344,7 +365,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -365,6 +386,8 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.role is not None: user["role"] = req.role
     if req.email is not None: user["email"] = req.email
     if req.reportingTo is not None: user["reportingTo"] = req.reportingTo
+    if req.officeNumber is not None: user["officeNumber"] = req.officeNumber.strip()
+    if req.officialEmail is not None: user["officialEmail"] = req.officialEmail.strip().lower()
     if req.bankAccountNumber is not None: user["bankAccountNumber"] = req.bankAccountNumber
     if req.ifscCode is not None: user["ifscCode"] = req.ifscCode
     if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch

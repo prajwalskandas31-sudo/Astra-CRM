@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, TELEGRAM_REVIEW_STATUS } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
   CheckCircle, 
@@ -114,12 +114,17 @@ export const SaleApprovalWorkflow = () => {
     }
   };
 
-  // Sales already sent to Leegality move down to the pipeline, where the traffic light tracks them
+  // Sales already sent to Leegality move down to the pipeline, where the traffic light tracks them.
+  // Submissions still waiting on (or rejected in) the Telegram review group are not in either list.
+  const inTelegramReview = (s) => s.status === TELEGRAM_REVIEW_STATUS || s.status === 'Rejected in Telegram Review';
+  const awaitingTelegram = sales.filter(s => s.status === TELEGRAM_REVIEW_STATUS);
   const pendingSales = sales.filter(s =>
-    s.status.includes('Pending') ||
-    s.status.includes('Voice Call Pending')
+    !inTelegramReview(s) && (
+      s.status.includes('Pending') ||
+      s.status.includes('Voice Call Pending')
+    )
   );
-  const processedSales = sales.filter(s => !pendingSales.some(p => p.id === s.id));
+  const processedSales = sales.filter(s => !inTelegramReview(s) && !pendingSales.some(p => p.id === s.id));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -169,6 +174,11 @@ export const SaleApprovalWorkflow = () => {
         <div style={{ padding: '12px 20px', background: 'var(--bg-table-head)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h4 style={{ fontSize: '0.86rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
             <Clock size={15} /> Pending Super Admin Approval Queue ({pendingSales.length})
+            {awaitingTelegram.length > 0 && (
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                · {awaitingTelegram.length} awaiting Telegram group approval
+              </span>
+            )}
           </h4>
           <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
             Voice Agent: <strong>{voiceAgentSettings?.enabled ? 'Enabled' : 'Disabled'}</strong>

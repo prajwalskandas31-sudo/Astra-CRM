@@ -60,9 +60,10 @@ import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewMo
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { isRealLeegalityDispatch } from './services/leegalityService';
 import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchModal';
+import { useEKycDeepLink } from './services/clientInfoTelegramService';
 
 const AppContent = () => {
-  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign } = useCRM();
+  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign, sales } = useCRM();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
@@ -103,6 +104,34 @@ const AppContent = () => {
       setActiveTab(fallbackTab);
     }
   }, [currentUser?.id, simulatedRole, activeTab, userPermissions]);
+
+  // The e-KYC link at the end of the Client Information message in Telegram (?ekyc=<saleId>):
+  // runs the same "Trigger e-KYC & E-Sign" as Sale Approvals once the user has signed in.
+  useEKycDeepLink({
+    signedIn: !!authToken && !!currentUser,
+    sales,
+    onStart: async (sale) => {
+      setActiveTab('sale-approvals');
+      if (currentUser?.role !== 'Super Admin') {
+        showToast('Only a Super Admin can start e-KYC & E-Sign. Sign in as Super Admin and open the link again.', 'error');
+        return;
+      }
+      if (isRealLeegalityDispatch(sale) && !['Rejected by Client', 'Invitation Expired'].includes(sale.eSignStatus)) {
+        showToast(`e-KYC & E-Sign was already sent for '${sale.clientName}'. Showing its Leegality status.`, 'info');
+        setGlobalLiveDispatchData({ sale, result: sale.eSignDetails?.documentId ? sale.eSignDetails : { documentId: sale.eSignDocumentId } });
+        return;
+      }
+      showToast(`Starting e-KYC & E-Sign for '${sale.clientName}' from the Telegram link...`, 'info');
+      try {
+        const res = await triggerEKycAndESign(sale.id);
+        setGlobalLiveDispatchData({ sale, result: res.apiResult });
+        showToast(`Leegality created document ${res.apiResult.documentId} for '${sale.clientName}'.`, 'success');
+      } catch (err) {
+        showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
+      }
+    },
+    onMissing: (saleId) => showToast(`The e-KYC link's sale (${saleId}) was not found in the CRM. It may have been deleted.`, 'error')
+  });
 
   if (!authToken || !currentUser) {
     return <LoginPage />;

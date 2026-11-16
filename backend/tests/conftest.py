@@ -45,8 +45,10 @@ def crm(tmp_path_factory):
     import backend.reports as reports
     import backend.sync as sync
     import backend.email_kit as email_kit
+    import backend.client_info_telegram as client_info_telegram
+    import backend.service_expiry as service_expiry
     import backend.db_init as db_init
-    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, db_init):
+    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, service_expiry, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
     # Never import the real backend/data files into the test database
@@ -55,6 +57,7 @@ def crm(tmp_path_factory):
     main = importlib.reload(main)
     # Broadcasts never read the real backend/.env in tests
     broadcasts.ENV_PATH = str(data_dir / "broadcasts.env")
+    client_info_telegram.ENV_PATH = str(data_dir / "client_info.env")
 
     client = TestClient(main.app)
     ip_counter = iter(range(1, 10_000))
@@ -72,7 +75,8 @@ def crm(tmp_path_factory):
         return res.json()["access_token"]
 
     return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts, reports=reports,
-                           store=store, email_kit=email_kit, leegality=leegality, login=login, token=token)
+                           store=store, email_kit=email_kit, service_expiry=service_expiry, leegality=leegality,
+                           client_info_telegram=client_info_telegram, login=login, token=token)
 
 
 def bearer(tok):

@@ -84,6 +84,26 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## Client Information review group (Telegram Approve / Reject)
+
+With this on, **Send to Review** on the Client Information page posts every detail of the submission
+(and its transaction attachments) to a Telegram group with **Approve** and **Reject** buttons. Only an
+Approve there moves the sale into the **Sale Approval & Automated Verification Queue**; a Reject sends it
+back to the executive (notification + lead history) to correct and resubmit. Code: `backend/sale_review.py`.
+
+| `backend/.env` key | Value |
+|---|---|
+| `SALE_REVIEW_BOT_TOKEN` | the review bot's BotFather token. Empty = feature off (sales go straight to the queue) |
+| `SALE_REVIEW_CHAT_ID` | the group's id (e.g. `-100…`). Required: nothing is posted until it is set |
+
+Add the bot to the group and send `/chatid` there; the bot replies with the group's id. Put both keys in
+`backend/.env` and restart the backend (`docker compose up -d backend`). The group can only be chosen
+here, on the server, never from inside Telegram, so a stranger who adds the bot to their own group gets
+nothing. Submissions made before the id is set are queued and posted once it is. If Telegram upgrades the
+group to a supergroup, the bot follows the new id by itself. Super Admins can check
+`GET /api/sale-review/status` (bot name, group id, last error, queued posts). As with the trade-call
+bots, run a token on one server only.
+
 ## Research Reports (Telegram calls → 3-page PDFs, on demand)
 
 Calls posted in the Telegram bots (above) are logged as they come in. Reports are not made live: in
@@ -123,6 +143,20 @@ so the daily login is not used here. Instead the Upstox account owner generates 
 Reports. The CRM checks it with Upstox before saving, never shows it again, and warns 30 days before it
 expires. Without a token the CRM uses Upstox's public market data and notes this in the Telegram reply.
 The daily login (`/api/upstox/login-url`, `/api/upstox/callback`) stays in the code for a server with HTTPS.
+
+## Client Information Page alerts (Telegram)
+
+"Send to Review" on the Client Information Page posts every detail on the page, through the
+`Client_info_page_updates_bot` bot, to the `Client_information_page_updates` Telegram group. The message
+ends with an e-KYC link (`http://<server>:<CRM_PORT>/?ekyc=<saleId>`, also as a button): it opens the CRM
+and, after a Super Admin signs in, runs the same "Trigger e-KYC & E-Sign" as Sale Approvals. A sale that was
+already sent shows its Leegality status instead, so a second tap never spends another credit.
+
+| Key | Value |
+|---|---|
+| `TELEGRAM_CLIENT_INFO_BOT_TOKEN` | The bot's BotFather token |
+| `TELEGRAM_CLIENT_INFO_CHAT_ID` | Optional. Without it the CRM finds the group itself: send `/start@Client_info_page_updates_bot` in the group once (Telegram keeps that for 24 hours); the id is then remembered |
+| `CRM_PUBLIC_URL` | Required, e.g. `http://200.234.32.65:8080`. The only address the e-KYC link may use; the address the browser reports is never trusted |
 
 ## e-KYC & E-Sign (Leegality)
 
