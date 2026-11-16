@@ -94,12 +94,14 @@ back to the executive (notification + lead history) to correct and resubmit. Cod
 | `backend/.env` key | Value |
 |---|---|
 | `SALE_REVIEW_BOT_TOKEN` | the review bot's BotFather token. Empty = feature off (sales go straight to the queue) |
-| `SALE_REVIEW_CHAT_ID` | optional group id (e.g. `-100…`). Without it, a group member sends `/bind` in the group once |
+| `SALE_REVIEW_CHAT_ID` | the group's id (e.g. `-100…`). Required: nothing is posted until it is set |
 
-Add the bot to the group, set the token, redeploy (`docker compose up -d backend`), then send `/bind` in
-the group; the bot answers "Linked". After that `/bind` from any other group is refused. Submissions made
-before the group is linked are queued and posted as soon as it is. Super Admins can check
-`GET /api/sale-review/status` (bot name, linked group, last error, queued posts). As with the trade-call
+Add the bot to the group and send `/chatid` there; the bot replies with the group's id. Put both keys in
+`backend/.env` and restart the backend (`docker compose up -d backend`). The group can only be chosen
+here, on the server, never from inside Telegram, so a stranger who adds the bot to their own group gets
+nothing. Submissions made before the id is set are queued and posted once it is. If Telegram upgrades the
+group to a supergroup, the bot follows the new id by itself. Super Admins can check
+`GET /api/sale-review/status` (bot name, group id, last error, queued posts). As with the trade-call
 bots, run a token on one server only.
 
 ## Research Reports (Telegram calls → 3-page PDFs, on demand)

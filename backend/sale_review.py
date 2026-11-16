@@ -7,7 +7,8 @@ and Reject buttons. Approve moves the sale into the Sale Approval & Automated Ve
 (the status the queue lists); Reject sends it back to the person who submitted it.
 
 Configured in backend/.env: SALE_REVIEW_BOT_TOKEN (BotFather token), and optionally
-SALE_REVIEW_CHAT_ID. Without a chat id, a member sends /bind in the group once to link it.
+SALE_REVIEW_CHAT_ID (the group id; /chatid in the group shows it). Nothing is posted until the
+id is set: the group is chosen only by whoever controls the server, never from inside Telegram.
 The server has no HTTPS, which Telegram webhooks require, so updates are long-polled.
 """
 import base64
@@ -42,7 +43,7 @@ QUEUE_STATUS = "Pending Super Admin Review"
 QUEUE_STAGE = "Under Review by Super Admin"
 
 OUTBOX = "saleReviewOutbox"      # sale ids waiting to be posted
-CHAT = "saleReviewChat"          # {"id", "title"} of the bound group
+MIGRATED = "saleReviewMigrated"  # {old id: new id} reported by Telegram when the group became a supergroup
 OFFSET = "saleReviewOffset"
 STATUS = "saleReviewStatus"      # poller state, shared because only one worker polls
 TELEGRAM_API = "https://api.telegram.org"
@@ -74,9 +75,13 @@ def enabled() -> bool:
 
 def chat() -> Optional[dict]:
     configured = _setting("SALE_REVIEW_CHAT_ID")
-    if configured:
-        return {"id": int(configured), "title": "(set in backend/.env)"}
-    return store.get_value(CHAT)
+    try:
+        chat_id = int(configured)
+    except ValueError:
+        return None
+    # Follow Telegram's own group -> supergroup move of the configured group
+    chat_id = int((store.get_value(MIGRATED) or {}).get(str(chat_id), chat_id))
+    return {"id": chat_id, "title": "configured group"}
 
 
 # ==========================================
@@ -212,7 +217,7 @@ def post_sale(sale_id: str) -> bool:
         return True
     target = chat()
     if not target:
-        return False  # wait for /bind
+        return False  # wait for SALE_REVIEW_CHAT_ID
     msg = _telegram("sendMessage", chat_id=target["id"], text=render(sale), parse_mode="HTML",
                     reply_markup=_buttons(sale_id), disable_web_page_preview=True)
     for n, f in enumerate(_attachments(sale), 1):
@@ -260,10 +265,12 @@ def _who(user: dict) -> str:
 
 
 def _rebind(new_id: int) -> None:
-    # A group upgraded to a supergroup gets a new id
-    with store.update_value(CHAT, None) as box:
-        if box[0]:
-            box[0] = {**box[0], "id": int(new_id)}
+    # A group upgraded to a supergroup gets a new id; only ever applied to the configured group
+    current = chat()
+    if not current:
+        return
+    with store.update_value(MIGRATED, {}) as box:
+        box[0] = {**(box[0] or {}), _setting("SALE_REVIEW_CHAT_ID"): int(new_id)}
 
 
 def _notify(sale: dict, title: str, message: str, kind: str, **target) -> None:
@@ -355,16 +362,14 @@ def handle_message(msg: dict) -> None:
     if not text.startswith("/") or chat_info.get("type") not in ("group", "supergroup"):
         return
     command = text.split()[0].split("@")[0].lower()
-    if command != "/bind":
+    if command not in ("/chatid", "/bind"):
         return
-    current = chat()
-    if _setting("SALE_REVIEW_CHAT_ID"):
-        reply = "The review group is fixed in the server settings (SALE_REVIEW_CHAT_ID)."
-    elif current and current["id"] != chat_info["id"]:
-        reply = "This bot already posts to another group. Ask the CRM administrator to change it."
+    # Only reports the id; linking a group is done in the server settings, never from Telegram
+    if (chat() or {}).get("id") == chat_info["id"]:
+        reply = "✅ This group receives Client Information submissions for Approve / Reject."
     else:
-        store.set_value(CHAT, {"id": chat_info["id"], "title": chat_info.get("title") or ""})
-        reply = "✅ Linked. Client Information submissions from the CRM will be posted here for Approve / Reject."
+        reply = (f"This group's id is {chat_info['id']}. To receive Client Information submissions here, "
+                 f"the CRM administrator sets SALE_REVIEW_CHAT_ID={chat_info['id']} on the server.")
     _telegram("sendMessage", chat_id=chat_info["id"], text=reply)
 
 
@@ -440,7 +445,7 @@ def status(current_user: dict = Depends(get_current_user)):
     result = {"enabled": enabled()}
     if current_user.get("role") == "Super Admin":
         state = store.get_value(STATUS) or {}
-        result.update({"group": (chat() or {}).get("title"), "linked": bool(chat()),
+        result.update({"groupId": (chat() or {}).get("id"), "linked": bool(chat()),
                        "bot": state.get("username"), "error": state.get("error"),
                        "queued": len(store.get_value(OUTBOX) or [])})
     return result
