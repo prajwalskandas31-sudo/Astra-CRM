@@ -8,7 +8,7 @@ import {
   getEKycLight
 } from '../services/leegalityService';
 import { getPrimarySignatory, pullSignaturesFromServer } from '../services/digitalSignatureService';
-import { buildPaidClient, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
+import { buildPaidClient, defaultSegmentsForService, disableTelegram, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
 import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
 import { useServerSync } from '../services/serverSync';
 
@@ -3019,16 +3019,23 @@ export const CRMProvider = ({ children }) => {
   };
 
   // ─── Paid Block: service tenure expiry ──────────────────────────────────
-  // Checked on load and hourly, so a record flips to "Service Expired" the day its tenure ends.
-  // The interval calls the latest check through a ref, since paidClients and leads change every render.
+  // Checked on load and hourly, so a record flips to "Service Expired" the day its tenure ends and is
+  // disabled in the Telegram Control Block (segments cleared). The server does the same on its own
+  // (backend/service_expiry.py, which also sends the Service Expiry Email), so this only keeps the
+  // screen current. The interval calls the latest check through a ref, since paidClients and leads change every render.
   const expireServicesRef = useRef(null);
   expireServicesRef.current = () => {
     const today = todayKey();
+    const stillTicked = paidClients.filter(p => p.status === PAID_STATUS_EXPIRED && Array.isArray(p.segments) && p.segments.length);
+    if (stillTicked.length) {
+      const ids = new Set(stillTicked.map(p => p.id));
+      setPaidClients(prev => prev.map(p => ids.has(p.id) ? disableTelegram(p, today) : p));
+    }
     const ending = paidClients.filter(p => p.status !== PAID_STATUS_EXPIRED && isTenureOver(p, today));
     if (ending.length === 0) return;
 
     const endingIds = new Set(ending.map(p => p.id));
-    setPaidClients(prev => prev.map(p => endingIds.has(p.id) ? { ...p, status: PAID_STATUS_EXPIRED, expiredAt: today } : p));
+    setPaidClients(prev => prev.map(p => endingIds.has(p.id) ? { ...disableTelegram(p, today), status: PAID_STATUS_EXPIRED, expiredAt: today } : p));
 
     const leadIds = new Set(ending.map(p => p.leadId).filter(Boolean));
     if (leadIds.size) {
@@ -3054,10 +3061,18 @@ export const CRMProvider = ({ children }) => {
     return () => clearInterval(timer);
   }, []);
 
+  // Clients added before segments existed start with the boxes for their service ticked.
+  // A saved list (even an empty one) is left alone, so manual unticks are kept.
+  useEffect(() => {
+    if (!paidClients.some(p => !Array.isArray(p.segments))) return;
+    setPaidClients(prev => prev.map(p => (Array.isArray(p.segments) ? p : { ...p, segments: defaultSegmentsForService(p.serviceName) })));
+  }, [paidClients]);
+
   // Telegram Control Block: turn one trading segment (NSE/MCX/BSE derivatives, equity) on or off for a client
+  // Expired clients stay disabled: their boxes cannot be ticked again.
   const togglePaidClientSegment = (paidId, segment) => {
     setPaidClients(prev => prev.map(p => {
-      if (p.id !== paidId) return p;
+      if (p.id !== paidId || p.status === PAID_STATUS_EXPIRED || isTenureOver(p)) return p;
       const current = Array.isArray(p.segments) ? p.segments : [];
       const segments = current.includes(segment) ? current.filter(s => s !== segment) : [...current, segment];
       return { ...p, segments };

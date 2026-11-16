@@ -1007,7 +1007,7 @@ export const ClientInformationModal = ({
                 <div className="form-group" style={{ margin: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>GST (A - B)</span>
-                    <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 500 }}>(18% Tax Component)</span>
+                    <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 500 }}>({+((((financialSettings?.cDivisorFactor || 1.18) - 1) * 100).toFixed(2))}% Tax Component)</span>
                   </label>
                   <div style={{
                     padding: '8px 12px',

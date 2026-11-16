@@ -55,8 +55,8 @@ MAX_LOGGED_BROADCASTS = 200
 # a stale trade call is worse than none.
 MAX_CALL_AGE_SECONDS = 300
 SEND_WORKERS = 8
-PAID_FIELDS = ("id", "saleId", "leadId", "clientName", "phone", "serviceName", "serviceTenure",
-               "serviceStartDate", "serviceEndDate", "status", "segments")
+PAID_FIELDS = ("id", "saleId", "leadId", "clientPrefix", "clientName", "phone", "email", "serviceName", "serviceTenure",
+               "serviceStartDate", "serviceEndDate", "status", "expiredAt", "segments")
 
 router = APIRouter(tags=["broadcasts"])
 # The wappie gateway (GET only) and Telegram both carry their tokens in the URL, and httpx logs full
