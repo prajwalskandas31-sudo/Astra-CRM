@@ -82,6 +82,8 @@ class UserCreate(BaseModel):
     email: Optional[str] = ""
     reportingTo: Optional[str] = "Sreenivasulu"
     employeeId: Optional[str] = None
+    officeNumber: Optional[str] = ""
+    officialEmail: Optional[str] = ""
     bankAccountNumber: Optional[str] = ""
     ifscCode: Optional[str] = ""
     bankNameAndBranch: Optional[str] = ""
@@ -96,6 +98,8 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     email: Optional[str] = None
     reportingTo: Optional[str] = None
+    officeNumber: Optional[str] = None
+    officialEmail: Optional[str] = None
     bankAccountNumber: Optional[str] = None
     ifscCode: Optional[str] = None
     bankNameAndBranch: Optional[str] = None
@@ -304,6 +308,8 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "email": email,
         "reportingTo": req.reportingTo or "Sreenivasulu",
         "employeeId": req.employeeId or f"EMP-{store.count('users') + 100}",
+        "officeNumber": (req.officeNumber or "").strip(),
+        "officialEmail": (req.officialEmail or "").strip().lower(),
         "status": "Active",
         "expiryDate": "27-07-2027",
         "bankAccountNumber": req.bankAccountNumber or "",
@@ -337,7 +343,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "officeNumber", "officialEmail"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -358,6 +364,8 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.role is not None: user["role"] = req.role
     if req.email is not None: user["email"] = req.email
     if req.reportingTo is not None: user["reportingTo"] = req.reportingTo
+    if req.officeNumber is not None: user["officeNumber"] = req.officeNumber.strip()
+    if req.officialEmail is not None: user["officialEmail"] = req.officialEmail.strip().lower()
     if req.bankAccountNumber is not None: user["bankAccountNumber"] = req.bankAccountNumber
     if req.ifscCode is not None: user["ifscCode"] = req.ifscCode
     if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch
