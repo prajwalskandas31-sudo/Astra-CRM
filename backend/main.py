@@ -17,6 +17,7 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import sale_review
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -29,6 +30,7 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import sale_review
     from db_init import init_database
 
 
@@ -53,6 +55,7 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(sale_review.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -61,6 +64,8 @@ def start_broadcast_pollers():
     # With several workers only one may poll Telegram, or every call would be sent once per worker
     if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
+        # Client Information review group (Approve / Reject before the Sale Approval queue)
+        sale_review.start()
         # Research reports are built one at a time in this same worker
         reports.start_worker()
 
@@ -68,6 +73,7 @@ def start_broadcast_pollers():
 @app.on_event("shutdown")
 def stop_broadcast_pollers():
     broadcasts.stop_pollers()
+    sale_review.stop()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):

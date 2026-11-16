@@ -344,7 +344,7 @@ export const ClientInformationModal = ({
   };
 
   // Send to Review Validation & Submission
-  const handleSendToReview = (e) => {
+  const handleSendToReview = async (e) => {
     e.preventDefault();
 
     const errors = {};
@@ -422,11 +422,11 @@ export const ClientInformationModal = ({
       agentId: currentUser?.id || 'usr-5'
     };
 
-    if (lead?.id) {
-      submitClientInformationReview(lead.id, finalData, transactionAttachments);
-    }
+    const submitted = lead?.id ? await submitClientInformationReview(lead.id, finalData, transactionAttachments) : null;
 
-    showToast('Client Information submitted! Automated approval email sent to Super Admin.', 'success');
+    showToast(submitted?.viaTelegram
+      ? 'Client Information sent to the Telegram review group. It reaches the Sale Approval queue once approved there.'
+      : 'Client Information submitted! Automated approval email sent to Super Admin.', 'success');
 
     if (onSuccess) {
       onSuccess(finalData);

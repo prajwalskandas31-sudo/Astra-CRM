@@ -84,6 +84,24 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## Client Information review group (Telegram Approve / Reject)
+
+With this on, **Send to Review** on the Client Information page posts every detail of the submission
+(and its transaction attachments) to a Telegram group with **Approve** and **Reject** buttons. Only an
+Approve there moves the sale into the **Sale Approval & Automated Verification Queue**; a Reject sends it
+back to the executive (notification + lead history) to correct and resubmit. Code: `backend/sale_review.py`.
+
+| `backend/.env` key | Value |
+|---|---|
+| `SALE_REVIEW_BOT_TOKEN` | the review bot's BotFather token. Empty = feature off (sales go straight to the queue) |
+| `SALE_REVIEW_CHAT_ID` | optional group id (e.g. `-100…`). Without it, a group member sends `/bind` in the group once |
+
+Add the bot to the group, set the token, redeploy (`docker compose up -d backend`), then send `/bind` in
+the group; the bot answers "Linked". After that `/bind` from any other group is refused. Submissions made
+before the group is linked are queued and posted as soon as it is. Super Admins can check
+`GET /api/sale-review/status` (bot name, linked group, last error, queued posts). As with the trade-call
+bots, run a token on one server only.
+
 ## Research Reports (Telegram calls → 3-page PDFs, on demand)
 
 Calls posted in the Telegram bots (above) are logged as they come in. Reports are not made live: in
