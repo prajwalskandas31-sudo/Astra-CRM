@@ -45,3 +45,6 @@ CRM_ACCOUNT_CREDENTIALS.txt
 # Client handover documents that contain live API keys and bot tokens
 Developer Spec Telegram Call to Auto-Generated Research Report.docx
 Telegram_Bots_Developer_Handover.pdf
+
+# Playwright MCP page snapshots (can contain typed logins)
+.playwright-mcp/
