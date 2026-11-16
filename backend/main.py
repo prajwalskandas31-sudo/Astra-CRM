@@ -17,6 +17,7 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import client_info_telegram
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -29,6 +30,7 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import client_info_telegram
     from db_init import init_database
 
 
@@ -53,6 +55,7 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(client_info_telegram.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
+import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
 import { 
   X, 
   Lock, 
@@ -423,7 +424,12 @@ export const ClientInformationModal = ({
     };
 
     if (lead?.id) {
-      submitClientInformationReview(lead.id, finalData, transactionAttachments);
+      const leadId = lead.id;
+      const attachments = transactionAttachments;
+      Promise.resolve(submitClientInformationReview(leadId, finalData, attachments))
+        .then(sale => sale?.id && postClientInfoToTelegram({ saleId: sale.id, leadId, clientInfo: finalData, attachments }))
+        .then(res => { if (res && !res.skipped) showToast('Client details posted to the Telegram group with the e-KYC link.', 'success'); })
+        .catch(err => showToast(`Telegram group not updated: ${err.message}`, 'warning'));
     }
 
     showToast('Client Information submitted! Automated approval email sent to Super Admin.', 'success');
