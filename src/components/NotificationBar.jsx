@@ -12,6 +12,7 @@ import {
   FileSignature, 
   Mail,
   ShieldCheck,
+  Megaphone,
   X
 } from 'lucide-react';
 
@@ -166,6 +167,8 @@ export const NotificationBar = ({
                       <AlertCircle size={14} color="#f59e0b" />
                     ) : isReview ? (
                       <Mail size={14} color="#6366f1" />
+                    ) : n.type === 'broadcast' ? (
+                      <Megaphone size={14} color="#0ea5e9" />
                     ) : (
                       <ShieldCheck size={14} color="#3b82f6" />
                     )}
@@ -177,7 +180,7 @@ export const NotificationBar = ({
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{n.timestamp}</span>
                 </div>
 
-                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.35, whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
                   {n.message}
                 </p>
 

@@ -18,10 +18,12 @@ try:
     from backend import store
     from backend.auth import get_current_user, is_admin, role_rank
     from backend.broadcasts import DELETED_PAID, forget_paid_client
+    from backend import sale_review
 except ImportError:
     import store
     from auth import get_current_user, is_admin, role_rank
     from broadcasts import DELETED_PAID, forget_paid_client
+    import sale_review
 
 
 router = APIRouter(prefix="/api/sync", tags=["sync"])
@@ -84,12 +86,13 @@ class Policy:
     redact: Optional[Callable[[dict, dict], dict]] = None    # strip fields for this user
     check: Optional[Callable[[dict, Optional[dict], Optional[dict]], Optional[str]]] = None  # (user, old, new|None) -> error
     on_delete: Optional[Callable[[str], None]] = None  # replaces the plain delete
+    on_write: Optional[Callable[[Optional[dict], dict], None]] = None  # (old, new) after a saved change, same transaction
 
 
 # Exact values the CRM screens use when a sale is submitted, and when one is sent back
-NEW_SALE_STATUSES = {"Pending Super Admin Review", "Pending Super Admin Approval"}
-NEW_SALE_STAGES = {None, "", "Under Review by Super Admin", "Sale Submitted"}
-OPEN_SALE_STATUSES = NEW_SALE_STATUSES | {"Rejected by Super Admin", "Rejected"}
+NEW_SALE_STATUSES = {"Pending Super Admin Review", "Pending Super Admin Approval", sale_review.AWAITING_STATUS}
+NEW_SALE_STAGES = {None, "", "Under Review by Super Admin", "Sale Submitted", sale_review.AWAITING_STAGE}
+OPEN_SALE_STATUSES = NEW_SALE_STATUSES | {"Rejected by Super Admin", "Rejected", sale_review.REJECTED_STATUS}
 
 
 def _open_sale(sale: Optional[dict]) -> bool:
@@ -104,9 +107,12 @@ def _sale_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optiona
     if new is None:
         return None if _open_sale(old) else "Only a Super Admin can delete a sale that is under way."
     if old is None:
-        if new.get("status") in NEW_SALE_STATUSES and new.get("stage") in NEW_SALE_STAGES:
-            return None
-        return "New sales must start as pending Super Admin review."
+        if new.get("status") not in NEW_SALE_STATUSES or new.get("stage") not in NEW_SALE_STAGES:
+            return "New sales must start as pending Super Admin review."
+        # While the Telegram review group is on, it decides what reaches the Super Admin queue
+        if sale_review.enabled() and new.get("status") != sale_review.AWAITING_STATUS:
+            return "New sales must first be approved in the Telegram review group."
+        return None
     if not _open_sale(old):
         return "This sale is under review or approved; only a Super Admin can change it."
     if new.get("status") != old.get("status") or new.get("stage") != old.get("stage"):
@@ -125,6 +131,20 @@ def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict])
         link = str(account.get("paymentGatewayLink") or "").strip().lower()
         if link and not link.startswith(("https://", "http://")):
             return "Payment Gateway Link must start with https://"
+    return None
+
+
+MAX_COMPANY_ASSETS = 10
+
+
+def _company_asset_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    # The Add User form offers at most 10 asset items (laptop, SIM card, ID card, ...)
+    if new is None:
+        return None
+    if not str(new.get("name") or "").strip():
+        return "Asset name is required."
+    if old is None and store.count("companyAssets") >= MAX_COMPANY_ASSETS:
+        return f"Only {MAX_COMPANY_ASSETS} company asset items can be set up."
     return None
 
 
@@ -221,7 +241,7 @@ def _attendance_check(user: dict, old: Optional[dict], new: Optional[dict]) -> O
 
 POLICIES: Dict[str, Policy] = {
     "leads": Policy(read=SCOPED, write=SCOPED, owner=_lead_owner, delete_min_rank=role_rank("Team Leader")),
-    "sales": Policy(read=SCOPED, write=SCOPED, check=_sale_check,
+    "sales": Policy(read=SCOPED, write=SCOPED, check=_sale_check, on_write=sale_review.on_sale_write,
                     owner=lambda s: s.get("submittedByUserId") or s.get("employeeId")),
     "assignmentInstances": Policy(read=SCOPED, write=SCOPED, delete_min_rank=role_rank("Team Leader"),
                                   owner=lambda i: i.get("assignedToId") or i.get("assigned_user_id")),
@@ -245,6 +265,8 @@ POLICIES: Dict[str, Policy] = {
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
     # Branch Profiles block; every user creator picks from these names
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    # "Company Assets Provided" items offered in Add User (max 10)
+    "companyAssets": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_asset_check),
 }
 
 for _collection, _rules in POLICIES.items():
@@ -413,6 +435,8 @@ def push(req: PushRequest, current_user: dict = Depends(get_current_user)):
                     continue
                 if old != doc:
                     writes[rid] = doc
+                    if policy.on_write:
+                        policy.on_write(old, doc)
                 saved[name].append(rid)
             store.put_pairs(name, list(writes.items()))
             plain_deletes = []

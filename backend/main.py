@@ -17,8 +17,10 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import sale_review
     from backend import client_info_telegram
     from backend import service_expiry
+    from backend import broadcast_group
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -31,8 +33,10 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import sale_review
     import client_info_telegram
     import service_expiry
+    import broadcast_group
     from db_init import init_database
 
 
@@ -57,8 +61,10 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(sale_review.router)
 app.include_router(client_info_telegram.router)
 app.include_router(service_expiry.router)
+app.include_router(broadcast_group.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -67,16 +73,22 @@ def start_broadcast_pollers():
     # With several workers only one may poll Telegram, or every call would be sent once per worker
     if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
+        # Client Information review group (Approve / Reject before the Sale Approval queue)
+        sale_review.start()
         # Research reports are built one at a time in this same worker
         reports.start_worker()
         # Expired services: disabled in the Telegram Control Block and sent the Service Expiry Email
         service_expiry.start_worker()
+        # Broadcast_group messages -> a notification for every CRM user
+        broadcast_group.start()
 
 
 @app.on_event("shutdown")
 def stop_broadcast_pollers():
     broadcasts.stop_pollers()
+    sale_review.stop()
     service_expiry.stop_worker()
+    broadcast_group.stop()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
@@ -99,6 +111,7 @@ class UserCreate(BaseModel):
     familyReferenceNumber: Optional[str] = ""
     referredBy: Optional[str] = ""
     branchId: Optional[str] = ""
+    companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
 
 class UserUpdate(BaseModel):
@@ -115,6 +128,7 @@ class UserUpdate(BaseModel):
     familyReferenceNumber: Optional[str] = None
     referredBy: Optional[str] = None
     branchId: Optional[str] = None
+    companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
 
 class PasswordChange(BaseModel):
@@ -327,11 +341,16 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "familyReferenceNumber": req.familyReferenceNumber or "",
         "referredBy": req.referredBy or "",
         "branchId": req.branchId or "",
+        "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
     }
     set_user_password(new_user, req.password)
     _save_user(new_user)
     return public_user(new_user)
+
+def _clean_asset_ids(asset_ids: Optional[List[str]]) -> List[str]:
+    """Ids of the company assets handed to a user, without blanks or repeats."""
+    return list(dict.fromkeys(str(a).strip() for a in (asset_ids or []) if str(a).strip()))[:10]
 
 # Name is excluded: lead ownership can fall back to name matching, so only admins may rename.
 _SELF_EDITABLE_FIELDS = {"mobile", "bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "referredBy"}
@@ -352,7 +371,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "officeNumber", "officialEmail"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -381,6 +400,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.familyReferenceNumber is not None: user["familyReferenceNumber"] = req.familyReferenceNumber
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.branchId is not None: user["branchId"] = req.branchId
+    if req.companyAssets is not None: user["companyAssets"] = _clean_asset_ids(req.companyAssets)
     if req.documents is not None: user["documents"] = req.documents
 
     _save_user(user)
