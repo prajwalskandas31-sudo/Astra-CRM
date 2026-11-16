@@ -326,11 +326,15 @@ export const UserDirectory = () => {
                         )}
                       </div>
                     </td>
-                    <td>{u.mobile}</td>
+                    <td>
+                      {u.mobile}
+                      {u.officeNumber && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Office: {u.officeNumber}</div>}
+                    </td>
                     <td>{u.reportingTo || '—'}</td>
                     <td style={{ color: branchName(u.branchId) ? undefined : 'var(--text-muted)' }}>{branchName(u.branchId) || '—'}</td>
                     <td style={{ color: u.email ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
                       {u.email || '—'}
+                      {u.officialEmail && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Official: {u.officialEmail}</div>}
                     </td>
                     <td>
                       <span className="badge badge-role">{u.role}</span>

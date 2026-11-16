@@ -90,6 +90,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     email: userToEdit ? userToEdit.email : '',
     reportingTo: userToEdit ? userToEdit.reportingTo : '',
     employeeId: userToEdit ? userToEdit.employeeId : '',
+    officeNumber: userToEdit ? (userToEdit.officeNumber || '') : '',
+    officialEmail: userToEdit ? (userToEdit.officialEmail || '') : '',
     bankAccountNumber: userToEdit ? (userToEdit.bankAccountNumber || '') : '',
     ifscCode: userToEdit ? (userToEdit.ifscCode || '') : '',
     bankNameAndBranch: userToEdit ? (userToEdit.bankNameAndBranch || '') : '',
@@ -142,6 +144,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           email: userToEdit.email || '',
           reportingTo: userToEdit.reportingTo || '',
           employeeId: userToEdit.employeeId || '',
+          officeNumber: userToEdit.officeNumber || '',
+          officialEmail: userToEdit.officialEmail || '',
           bankAccountNumber: userToEdit.bankAccountNumber || '',
           ifscCode: userToEdit.ifscCode || '',
           bankNameAndBranch: userToEdit.bankNameAndBranch || '',
@@ -160,6 +164,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           email: '',
           reportingTo: '',
           employeeId: '',
+          officeNumber: '',
+          officialEmail: '',
           bankAccountNumber: '',
           ifscCode: '',
           bankNameAndBranch: '',
@@ -757,6 +763,28 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     value={formData.employeeId}
                     onChange={handleChange}
                     placeholder="e.g. EMP-105"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Office Number</label>
+                  <input
+                    type="text"
+                    name="officeNumber"
+                    value={formData.officeNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. 080 4123 4567"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Official Email ID</label>
+                  <input
+                    type="email"
+                    name="officialEmail"
+                    value={formData.officialEmail}
+                    onChange={handleChange}
+                    placeholder="e.g. name@unitetech.trade"
                   />
                 </div>
 
