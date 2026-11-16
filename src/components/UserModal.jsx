@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative } from '../services/backendConfig';
+import { CompanyAssetsField } from './CompanyAssetsField';
 import { 
   X, 
   UserPlus, 
@@ -95,7 +96,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     bankNameAndBranch: userToEdit ? (userToEdit.bankNameAndBranch || '') : '',
     familyReferenceNumber: userToEdit ? (userToEdit.familyReferenceNumber || '') : '',
     referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
-    branchId: userToEdit ? (userToEdit.branchId || '') : ''
+    branchId: userToEdit ? (userToEdit.branchId || '') : '',
+    companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
 
   // Attached Documents State (Direct upload on user creation/edit)
@@ -147,7 +149,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           bankNameAndBranch: userToEdit.bankNameAndBranch || '',
           familyReferenceNumber: userToEdit.familyReferenceNumber || '',
           referredBy: userToEdit.referredBy || '',
-          branchId: userToEdit.branchId || ''
+          branchId: userToEdit.branchId || '',
+          companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
         setCustomFieldValues(userToEdit.customFieldValues ? { ...userToEdit.customFieldValues } : {});
@@ -165,7 +168,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           bankNameAndBranch: '',
           familyReferenceNumber: '',
           referredBy: '',
-          branchId: ''
+          branchId: '',
+          companyAssets: []
         });
         setAttachedDocs([]);
         setCustomFieldValues({});
@@ -772,6 +776,11 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     )}
                   </select>
                 </div>
+
+                <CompanyAssetsField
+                  value={formData.companyAssets}
+                  onChange={ids => setFormData(prev => ({ ...prev, companyAssets: ids }))}
+                />
 
                 {formData.role === 'Executive' && (
                   <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--accent-soft)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-border)' }}>

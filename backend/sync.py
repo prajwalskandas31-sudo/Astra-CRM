@@ -128,6 +128,20 @@ def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict])
     return None
 
 
+MAX_COMPANY_ASSETS = 10
+
+
+def _company_asset_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    # The Add User form offers at most 10 asset items (laptop, SIM card, ID card, ...)
+    if new is None:
+        return None
+    if not str(new.get("name") or "").strip():
+        return "Asset name is required."
+    if old is None and store.count("companyAssets") >= MAX_COMPANY_ASSETS:
+        return f"Only {MAX_COMPANY_ASSETS} company asset items can be set up."
+    return None
+
+
 def _paid_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
     # Telegram trade calls go to every stored Paid client, so a deleted one must stay deleted
     if new is not None and new.get("id") in store.get_value(DELETED_PAID, []):
@@ -194,6 +208,8 @@ POLICIES: Dict[str, Policy] = {
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
     # Branch Profiles block; every user creator picks from these names
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    # "Company Assets Provided" items offered in Add User (max 10)
+    "companyAssets": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_asset_check),
 }
 
 for _collection, _rules in POLICIES.items():
