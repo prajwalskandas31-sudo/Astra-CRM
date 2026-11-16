@@ -124,6 +124,20 @@ Reports. The CRM checks it with Upstox before saving, never shows it again, and 
 expires. Without a token the CRM uses Upstox's public market data and notes this in the Telegram reply.
 The daily login (`/api/upstox/login-url`, `/api/upstox/callback`) stays in the code for a server with HTTPS.
 
+## Client Information Page alerts (Telegram)
+
+"Send to Review" on the Client Information Page posts every detail on the page, through the
+`Client_info_page_updates_bot` bot, to the `Client_information_page_updates` Telegram group. The message
+ends with an e-KYC link (`http://<server>:<CRM_PORT>/?ekyc=<saleId>`, also as a button): it opens the CRM
+and, after a Super Admin signs in, runs the same "Trigger e-KYC & E-Sign" as Sale Approvals. A sale that was
+already sent shows its Leegality status instead, so a second tap never spends another credit.
+
+| Key | Value |
+|---|---|
+| `TELEGRAM_CLIENT_INFO_BOT_TOKEN` | The bot's BotFather token |
+| `TELEGRAM_CLIENT_INFO_CHAT_ID` | Optional. Without it the CRM finds the group itself: send `/start@Client_info_page_updates_bot` in the group once (Telegram keeps that for 24 hours); the id is then remembered |
+| `CRM_PUBLIC_URL` | Required, e.g. `http://200.234.32.65:8080`. The only address the e-KYC link may use; the address the browser reports is never trusted |
+
 ## e-KYC & E-Sign (Leegality)
 
 "Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with
