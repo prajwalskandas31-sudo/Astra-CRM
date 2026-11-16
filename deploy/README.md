@@ -158,6 +158,22 @@ already sent shows its Leegality status instead, so a second tap never spends an
 | `TELEGRAM_CLIENT_INFO_CHAT_ID` | Optional. Without it the CRM finds the group itself: send `/start@Client_info_page_updates_bot` in the group once (Telegram keeps that for 24 hours); the id is then remembered |
 | `CRM_PUBLIC_URL` | Required, e.g. `http://200.234.32.65:8080`. The only address the e-KYC link may use; the address the browser reports is never trusted |
 
+## Broadcast_group → notification to every CRM user (Telegram)
+
+`backend/broadcast_group.py` long-polls the `Crm_broadcast_bot` bot (Telegram Bot API `getUpdates`). Every text
+message (or photo/file caption) posted in the `Broadcast_group` group becomes a notification for all CRM users:
+a pop-up within about 5 seconds plus an entry in the notification tray. Editing the message updates it. Runs in
+the same single backend worker as the trade-call pollers.
+
+The bot must see ordinary messages: make it an **admin** of the group, or set BotFather `/setprivacy` → Disable
+and then remove and re-add it to the group. `GET /api/broadcast-group/status` (admins) shows whether it is running.
+
+| Key | Value |
+|---|---|
+| `TELEGRAM_BROADCAST_GROUP_BOT_TOKEN` | The bot's BotFather token |
+| `TELEGRAM_BROADCAST_GROUP` | Optional. The group's title, default `Broadcast_group`; the id is remembered after the first match |
+| `TELEGRAM_BROADCAST_GROUP_CHAT_ID` | Optional. Pins the group by id instead of by title |
+
 ## e-KYC & E-Sign (Leegality)
 
 "Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with

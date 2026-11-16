@@ -20,6 +20,7 @@ try:
     from backend import sale_review
     from backend import client_info_telegram
     from backend import service_expiry
+    from backend import broadcast_group
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -35,6 +36,7 @@ except ImportError:
     import sale_review
     import client_info_telegram
     import service_expiry
+    import broadcast_group
     from db_init import init_database
 
 
@@ -62,6 +64,7 @@ app.include_router(email_kit.router)
 app.include_router(sale_review.router)
 app.include_router(client_info_telegram.router)
 app.include_router(service_expiry.router)
+app.include_router(broadcast_group.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -76,6 +79,8 @@ def start_broadcast_pollers():
         reports.start_worker()
         # Expired services: disabled in the Telegram Control Block and sent the Service Expiry Email
         service_expiry.start_worker()
+        # Broadcast_group messages -> a notification for every CRM user
+        broadcast_group.start()
 
 
 @app.on_event("shutdown")
@@ -83,6 +88,7 @@ def stop_broadcast_pollers():
     broadcasts.stop_pollers()
     sale_review.stop()
     service_expiry.stop_worker()
+    broadcast_group.stop()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
