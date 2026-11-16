@@ -89,10 +89,14 @@ class Policy:
     on_write: Optional[Callable[[Optional[dict], dict], None]] = None  # (old, new) after a saved change, same transaction
 
 
-# Exact values the CRM screens use when a sale is submitted, and when one is sent back
-NEW_SALE_STATUSES = {"Pending Super Admin Review", "Pending Super Admin Approval", sale_review.AWAITING_STATUS}
-NEW_SALE_STAGES = {None, "", "Under Review by Super Admin", "Sale Submitted", sale_review.AWAITING_STAGE}
-OPEN_SALE_STATUSES = NEW_SALE_STATUSES | {"Rejected by Super Admin", "Rejected", sale_review.REJECTED_STATUS}
+# Exact values the CRM screens use when a sale is submitted, and when one is sent back.
+# Old Client sales skip the Super Admin queue: they wait for the Telegram review link (old_client_review.py).
+NEW_SALE_STATUSES = {"Pending Super Admin Review", "Pending Super Admin Approval", sale_review.AWAITING_STATUS,
+                     "Old Client - Awaiting Approval"}
+NEW_SALE_STAGES = {None, "", "Under Review by Super Admin", "Sale Submitted", sale_review.AWAITING_STAGE,
+                   "Awaiting Telegram Approval (Old Client)"}
+OPEN_SALE_STATUSES = NEW_SALE_STATUSES | {"Rejected by Super Admin", "Rejected", sale_review.REJECTED_STATUS,
+                                          "Old Client - Declined"}
 
 
 def _open_sale(sale: Optional[dict]) -> bool:

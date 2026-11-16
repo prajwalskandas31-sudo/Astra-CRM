@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCRM, TELEGRAM_REVIEW_STATUS } from '../context/CRMContext';
+import { useCRM, TELEGRAM_REVIEW_STATUS, isOldClientSale, OLD_CLIENT_STATUS } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
   CheckCircle, 
@@ -346,6 +346,22 @@ export const SaleApprovalWorkflow = () => {
                         </span>
                       </td>
                       <td>
+                        {isOldClientSale(s) ? (
+                          // Old Client: approved in the Telegram group, invoice emailed; never sent for e-KYC
+                          <span
+                            className="badge"
+                            title={s.invoiceNumber ? `Invoice ${s.invoiceNumber} emailed to ${s.invoiceEmailedTo || 'the client'}` : undefined}
+                            style={{
+                              background: s.status === OLD_CLIENT_STATUS.declined ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                              color: s.status === OLD_CLIENT_STATUS.declined ? '#ef4444' : '#d97706',
+                              border: '1px solid currentColor'
+                            }}
+                          >
+                            Old Client · {s.status === OLD_CLIENT_STATUS.approved ? `Invoice ${s.invoiceNumber || ''} emailed`
+                              : s.status === OLD_CLIENT_STATUS.declined ? 'Declined in Telegram'
+                              : 'Awaiting Telegram approval'}
+                          </span>
+                        ) : (
                         <EKycTrafficLight
                           sale={s}
                           canTrigger={hasPermission('sale-approvals')}
@@ -353,6 +369,7 @@ export const SaleApprovalWorkflow = () => {
                           onTrigger={() => handleDirectTriggerEKycAndESign(s)}
                           onViewStatus={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
                         />
+                        )}
                       </td>
                     </tr>
                   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useCRM } from '../context/CRMContext';
+import { useCRM, NEW_CLIENT, OLD_CLIENT } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
@@ -83,6 +83,7 @@ export const ClientInformationModal = ({
   const { showToast } = useToast();
 
   const [formData, setFormData] = useState({
+    clientType: NEW_CLIENT,       // New Client: e-KYC + Welcome Kit | Old Client: Telegram approval, invoice email only
     panNumber: '',
     clientCategory: 'Individual', // Individual | Non-Individual
     clientPrefix: 'Mr.',          // Mr. | Miss | Mrs.
@@ -137,6 +138,7 @@ export const ClientInformationModal = ({
       const calcGst = (numGross - parseFloat(calcNet)).toFixed(2);
 
       setFormData({
+        clientType: existing.clientType === OLD_CLIENT ? OLD_CLIENT : NEW_CLIENT,
         panNumber: existing.panNumber || '',
         clientCategory: existing.clientCategory || 'Individual',
         clientPrefix: existing.clientPrefix || 'Mr.',
@@ -423,17 +425,25 @@ export const ClientInformationModal = ({
       agentId: currentUser?.id || 'usr-5'
     };
 
+    const oldClient = formData.clientType === OLD_CLIENT;
     const submitted = lead?.id ? await submitClientInformationReview(lead.id, finalData, transactionAttachments) : null;
 
-    // With the Approve / Reject review group on, the server posts the submission (with the e-KYC link)
-    // itself; otherwise the page posts it to the Client Information group as before.
-    if (submitted?.id && !submitted.viaTelegram) {
+    if (submitted?.id && oldClient) {
+      // Old Client: the group gets the details with an Approve / Decline link; approval emails only the invoice
+      postClientInfoToTelegram({ saleId: submitted.id, leadId: lead.id, clientInfo: finalData, attachments: transactionAttachments, oldClient: true })
+        .then(res => { if (res && !res.skipped) showToast('Old Client details posted to the Telegram group for approval. The invoice is emailed once approved.', 'success'); })
+        .catch(err => showToast(`Telegram group not updated, so nobody can approve this Old Client sale yet: ${err.message}. Open the form and send it again.`, 'error'));
+    } else if (submitted?.id && !submitted.viaTelegram) {
+      // With the Approve / Reject review group on, the server posts the submission (with the e-KYC link)
+      // itself; otherwise the page posts it to the Client Information group as before.
       postClientInfoToTelegram({ saleId: submitted.id, leadId: lead.id, clientInfo: finalData, attachments: transactionAttachments })
         .then(res => { if (res && !res.skipped) showToast('Client details posted to the Telegram group with the e-KYC link.', 'success'); })
         .catch(err => showToast(`Telegram group not updated: ${err.message}`, 'warning'));
     }
 
-    showToast(submitted?.viaTelegram
+    showToast(oldClient
+      ? 'Old Client sale submitted for Telegram approval (no e-KYC or Welcome Kit).'
+      : submitted?.viaTelegram
       ? 'Client Information sent to the Telegram review group. It reaches the Sale Approval queue once approved there.'
       : 'Client Information submitted! Automated approval email sent to Super Admin.', 'success');
 
@@ -585,6 +595,52 @@ export const ClientInformationModal = ({
               gap: '16px' 
             }}
           >
+            {/* ─── Client Type: New (e-KYC + Welcome Kit) or Old (Telegram approval, invoice only) ─── */}
+            <div style={{
+              background: 'var(--bg-input)',
+              border: `1px solid ${formData.clientType === OLD_CLIENT ? 'rgba(245, 158, 11, 0.45)' : 'var(--border-default)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 16px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '10px 16px'
+            }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Client Type <span style={{ color: '#ef4444' }}>*</span>
+              </span>
+              <div role="radiogroup" aria-label="Client Type" style={{ display: 'inline-flex', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                {[NEW_CLIENT, OLD_CLIENT].map(type => {
+                  const active = formData.clientType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => handleChange('clientType', type)}
+                      style={{
+                        padding: '7px 16px',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: active ? (type === OLD_CLIENT ? '#d97706' : '#4f46e5') : 'transparent',
+                        color: active ? '#ffffff' : 'var(--text-secondary)'
+                      }}
+                    >
+                      {type}
+                    </button>
+                  );
+                })}
+              </div>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', flex: '1 1 260px' }}>
+                {formData.clientType === OLD_CLIENT
+                  ? 'No e-KYC and no Welcome Kit. Sent to the Telegram group for approval; once approved, only the invoice is emailed to the client.'
+                  : 'Goes to Super Admin review, then e-KYC & E-Sign and the Welcome Kit.'}
+              </span>
+            </div>
+
             {/* ─── SECTION 1: Identity & Category Matrix ─── */}
             <div style={{
               background: 'var(--bg-input)',
@@ -1273,7 +1329,7 @@ export const ClientInformationModal = ({
                   gap: '6px'
                 }}
               >
-                <Send size={15} /> Send to Review
+                <Send size={15} /> {formData.clientType === OLD_CLIENT ? 'Send to Telegram Review' : 'Send to Review'}
               </button>
             </div>
           </div>

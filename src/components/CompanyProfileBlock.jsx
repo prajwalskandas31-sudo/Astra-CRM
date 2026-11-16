@@ -7,6 +7,7 @@ import { CompanyBankAccounts } from './CompanyBankAccounts';
 const FIELDS = [
   { key: 'companyName', label: 'Company Name', type: 'text', placeholder: 'e.g. Astra Research Pvt. Ltd.', autoComplete: 'organization' },
   { key: 'sebiRegistrationNumber', label: 'SEBI Registration Number', type: 'text', placeholder: 'e.g. INH000000000' },
+  { key: 'gstin', label: 'GSTIN (printed on invoices)', type: 'text', placeholder: 'e.g. 29ABCDE1234F1Z5' },
   { key: 'contact', label: 'Contact', type: 'tel', placeholder: 'e.g. +91 98765 43210', autoComplete: 'tel' },
   { key: 'email', label: 'Email', type: 'email', placeholder: 'e.g. support@company.com', autoComplete: 'email' },
   { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. www.company.com', autoComplete: 'url' },
@@ -36,6 +37,7 @@ export const CompanyProfileBlock = () => {
     e.preventDefault();
     const cleaned = Object.fromEntries(FIELDS.map(f => [f.key, (draft[f.key] || '').trim()]));
     cleaned.sebiRegistrationNumber = cleaned.sebiRegistrationNumber.toUpperCase();
+    cleaned.gstin = cleaned.gstin.toUpperCase();
     if (!cleaned.companyName) {
       showToast('Company Name is required.', 'error');
       return;
@@ -87,7 +89,7 @@ export const CompanyProfileBlock = () => {
                   autoComplete={f.autoComplete}
                   readOnly={!canEdit}
                   required={f.key === 'companyName'}
-                  style={f.key === 'sebiRegistrationNumber' ? { textTransform: 'uppercase', fontFamily: 'monospace' } : undefined}
+                  style={['sebiRegistrationNumber', 'gstin'].includes(f.key) ? { textTransform: 'uppercase', fontFamily: 'monospace' } : undefined}
                 />
               )}
             </div>
