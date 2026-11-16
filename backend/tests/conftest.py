@@ -73,7 +73,8 @@ def crm(tmp_path_factory):
         return res.json()["access_token"]
 
     return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts, reports=reports,
-                           store=store, email_kit=email_kit, service_expiry=service_expiry, leegality=leegality, login=login, token=token)
+                           store=store, email_kit=email_kit, service_expiry=service_expiry, leegality=leegality,
+                           login=login, token=token)
 
 
 def bearer(tok):
