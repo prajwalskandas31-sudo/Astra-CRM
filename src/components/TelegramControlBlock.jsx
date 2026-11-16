@@ -1,15 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { TradeCallBroadcasts } from './TradeCallBroadcasts';
+import { TRADING_SEGMENTS } from '../services/serviceTenure';
 import { Send, Search, X } from 'lucide-react';
 
-// Trading segments a client can be enabled for; stored on the paid client as `segments`
-export const TRADING_SEGMENTS = [
-  'NSE DERIVATIVES',
-  'MCX DERIVATIVES',
-  'BSE DERIVATIVES',
-  'NSE BSE Equity'
-];
+export { TRADING_SEGMENTS };
 
 export const TelegramControlBlock = () => {
   const { paidClients = [], togglePaidClientSegment } = useCRM();

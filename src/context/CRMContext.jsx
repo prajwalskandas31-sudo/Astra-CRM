@@ -8,7 +8,7 @@ import {
   getEKycLight
 } from '../services/leegalityService';
 import { getPrimarySignatory, pullSignaturesFromServer } from '../services/digitalSignatureService';
-import { buildPaidClient, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
+import { buildPaidClient, defaultSegmentsForService, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
 import { API_BASE_URL, isBackendEnabled, isBackendAuthoritative, readErrorDetail } from '../services/backendConfig';
 import { useServerSync } from '../services/serverSync';
 
@@ -3029,6 +3029,13 @@ export const CRMProvider = ({ children }) => {
     const timer = setInterval(() => expireServicesRef.current(), 60 * 60 * 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Clients added before segments existed start with the boxes for their service ticked.
+  // A saved list (even an empty one) is left alone, so manual unticks are kept.
+  useEffect(() => {
+    if (!paidClients.some(p => !Array.isArray(p.segments))) return;
+    setPaidClients(prev => prev.map(p => (Array.isArray(p.segments) ? p : { ...p, segments: defaultSegmentsForService(p.serviceName) })));
+  }, [paidClients]);
 
   // Telegram Control Block: turn one trading segment (NSE/MCX/BSE derivatives, equity) on or off for a client
   const togglePaidClientSegment = (paidId, segment) => {
