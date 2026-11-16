@@ -101,6 +101,11 @@ def submit_old_client(alert: cit.ClientInfoAlert, current_user: dict = Depends(g
     sale_id = alert.saleId.strip()
     if not sale_id:
         raise HTTPException(status_code=400, detail="saleId is required")
+    # The browser pushes the sale through sync a moment before or after this call, so it may not be here
+    # yet; if it is, it must be this user's own Old Client sale awaiting approval. _update_crm checks again.
+    existing = store.get("sales", sale_id)
+    if existing and not _sale_matches(existing, alert.leadId or "", current_user.get("id")):
+        raise HTTPException(status_code=403, detail="That sale is not your Old Client sale awaiting approval.")
     details = _clean_details(alert.details)
     if not email_kit.EMAIL_RE.match(details["email"]):
         raise HTTPException(status_code=400, detail=f"The client's Email ID '{details['email']}' is not a valid address.")
@@ -297,11 +302,22 @@ def _email_invoice(record: dict, issued: datetime) -> dict:
     return {"from": settings["senderEmail"], "fileName": file_name, **email_kit._save_to_sent(settings, msg)}
 
 
+def _sale_matches(sale: dict, lead_id: str, user_id: Optional[str]) -> bool:
+    """An Old Client sale, still awaiting approval, submitted by this user, for this lead."""
+    return (sale.get("clientType") == CLIENT_TYPE and sale.get("status") == STATUS_AWAITING
+            and sale.get("submittedByUserId") == user_id and (sale.get("leadId") or "") == (lead_id or ""))
+
+
 def _update_crm(record: dict, sale_fields: dict, lead_fields: dict, history: str) -> None:
-    """Move the sale and lead on; the browsers pick the change up on their next sync."""
+    """Move the sale and lead on; the browsers pick the change up on their next sync.
+    Only the submitter's own awaiting Old Client sale (and its lead) is touched, so a review can never be
+    pointed at someone else's sale or lead."""
     sale = store.get("sales", record["saleId"]) if record.get("saleId") else None
-    if sale:
-        store.put("sales", sale["id"], {**sale, **sale_fields})
+    if not sale or not _sale_matches(sale, record.get("leadId") or "", record.get("submittedById")):
+        log.warning("Old client review for sale %s: sale missing or not an awaiting Old Client sale of the submitter; "
+                    "CRM records left unchanged", record.get("saleId"))
+        return
+    store.put("sales", sale["id"], {**sale, **sale_fields})
     lead = store.get("leads", record["leadId"]) if record.get("leadId") else None
     if lead:
         today = datetime.now(IST).strftime("%Y-%m-%d")

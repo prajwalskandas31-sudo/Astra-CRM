@@ -32,7 +32,7 @@ def oc(crm, monkeypatch):
     monkeypatch.setattr(ek, "_save_to_sent", lambda settings, msg: {"savedToSent": True})
     crm.store.set_value(ek.SETTINGS, {"senderEmail": "no-reply@example.com", "smtpHost": "smtp.example.com", "smtpPassword": "x"})
     crm.store.put("companyProfile", "companyName", {"id": "companyName", "value": "Unite Tech"})
-    crm.store.put("sales", "SL-OC", {"id": "SL-OC", "submittedByUserId": "usr-3", "clientType": "Old Client",
+    crm.store.put("sales", "SL-OC", {"id": "SL-OC", "submittedByUserId": "usr-3", "leadId": "L-OC", "clientType": "Old Client",
                                      "status": m.STATUS_AWAITING, "stage": m.STAGE_AWAITING})
     crm.store.put("leads", "L-OC", {"id": "L-OC", "assignedToId": "usr-3", "disposition": "Under Review (Old Client)", "history": []})
     return crm, m, calls, mails
@@ -158,3 +158,24 @@ def test_invoice_words_and_numbers(crm):
     assert inv.rupees(150847.46) == "Rs. 1,50,847.46"
     from datetime import datetime
     assert inv.financial_year(datetime(2027, 3, 31)) == "2026-27" and inv.financial_year(datetime(2027, 4, 1)) == "2027-28"
+
+
+def test_a_review_cannot_target_someone_elses_sale(oc):
+    crm, m, calls, mails = oc
+    crm.store.put("sales", "SL-OTHER", {"id": "SL-OTHER", "submittedByUserId": "usr-9", "leadId": "L-X",
+                                        "status": "E-Signed & Converted", "stage": "Deal Finalized & Active"})
+    assert submit(crm, saleId="SL-OTHER", leadId="L-X").status_code == 403
+    assert submit(crm, leadId="L-WRONG").status_code == 403  # own sale, but another lead
+
+
+def test_approval_leaves_the_crm_alone_when_the_sale_is_not_the_submitters(oc):
+    crm, m, calls, mails = oc
+    crm.store.delete("sales", "SL-OC")  # not synced yet at submit time: allowed
+    submit(crm)
+    path = link_from(calls)
+    # Before the decision a different, finished sale appears under that id
+    crm.store.put("sales", "SL-OC", {"id": "SL-OC", "submittedByUserId": "usr-9", "leadId": "L-OC", "status": "E-Signed & Converted"})
+    crm.client.post(f"{path}/approve", data={"reviewer": "Srinivas"})
+    assert len(mails) == 1  # the reviewer approved what they saw
+    assert crm.store.get("sales", "SL-OC")["status"] == "E-Signed & Converted"
+    assert crm.store.get("leads", "L-OC")["disposition"] == "Under Review (Old Client)"
