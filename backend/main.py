@@ -17,6 +17,7 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import sale_review
     from backend import client_info_telegram
     from backend import service_expiry
     from backend.db_init import init_database
@@ -31,6 +32,7 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import sale_review
     import client_info_telegram
     import service_expiry
     from db_init import init_database
@@ -57,6 +59,7 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(sale_review.router)
 app.include_router(client_info_telegram.router)
 app.include_router(service_expiry.router)
 
@@ -67,6 +70,8 @@ def start_broadcast_pollers():
     # With several workers only one may poll Telegram, or every call would be sent once per worker
     if os.environ.get("BROADCAST_POLLERS_DISABLED") != "1" and broadcasts.claim_poller_role():
         broadcasts.start_pollers()
+        # Client Information review group (Approve / Reject before the Sale Approval queue)
+        sale_review.start()
         # Research reports are built one at a time in this same worker
         reports.start_worker()
         # Expired services: disabled in the Telegram Control Block and sent the Service Expiry Email
@@ -76,6 +81,7 @@ def start_broadcast_pollers():
 @app.on_event("shutdown")
 def stop_broadcast_pollers():
     broadcasts.stop_pollers()
+    sale_review.stop()
     service_expiry.stop_worker()
 
 # Pydantic Schemas

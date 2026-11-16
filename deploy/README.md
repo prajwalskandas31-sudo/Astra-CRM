@@ -84,6 +84,26 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## Client Information review group (Telegram Approve / Reject)
+
+With this on, **Send to Review** on the Client Information page posts every detail of the submission
+(and its transaction attachments) to a Telegram group with **Approve** and **Reject** buttons. Only an
+Approve there moves the sale into the **Sale Approval & Automated Verification Queue**; a Reject sends it
+back to the executive (notification + lead history) to correct and resubmit. Code: `backend/sale_review.py`.
+
+| `backend/.env` key | Value |
+|---|---|
+| `SALE_REVIEW_BOT_TOKEN` | the review bot's BotFather token. Empty = feature off (sales go straight to the queue) |
+| `SALE_REVIEW_CHAT_ID` | the group's id (e.g. `-100…`). Required: nothing is posted until it is set |
+
+Add the bot to the group and send `/chatid` there; the bot replies with the group's id. Put both keys in
+`backend/.env` and restart the backend (`docker compose up -d backend`). The group can only be chosen
+here, on the server, never from inside Telegram, so a stranger who adds the bot to their own group gets
+nothing. Submissions made before the id is set are queued and posted once it is. If Telegram upgrades the
+group to a supergroup, the bot follows the new id by itself. Super Admins can check
+`GET /api/sale-review/status` (bot name, group id, last error, queued posts). As with the trade-call
+bots, run a token on one server only.
+
 ## Research Reports (Telegram calls → 3-page PDFs, on demand)
 
 Calls posted in the Telegram bots (above) are logged as they come in. Reports are not made live: in

@@ -667,6 +667,9 @@ export const CRM_FEATURES = [
 
 const CRMContext = createContext();
 
+// Status of a sale posted to the Telegram review group and not yet approved there (backend/sale_review.py)
+export const TELEGRAM_REVIEW_STATUS = 'Awaiting Telegram Approval';
+
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
   const [currentUser, setCurrentUser] = useState(() => {
@@ -1243,6 +1246,25 @@ export const CRMProvider = ({ children }) => {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${authToken}`
   });
+
+  // Telegram review group: when the server has the bot configured, "Send to Review" goes to the
+  // group first and only an Approve there moves the sale into the Sale Approval queue.
+  const [telegramSaleReview, setTelegramSaleReview] = useState({ enabled: false });
+  const fetchTelegramSaleReview = async () => {
+    if (!serverSyncActive) return { enabled: false };
+    try {
+      const res = await fetch(`${API_BASE_URL}/sale-review/status`, { headers: authHeaders() });
+      if (!res.ok) return telegramSaleReview;
+      const data = await res.json();
+      setTelegramSaleReview(data);
+      return data;
+    } catch (err) {
+      return telegramSaleReview;
+    }
+  };
+  useEffect(() => {
+    fetchTelegramSaleReview();
+  }, [serverSyncActive, authToken]);
 
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
@@ -2589,6 +2611,7 @@ export const CRMProvider = ({ children }) => {
 
   // ─── Client Information Submission & Review Trigger ─────────────────────
   const submitClientInformationReview = async (leadId, clientInfoData, transactionAttachments = []) => {
+    const viaTelegram = !!(await fetchTelegramSaleReview()).enabled;
     const todayStr = new Date().toISOString().split('T')[0];
     const todayDateObj = new Date();
     const formattedDate = `${String(todayDateObj.getDate()).padStart(2, '0')}/${String(todayDateObj.getMonth() + 1).padStart(2, '0')}/${todayDateObj.getFullYear()}`;
@@ -2596,7 +2619,7 @@ export const CRMProvider = ({ children }) => {
     // 1. Update lead record
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. Sent to Super Admin for Review.`;
+        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. ${viaTelegram ? 'Sent to the Telegram review group for approval.' : 'Sent to Super Admin for Review.'}`;
         return {
           ...l,
           disposition: 'Under Review by Super Admin',
@@ -2643,17 +2666,18 @@ export const CRMProvider = ({ children }) => {
       email: clientInfoData.email,
       mitcStatus: 'Verified',
       complianceStatus: 'Compliant',
-      status: 'Pending Super Admin Review',
-      stage: 'Under Review by Super Admin',
-      voiceCallStatus: 'Pending Super Admin Decision',
+      // With the Telegram review group on, the group's Approve moves it to 'Pending Super Admin Review'
+      status: viaTelegram ? TELEGRAM_REVIEW_STATUS : 'Pending Super Admin Review',
+      stage: viaTelegram ? TELEGRAM_REVIEW_STATUS : 'Under Review by Super Admin',
+      voiceCallStatus: viaTelegram ? 'Awaiting Telegram Approval' : 'Pending Super Admin Decision',
       eSignStatus: 'Not Started',
       fullClientInfo: clientInfoData
     };
 
     setSales(prev => [newSale, ...prev.filter(s => s.leadId !== leadId)]);
 
-    // 3. Trigger approval email notification to Super Admin
-    addNotification({
+    // 3. Trigger approval email notification to Super Admin (the server posts it on a Telegram Approve)
+    if (!viaTelegram) addNotification({
       title: 'Review Required: New Sale Submission',
       message: `${currentUser?.name || 'Executive'} submitted sale for '${clientInfoData.clientName}' (Gross: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')}) with ${transactionAttachments.length} transaction attachment(s).`,
       type: 'review',
@@ -2662,7 +2686,7 @@ export const CRMProvider = ({ children }) => {
       targetRole: 'Super Admin'
     });
 
-    return newSale;
+    return { ...newSale, viaTelegram };
   };
 
   // ─── Super Admin Approval Workflow (Voice Call / Skip) ──────────────────
@@ -3374,6 +3398,7 @@ export const CRMProvider = ({ children }) => {
       // ─── Verification & E-Sign Workflows ────────────────────
       checkDuplicatePhone2,
       submitClientInformationReview,
+      telegramSaleReview,
       superAdminApproveSale,
       triggerEKycAndESign,
       refreshESignStatus,
