@@ -168,9 +168,24 @@ export const DEFAULT_COMPANY_PROFILE = {
   website: '',
   registeredAddress: '',
   investorCharterUrl: '',
+  gstin: '', // printed on Old Client invoices (they become "Tax Invoice" once it is set)
   // [{id, bankName, accountNumber, ifscCode, accountType, bankBranch, upiId, paymentGatewayLink}]
   bankAccounts: []
 };
+
+// Client type on the Client Information Page. Values must match backend/old_client_review.py and sync.py.
+export const NEW_CLIENT = 'New Client';
+export const OLD_CLIENT = 'Old Client';
+export const OLD_CLIENT_STATUS = {
+  awaiting: 'Old Client - Awaiting Approval',
+  approved: 'Old Client - Approved',
+  declined: 'Old Client - Declined'
+};
+export const OLD_CLIENT_STAGE = { awaiting: 'Awaiting Telegram Approval (Old Client)' };
+// Sales still with the executive (sync.py OPEN_SALE_STATUSES): a new submission for the lead replaces these
+const OPEN_SALE_STATUSES = ['Pending Super Admin Review', 'Pending Super Admin Approval', 'Rejected by Super Admin', 'Rejected',
+  OLD_CLIENT_STATUS.awaiting, OLD_CLIENT_STATUS.declined];
+export const isOldClientSale = (sale) => sale?.clientType === OLD_CLIENT;
 
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
   enabled: true,
@@ -2592,14 +2607,17 @@ export const CRMProvider = ({ children }) => {
     const todayStr = new Date().toISOString().split('T')[0];
     const todayDateObj = new Date();
     const formattedDate = `${String(todayDateObj.getDate()).padStart(2, '0')}/${String(todayDateObj.getMonth() + 1).padStart(2, '0')}/${todayDateObj.getFullYear()}`;
+    // Old Client: no Super Admin queue, e-KYC or Welcome Kit. The Telegram group approves it and the
+    // client is emailed only the invoice (backend/old_client_review.py, which also moves the sale on).
+    const isOldClient = clientInfoData.clientType === OLD_CLIENT;
 
     // 1. Update lead record
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. Sent to Super Admin for Review.`;
+        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}${isOldClient ? ' (Old Client)' : ''}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. ${isOldClient ? 'Sent to the Telegram group for approval; the invoice is emailed once approved.' : 'Sent to Super Admin for Review.'}`;
         return {
           ...l,
-          disposition: 'Under Review by Super Admin',
+          disposition: isOldClient ? 'Under Review (Old Client)' : 'Under Review by Super Admin',
           clientName: clientInfoData.firmName || clientInfoData.clientName || l.clientName,
           contactPerson: clientInfoData.clientName || l.contactPerson,
           phone: clientInfoData.phone1 || l.phone,
@@ -2643,14 +2661,28 @@ export const CRMProvider = ({ children }) => {
       email: clientInfoData.email,
       mitcStatus: 'Verified',
       complianceStatus: 'Compliant',
-      status: 'Pending Super Admin Review',
-      stage: 'Under Review by Super Admin',
-      voiceCallStatus: 'Pending Super Admin Decision',
-      eSignStatus: 'Not Started',
+      clientType: isOldClient ? OLD_CLIENT : NEW_CLIENT,
+      status: isOldClient ? OLD_CLIENT_STATUS.awaiting : 'Pending Super Admin Review',
+      stage: isOldClient ? OLD_CLIENT_STAGE.awaiting : 'Under Review by Super Admin',
+      voiceCallStatus: isOldClient ? 'Not Required (Old Client)' : 'Pending Super Admin Decision',
+      eSignStatus: isOldClient ? 'Not Required (Old Client)' : 'Not Started',
       fullClientInfo: clientInfoData
     };
 
-    setSales(prev => [newSale, ...prev.filter(s => s.leadId !== leadId)]);
+    // Replace only this lead's sale that is still open (awaiting review or sent back). An old client's
+    // lead usually has an earlier, finished sale, which must stay.
+    setSales(prev => [newSale, ...prev.filter(s => s.leadId !== leadId || !OPEN_SALE_STATUSES.includes(s.status))]);
+
+    if (isOldClient) {
+      addNotification({
+        title: 'Old Client Sale Sent to Telegram Review',
+        message: `${currentUser?.name || 'Executive'} submitted an Old Client sale for '${clientInfoData.clientName}' (Gross: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')}). Approve or decline it from the link in the Telegram group; approval emails the invoice only.`,
+        type: 'info',
+        actionPayload: { saleId: newSale.id, leadId: leadId },
+        targetRole: 'Super Admin'
+      });
+      return newSale;
+    }
 
     // 3. Trigger approval email notification to Super Admin
     addNotification({

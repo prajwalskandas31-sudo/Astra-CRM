@@ -172,10 +172,18 @@ def _crm_base(cfg: dict) -> str:
     raise HTTPException(status_code=503, detail="CRM_PUBLIC_URL is not set (or is not an http/https address) in backend/.env.")
 
 
-def build_message(alert: ClientInfoAlert, submitted_by: str, link: str, now: Optional[datetime] = None) -> str:
+def client_name(details: dict) -> str:
+    return " ".join(p for p in (_text(details.get("clientPrefix")), _text(details.get("clientName"))) if p)
+
+
+def _e(value) -> str:
+    return html.escape(_text(value)) or "—"
+
+
+def detail_lines(alert: ClientInfoAlert) -> list:
+    """Every field of the Client Information Page, as HTML lines for a Telegram message."""
     d = alert.details or {}
-    e = lambda v: html.escape(_text(v)) or "—"  # noqa: E731
-    name = " ".join(p for p in (_text(d.get("clientPrefix")), _text(d.get("clientName"))) if p)
+    name = client_name(d)
     rows = [
         ("<b>1. Client Identity &amp; Category</b>", None),
         ("PAN Number", d.get("panNumber")),
@@ -204,28 +212,40 @@ def build_message(alert: ClientInfoAlert, submitted_by: str, link: str, now: Opt
         ("Transaction Attachments", f"{len(alert.attachmentNames)} file(s)"
          + (f": {', '.join(_text(n) for n in alert.attachmentNames)}" if alert.attachmentNames else "")),
     ]
+    return [label if value is None else f"<b>{html.escape(label)}:</b> {_e(value)}" for label, value in rows]
+
+
+def submission_lines(alert: ClientInfoAlert, submitted_by: str, now: Optional[datetime] = None) -> list:
     stamp = (now or datetime.now(IST)).astimezone(IST).strftime("%d-%m-%Y %H:%M:%S IST")
-    lines = ["🆕 <b>Client Information Page: Sent to Review</b>", ""]
-    for label, value in rows:
-        lines.append(label if value is None else f"<b>{html.escape(label)}:</b> {e(value)}")
-    lines += [
-        "",
-        f"<b>Submitted by:</b> {e(submitted_by)}",
+    return [
+        f"<b>Submitted by:</b> {_e(submitted_by)}",
         f"<b>Submitted at:</b> {stamp}",
-        f"<b>Sale ID:</b> <code>{e(alert.saleId)}</code>" + (f"  •  <b>Lead ID:</b> <code>{e(alert.leadId)}</code>" if alert.leadId else ""),
-        "",
-        "🔐 <b>e-KYC &amp; E-Sign</b>",
-        f'<a href="{html.escape(link, quote=True)}">Start e-KYC &amp; E-Sign for {e(name or d.get("clientName"))}</a>',
-        f"{html.escape(link)}",
-        "<i>Opens the CRM (Super Admin sign-in) and sends the Leegality e-KYC &amp; E-Sign request.</i>",
+        f"<b>Sale ID:</b> <code>{_e(alert.saleId)}</code>" + (f"  •  <b>Lead ID:</b> <code>{_e(alert.leadId)}</code>" if alert.leadId else ""),
     ]
-    text = "\n".join(lines)
+
+
+def fit(text: str) -> str:
     return text if len(text) <= MAX_MESSAGE_CHARS else text[:MAX_MESSAGE_CHARS - 1] + "…"
 
 
-def _send(cfg: dict, chat_id: str, text: str, link: str) -> dict:
+def build_message(alert: ClientInfoAlert, submitted_by: str, link: str, now: Optional[datetime] = None) -> str:
+    d = alert.details or {}
+    name = client_name(d)
+    lines = ["🆕 <b>Client Information Page: Sent to Review</b>", "", *detail_lines(alert), "",
+             *submission_lines(alert, submitted_by, now)]
+    lines += [
+        "",
+        "🔐 <b>e-KYC &amp; E-Sign</b>",
+        f'<a href="{html.escape(link, quote=True)}">Start e-KYC &amp; E-Sign for {_e(name or d.get("clientName"))}</a>',
+        f"{html.escape(link)}",
+        "<i>Opens the CRM (Super Admin sign-in) and sends the Leegality e-KYC &amp; E-Sign request.</i>",
+    ]
+    return fit("\n".join(lines))
+
+
+def _send(cfg: dict, chat_id: str, text: str, link: str, button: str = "🔐 Start e-KYC & E-Sign") -> dict:
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True,
-               "reply_markup": {"inline_keyboard": [[{"text": "🔐 Start e-KYC & E-Sign", "url": link}]]}}
+               "reply_markup": {"inline_keyboard": [[{"text": button, "url": link}]]}}
     try:
         return _telegram(cfg["token"], "sendMessage", **payload)
     except TelegramError as err:
@@ -233,7 +253,7 @@ def _send(cfg: dict, chat_id: str, text: str, link: str) -> dict:
         if migrated:  # the group became a supergroup and has a new id
             if not cfg["chat_id"]:
                 store.set_value(CHAT_ID_VALUE, str(migrated))
-            return _send(cfg, str(migrated), text, link)
+            return _send(cfg, str(migrated), text, link, button)
         if "button" in str(err).lower() or "url" in str(err).lower():
             # Telegram refuses some button addresses (e.g. bare IPs); the link in the text still works
             payload.pop("reply_markup")

@@ -138,6 +138,21 @@ already sent shows its Leegality status instead, so a second tap never spends an
 | `TELEGRAM_CLIENT_INFO_CHAT_ID` | Optional. Without it the CRM finds the group itself: send `/start@Client_info_page_updates_bot` in the group once (Telegram keeps that for 24 hours); the id is then remembered |
 | `CRM_PUBLIC_URL` | Required, e.g. `http://200.234.32.65:8080`. The only address the e-KYC link may use; the address the browser reports is never trusted |
 
+### Old Clients (invoice only)
+
+The Client Information Page has a **Client Type**: New Client (the flow above) or Old Client. An Old Client gets
+no e-KYC & E-Sign and no Welcome Kit. "Send to Telegram Review" posts every detail to the same group, ending
+with a review link (`http://<server>:<CRM_PORT>/api/client-info/old-client/review/<token>`). **Anyone with the
+link** can open it without signing in and Approve or Decline (they type their name for the record):
+
+- **Approve** emails the client only the invoice PDF (`INV/<financial year>/<number>`), from the Email Block's
+  Sender Email ID, marks the sale "Old Client - Approved" and the lead Paid / Converted, and replies in the group.
+  If the email fails, the page shows why and Approve can be pressed again (same invoice number).
+- **Decline** marks the sale "Old Client - Declined" (the executive can correct and resend it) and replies in the group.
+
+The link is never shown to the executive who submitted. The invoice's seller block is the Company Profile;
+set its **GSTIN** to print a "Tax Invoice" (without it the PDF is titled "Invoice"). No new `.env` keys.
+
 ## e-KYC & E-Sign (Leegality)
 
 "Trigger e-KYC & E-Sign" sends workflow `KKliSJp` (template `kFWn7uC`, RA Terms and Conditions - UTFS) with

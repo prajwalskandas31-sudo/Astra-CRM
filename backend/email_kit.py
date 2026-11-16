@@ -431,6 +431,8 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
     settings = _settings()
     _require_sender(settings)
     sale = _sale_or_404(req.saleId)
+    if sale.get("clientType") == "Old Client":
+        raise HTTPException(status_code=400, detail="Old Clients get no Welcome Kit: only the invoice, emailed when the Telegram group approves.")
     client = _client(sale)
     if not client["email"]:
         raise HTTPException(status_code=400, detail="This client has no Email ID on the Client Information Page.")

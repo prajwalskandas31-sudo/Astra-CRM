@@ -11,12 +11,17 @@ import { API_BASE_URL, isBackendEnabled, readErrorDetail } from './backendConfig
 const FIELDS = ['panNumber', 'clientCategory', 'clientPrefix', 'clientName', 'firmName', 'gstin', 'email', 'phone1', 'phone2',
   'clientState', 'paymentDate', 'serviceName', 'serviceTenure', 'transactionNumbers', 'grossSales', 'netSales', 'gst'];
 
-export const postClientInfoToTelegram = async ({ saleId, leadId, clientInfo, attachments = [] }) => {
+/**
+ * New Client: the group message ends with the e-KYC link.
+ * Old Client (oldClient: true): the group message ends with a review link that anyone can open to
+ * Approve (emails the client only the invoice) or Decline. The link is never sent back to this browser.
+ */
+export const postClientInfoToTelegram = async ({ saleId, leadId, clientInfo, attachments = [], oldClient = false }) => {
   if (!isBackendEnabled()) return { skipped: true };
   const details = Object.fromEntries(FIELDS.map(f => [f, clientInfo?.[f] ?? '']));
   // File names only: the uploads themselves stay in the CRM
   details.gstCertificateFile = clientInfo?.gstCertificateFile?.name || '';
-  const res = await fetch(`${API_BASE_URL}/client-info/telegram`, {
+  const res = await fetch(`${API_BASE_URL}/client-info/${oldClient ? 'old-client' : 'telegram'}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('crm_token') || ''}` },
     body: JSON.stringify({

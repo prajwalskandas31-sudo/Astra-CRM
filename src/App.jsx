@@ -112,6 +112,10 @@ const AppContent = () => {
     sales,
     onStart: async (sale) => {
       setActiveTab('sale-approvals');
+      if (sale.clientType === 'Old Client') {
+        showToast(`'${sale.clientName}' is an Old Client: no e-KYC & E-Sign. Approve it from its review link in Telegram.`, 'info');
+        return;
+      }
       if (currentUser?.role !== 'Super Admin') {
         showToast('Only a Super Admin can start e-KYC & E-Sign. Sign in as Super Admin and open the link again.', 'error');
         return;
