@@ -17,6 +17,7 @@ try:
     from backend import reports
     from backend import sync
     from backend import email_kit
+    from backend import service_expiry
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -29,6 +30,7 @@ except ImportError:
     import reports
     import sync
     import email_kit
+    import service_expiry
     from db_init import init_database
 
 
@@ -53,6 +55,7 @@ app.include_router(broadcasts.router)
 app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
+app.include_router(service_expiry.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -63,11 +66,14 @@ def start_broadcast_pollers():
         broadcasts.start_pollers()
         # Research reports are built one at a time in this same worker
         reports.start_worker()
+        # Expired services: disabled in the Telegram Control Block and sent the Service Expiry Email
+        service_expiry.start_worker()
 
 
 @app.on_event("shutdown")
 def stop_broadcast_pollers():
     broadcasts.stop_pollers()
+    service_expiry.stop_worker()
 
 # Pydantic Schemas
 class LoginRequest(BaseModel):
