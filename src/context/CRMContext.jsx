@@ -14,6 +14,7 @@ import { useServerSync } from '../services/serverSync';
 
 // Which crm_* keys this browser held before the app wrote anything (the server import needs to know
 // whether local data is real or just defaults saved on first render).
+export const MAX_COMPANY_ASSETS = 10;
 const LOCAL_KEYS_AT_START = typeof window !== 'undefined' ? new Set(Object.keys(localStorage)) : new Set();
 
 // localStorage is only a cache of the server data; a full browser quota must never crash the app.
@@ -184,7 +185,7 @@ export const OLD_CLIENT_STATUS = {
 export const OLD_CLIENT_STAGE = { awaiting: 'Awaiting Telegram Approval (Old Client)' };
 // Sales still with the executive (sync.py OPEN_SALE_STATUSES): a new submission for the lead replaces these
 const OPEN_SALE_STATUSES = ['Pending Super Admin Review', 'Pending Super Admin Approval', 'Rejected by Super Admin', 'Rejected',
-  OLD_CLIENT_STATUS.awaiting, OLD_CLIENT_STATUS.declined];
+  'Awaiting Telegram Approval', 'Rejected in Telegram Review', OLD_CLIENT_STATUS.awaiting, OLD_CLIENT_STATUS.declined];
 export const isOldClientSale = (sale) => sale?.clientType === OLD_CLIENT;
 
 export const DEFAULT_VOICE_AGENT_SETTINGS = {
@@ -682,6 +683,9 @@ export const CRM_FEATURES = [
 
 const CRMContext = createContext();
 
+// Status of a sale posted to the Telegram review group and not yet approved there (backend/sale_review.py)
+export const TELEGRAM_REVIEW_STATUS = 'Awaiting Telegram Approval';
+
 export const CRMProvider = ({ children }) => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('crm_token') || '');
   const [currentUser, setCurrentUser] = useState(() => {
@@ -1126,6 +1130,19 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_branches', JSON.stringify(branches));
   }, [branches]);
 
+  // ─── Company Assets Provided (Super Admin managed list, max 10; users keep asset ids) ─
+  const [companyAssets, setCompanyAssets] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_company_assets') || 'null');
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    cacheSet('crm_company_assets', JSON.stringify(companyAssets));
+  }, [companyAssets]);
+
   // ─── Financial Controls & Limits (Super Admin Password Protected) ────────
   const [financialSettings, setFinancialSettings] = useState(() => {
     const saved = localStorage.getItem('crm_financial_settings');
@@ -1233,6 +1250,7 @@ export const CRMProvider = ({ children }) => {
     companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
     branches: { value: branches, setValue: setBranches, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_branches') },
+    companyAssets: { value: companyAssets, setValue: setCompanyAssets, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_company_assets') },
   }, {
     enabled: serverSyncActive && !!authUser,
     token: authToken,
@@ -1258,6 +1276,25 @@ export const CRMProvider = ({ children }) => {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${authToken}`
   });
+
+  // Telegram review group: when the server has the bot configured, "Send to Review" goes to the
+  // group first and only an Approve there moves the sale into the Sale Approval queue.
+  const [telegramSaleReview, setTelegramSaleReview] = useState({ enabled: false });
+  const fetchTelegramSaleReview = async () => {
+    if (!serverSyncActive) return { enabled: false };
+    try {
+      const res = await fetch(`${API_BASE_URL}/sale-review/status`, { headers: authHeaders() });
+      if (!res.ok) return telegramSaleReview;
+      const data = await res.json();
+      setTelegramSaleReview(data);
+      return data;
+    } catch (err) {
+      return telegramSaleReview;
+    }
+  };
+  useEffect(() => {
+    fetchTelegramSaleReview();
+  }, [serverSyncActive, authToken]);
 
   // Fetch initial data when authenticated (with graceful fallback to default state)
   const refreshData = async () => {
@@ -2520,6 +2557,36 @@ export const CRMProvider = ({ children }) => {
     setBranches(prev => prev.filter(b => b.id !== id));
   };
 
+  // Returns an error message instead of saving when the name is blank, repeated or the list is full
+  const companyAssetError = (name, exceptId = null) => {
+    const clean = (name || '').trim();
+    if (!clean) return 'Enter an asset name.';
+    if (companyAssets.some(a => a.id !== exceptId && (a.name || '').trim().toLowerCase() === clean.toLowerCase())) {
+      return `'${clean}' is already in the list.`;
+    }
+    if (!exceptId && companyAssets.length >= MAX_COMPANY_ASSETS) return `Only ${MAX_COMPANY_ASSETS} asset items can be set up.`;
+    return null;
+  };
+
+  const addCompanyAsset = (name) => {
+    const error = companyAssetError(name);
+    if (error) return { success: false, error };
+    const asset = { id: 'ast-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900), name: name.trim() };
+    setCompanyAssets(prev => [...prev, asset]);
+    return { success: true, asset };
+  };
+
+  const updateCompanyAsset = (id, name) => {
+    const error = companyAssetError(name, id);
+    if (error) return { success: false, error };
+    setCompanyAssets(prev => prev.map(a => a.id === id ? { ...a, name: name.trim() } : a));
+    return { success: true };
+  };
+
+  const deleteCompanyAsset = (id) => {
+    setCompanyAssets(prev => prev.filter(a => a.id !== id));
+  };
+
   const updateFinancialSettings = (updated) => {
     setFinancialSettings(prev => ({ ...prev, ...updated }));
   };
@@ -2604,6 +2671,7 @@ export const CRMProvider = ({ children }) => {
 
   // ─── Client Information Submission & Review Trigger ─────────────────────
   const submitClientInformationReview = async (leadId, clientInfoData, transactionAttachments = []) => {
+    const viaTelegram = !!(await fetchTelegramSaleReview()).enabled;
     const todayStr = new Date().toISOString().split('T')[0];
     const todayDateObj = new Date();
     const formattedDate = `${String(todayDateObj.getDate()).padStart(2, '0')}/${String(todayDateObj.getMonth() + 1).padStart(2, '0')}/${todayDateObj.getFullYear()}`;
@@ -2614,7 +2682,7 @@ export const CRMProvider = ({ children }) => {
     // 1. Update lead record
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}${isOldClient ? ' (Old Client)' : ''}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. ${isOldClient ? 'Sent to the Telegram group for approval; the invoice is emailed once approved.' : 'Sent to Super Admin for Review.'}`;
+        const historyText = `Client Information Page submitted by ${currentUser?.name || 'Executive'}${isOldClient ? ' (Old Client)' : ''}. Gross Sales: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')} (Net: ₹${Number(clientInfoData.netSales || 0).toLocaleString('en-IN')}, GST: ₹${Number(clientInfoData.gst || 0).toLocaleString('en-IN')}). ${transactionAttachments.length} attachment(s) uploaded. ${isOldClient ? 'Sent to the Telegram group for approval; the invoice is emailed once approved.' : (viaTelegram ? 'Sent to the Telegram review group for approval.' : 'Sent to Super Admin for Review.')}`;
         return {
           ...l,
           disposition: isOldClient ? 'Under Review (Old Client)' : 'Under Review by Super Admin',
@@ -2662,9 +2730,10 @@ export const CRMProvider = ({ children }) => {
       mitcStatus: 'Verified',
       complianceStatus: 'Compliant',
       clientType: isOldClient ? OLD_CLIENT : NEW_CLIENT,
-      status: isOldClient ? OLD_CLIENT_STATUS.awaiting : 'Pending Super Admin Review',
-      stage: isOldClient ? OLD_CLIENT_STAGE.awaiting : 'Under Review by Super Admin',
-      voiceCallStatus: isOldClient ? 'Not Required (Old Client)' : 'Pending Super Admin Decision',
+      // With the Telegram review group on, the group's Approve moves a new client to 'Pending Super Admin Review'
+      status: isOldClient ? OLD_CLIENT_STATUS.awaiting : viaTelegram ? TELEGRAM_REVIEW_STATUS : 'Pending Super Admin Review',
+      stage: isOldClient ? OLD_CLIENT_STAGE.awaiting : viaTelegram ? TELEGRAM_REVIEW_STATUS : 'Under Review by Super Admin',
+      voiceCallStatus: isOldClient ? 'Not Required (Old Client)' : viaTelegram ? 'Awaiting Telegram Approval' : 'Pending Super Admin Decision',
       eSignStatus: isOldClient ? 'Not Required (Old Client)' : 'Not Started',
       fullClientInfo: clientInfoData
     };
@@ -2684,8 +2753,8 @@ export const CRMProvider = ({ children }) => {
       return newSale;
     }
 
-    // 3. Trigger approval email notification to Super Admin
-    addNotification({
+    // 3. Trigger approval email notification to Super Admin (the server posts it on a Telegram Approve)
+    if (!viaTelegram) addNotification({
       title: 'Review Required: New Sale Submission',
       message: `${currentUser?.name || 'Executive'} submitted sale for '${clientInfoData.clientName}' (Gross: ₹${Number(clientInfoData.grossSales || 0).toLocaleString('en-IN')}) with ${transactionAttachments.length} transaction attachment(s).`,
       type: 'review',
@@ -2694,7 +2763,7 @@ export const CRMProvider = ({ children }) => {
       targetRole: 'Super Admin'
     });
 
-    return newSale;
+    return { ...newSale, viaTelegram };
   };
 
   // ─── Super Admin Approval Workflow (Voice Call / Skip) ──────────────────
@@ -3394,6 +3463,11 @@ export const CRMProvider = ({ children }) => {
       addBranch,
       updateBranch,
       deleteBranch,
+      // ─── Company Assets Provided ────────────────────────────
+      companyAssets,
+      addCompanyAsset,
+      updateCompanyAsset,
+      deleteCompanyAsset,
       // ─── Financial Settings & Limits ────────────────────────
       financialSettings,
       updateFinancialSettings,
@@ -3406,6 +3480,7 @@ export const CRMProvider = ({ children }) => {
       // ─── Verification & E-Sign Workflows ────────────────────
       checkDuplicatePhone2,
       submitClientInformationReview,
+      telegramSaleReview,
       superAdminApproveSale,
       triggerEKycAndESign,
       refreshESignStatus,

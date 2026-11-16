@@ -207,3 +207,16 @@ def test_notification_ownership(crm, tok):
     assert push(crm, tok["exec"], "notifications", [{"id": "n-global", "title": "Hacked"}])["rejected"]["notifications"]
     assert push(crm, tok["exec"], "notifications", deletes=["n-global"])["rejected"]["notifications"]
     assert not push(crm, tok["exec"], "notifications", deletes=["n-mine"])["rejected"]["notifications"]
+
+
+def test_company_assets_are_super_admin_only_and_capped_at_ten(crm, tok):
+    asset = {"id": "ast-1", "name": "Laptop"}
+    assert push(crm, tok["admin"], "companyAssets", [asset])["rejected"]["companyAssets"]
+    assert not push(crm, tok["sa"], "companyAssets", [asset])["rejected"]["companyAssets"]
+    assert "ast-1" in ids(pull(crm, tok["exec"], "companyAssets"), "companyAssets")
+    assert push(crm, tok["sa"], "companyAssets", [{"id": "ast-x", "name": "  "}])["rejected"]["companyAssets"]
+    more = [{"id": f"ast-{n}", "name": f"Item {n}"} for n in range(2, 11)]
+    assert not push(crm, tok["sa"], "companyAssets", more)["rejected"]["companyAssets"]
+    assert push(crm, tok["sa"], "companyAssets", [{"id": "ast-11", "name": "One too many"}])["rejected"]["companyAssets"]
+    # Renaming an existing item still works when the list is full
+    assert not push(crm, tok["sa"], "companyAssets", [{"id": "ast-1", "name": "Laptop (Dell)"}])["rejected"]["companyAssets"]

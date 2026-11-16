@@ -84,6 +84,26 @@ A sender verifies once by opening the bot and tapping **Share my number**; only 
 5 minutes late (e.g. while it was restarting) are not sent. Results show in the Paid block under
 **Trade Call Broadcasts** and in the bot's reply.
 
+## Client Information review group (Telegram Approve / Reject)
+
+With this on, **Send to Review** on the Client Information page posts every detail of the submission
+(and its transaction attachments) to a Telegram group with **Approve** and **Reject** buttons. Only an
+Approve there moves the sale into the **Sale Approval & Automated Verification Queue**; a Reject sends it
+back to the executive (notification + lead history) to correct and resubmit. Code: `backend/sale_review.py`.
+
+| `backend/.env` key | Value |
+|---|---|
+| `SALE_REVIEW_BOT_TOKEN` | the review bot's BotFather token. Empty = feature off (sales go straight to the queue) |
+| `SALE_REVIEW_CHAT_ID` | the group's id (e.g. `-100…`). Required: nothing is posted until it is set |
+
+Add the bot to the group and send `/chatid` there; the bot replies with the group's id. Put both keys in
+`backend/.env` and restart the backend (`docker compose up -d backend`). The group can only be chosen
+here, on the server, never from inside Telegram, so a stranger who adds the bot to their own group gets
+nothing. Submissions made before the id is set are queued and posted once it is. If Telegram upgrades the
+group to a supergroup, the bot follows the new id by itself. Super Admins can check
+`GET /api/sale-review/status` (bot name, group id, last error, queued posts). As with the trade-call
+bots, run a token on one server only.
+
 ## Research Reports (Telegram calls → 3-page PDFs, on demand)
 
 Calls posted in the Telegram bots (above) are logged as they come in. Reports are not made live: in
@@ -152,6 +172,22 @@ link** can open it without signing in and Approve or Decline (they type their na
 
 The link is never shown to the executive who submitted. The invoice's seller block is the Company Profile;
 set its **GSTIN** to print a "Tax Invoice" (without it the PDF is titled "Invoice"). No new `.env` keys.
+
+## Broadcast_group → notification to every CRM user (Telegram)
+
+`backend/broadcast_group.py` long-polls the `Crm_broadcast_bot` bot (Telegram Bot API `getUpdates`). Every text
+message (or photo/file caption) posted in the `Broadcast_group` group becomes a notification for all CRM users:
+a pop-up within about 5 seconds plus an entry in the notification tray. Editing the message updates it. Runs in
+the same single backend worker as the trade-call pollers.
+
+The bot must see ordinary messages: make it an **admin** of the group, or set BotFather `/setprivacy` → Disable
+and then remove and re-add it to the group. `GET /api/broadcast-group/status` (admins) shows whether it is running.
+
+| Key | Value |
+|---|---|
+| `TELEGRAM_BROADCAST_GROUP_BOT_TOKEN` | The bot's BotFather token |
+| `TELEGRAM_BROADCAST_GROUP` | Optional. The group's title, default `Broadcast_group`; the id is remembered after the first match |
+| `TELEGRAM_BROADCAST_GROUP_CHAT_ID` | Optional. Pins the group by id instead of by title |
 
 ## e-KYC & E-Sign (Leegality)
 

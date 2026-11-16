@@ -1,11 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { Bell, User, LogOut } from 'lucide-react';
 import { NotificationBar } from './NotificationBar';
+import { useToast } from './ToastNotification';
+
+// Broadcast_group messages (from Telegram, via the backend) pop up once per browser when they arrive.
+// Older ones (e.g. sent while this user was signed out) only wait in the tray.
+const SEEN_BROADCASTS_KEY = 'crm_seen_broadcasts';
+const POPUP_MAX_AGE_MS = 10 * 60 * 1000;
+
+const loadSeenBroadcasts = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(SEEN_BROADCASTS_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+};
 
 export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignModal = null }) => {
   const { currentUser, simulatedRole, handleLogout, notifications = [] } = useCRM();
   const [showNotificationBar, setShowNotificationBar] = useState(false);
+  const { showToast } = useToast();
+  const seenBroadcasts = useRef(null);
+
+  useEffect(() => {
+    if (!seenBroadcasts.current) seenBroadcasts.current = loadSeenBroadcasts();
+    const seen = seenBroadcasts.current;
+    const fresh = notifications.filter(n => n?.type === 'broadcast' && !seen.has(n.id));
+    if (!fresh.length) return;
+    fresh.slice().reverse().forEach(n => {  // oldest first, so the newest ends up on top
+      seen.add(n.id);
+      const age = Date.now() - Date.parse(n.createdAt || 0);
+      if (age < POPUP_MAX_AGE_MS) showToast(`📢 ${n.title} — ${n.message}`, 'info', 15000);
+    });
+    try {
+      // Keep only ids that still exist, so the list never grows without bound
+      const live = new Set(notifications.map(n => n?.id));
+      localStorage.setItem(SEEN_BROADCASTS_KEY, JSON.stringify([...seen].filter(id => live.has(id))));
+    } catch { /* storage blocked: worst case a pop-up shows again */ }
+  }, [notifications, showToast]);
 
   const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
 
