@@ -65,6 +65,21 @@ def _import_legacy_files(data_dir: str) -> list:
     return imported
 
 
+# Collections that gained an owner (used for scoped reads) after records were already stored
+OWNER_BACKFILLS = ["paidClients"]
+
+
+def _backfill_owners() -> None:
+    """Rewrite each stored record once so its owner column is filled in. Runs only once the
+    collection's owner is registered (backend/sync.py), i.e. when the app starts."""
+    for collection in OWNER_BACKFILLS:
+        marker = f"ownersBackfilled:{collection}"
+        if not store.has_owner(collection) or store.get_value(marker):
+            continue
+        store.put_many(collection, store.all(collection))
+        store.set_value(marker, True)
+
+
 def init_database(data_dir: str = DATA_DIR) -> dict:
     store.backend()  # creates the tables
     with store.transaction():  # serialized, so two workers starting together cannot both seed
@@ -75,6 +90,7 @@ def init_database(data_dir: str = DATA_DIR) -> dict:
                 if store.count(collection) == 0:
                     store.put_many(collection, copy.deepcopy(docs))
         imported = _import_legacy_files(data_dir)
+        _backfill_owners()
     return {"backend": store.backend().name, "seeded": seeded, "imported": imported}
 
 

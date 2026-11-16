@@ -35,7 +35,8 @@ import {
   HelpCircle,
   Check,
   X,
-  Copy
+  Copy,
+  Activity
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -49,6 +50,7 @@ const FEATURE_ICONS = {
   'employee-documents': FileText,
   dispositions: Layers,
   'team-monitoring': TrendingUp,
+  'team-performance': Activity,
   'lead-reassignment': Layers,
   'lead-upload': Upload,
   'lead-upload-bulk': Upload,

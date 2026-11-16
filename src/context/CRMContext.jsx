@@ -533,6 +533,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader']
   },
   {
+    id: 'team-performance',
+    name: 'Team Performance Tracking',
+    category: 'Operations & Dispositions',
+    description: 'Calls made, leads by data set and disposition, net sales and paid clients for a day or date range: your own as an Executive, your team as a Team Leader, every team for Admins. Anyone with people under them marks their attendance here.',
+    defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
+  },
+  {
     id: 'lead-reassignment',
     name: 'Lead Reassignment & Audit Protocol',
     category: 'Operations & Dispositions',
@@ -1205,6 +1212,28 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_paid_clients', JSON.stringify(paidClients));
   }, [paidClients]);
 
+  // ─── Team Performance Tracking ─────────────────────────────────────────────
+  // callStats: one record per user per day ({userId}:{YYYY-MM-DD}) counting the call outcomes they saved.
+  // attendance: one record per user per day, marked by someone they report to.
+  const readCachedList = (key) => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  };
+  const [callStats, setCallStats] = useState(() => readCachedList('crm_call_stats'));
+  const [attendance, setAttendance] = useState(() => readCachedList('crm_attendance'));
+
+  useEffect(() => {
+    cacheSet('crm_call_stats', JSON.stringify(callStats));
+  }, [callStats]);
+
+  useEffect(() => {
+    cacheSet('crm_attendance', JSON.stringify(attendance));
+  }, [attendance]);
+
   // ─── Shared data ↔ server (hosted deployments) ─────────────────────────────
   // Hosted deployments share leads, sales, etc. through /api/sync, so changes are made to local
   // state and synced; the older per-action endpoints are for local development.
@@ -1235,6 +1264,8 @@ export const CRMProvider = ({ children }) => {
     companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
     branches: { value: branches, setValue: setBranches, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_branches') },
+    callStats: { value: callStats, setValue: setCallStats, kind: 'list', canWrite: true, importLocal: false },
+    attendance: { value: attendance, setValue: setAttendance, kind: 'list', canWrite: true, importLocal: false },
     companyAssets: { value: companyAssets, setValue: setCompanyAssets, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_company_assets') },
   }, {
     enabled: serverSyncActive && !!authUser,
@@ -2077,8 +2108,56 @@ export const CRMProvider = ({ children }) => {
     setDispositions(prev => prev.filter(d => d.id !== dispId));
   };
 
+  // Team Performance Tracking: each saved call outcome counts as one call for the signed-in user today
+  const recordCall = (dispositionName) => {
+    const caller = authUser || currentUser;
+    if (!caller?.id) return;
+    const date = todayKey();
+    const id = `${caller.id}:${date}`;
+    const disposition = dispositionName || 'No Disposition';
+    setCallStats(prev => {
+      const existing = prev.find(c => c.id === id);
+      const byDisposition = { ...(existing?.byDisposition || {}) };
+      byDisposition[disposition] = (byDisposition[disposition] || 0) + 1;
+      const updated = {
+        id,
+        userId: caller.id,
+        userName: caller.name || '',
+        date,
+        total: (existing?.total || 0) + 1,
+        byDisposition,
+        updatedAt: new Date().toISOString()
+      };
+      return existing ? prev.map(c => (c.id === id ? updated : c)) : [updated, ...prev];
+    });
+  };
+
+  // Attendance for one person on one day; status null clears it. The server records who marked it.
+  const markAttendance = (userId, date, status, note = '') => {
+    const marker = authUser || currentUser;
+    const id = `${userId}:${date}`;
+    if (!status) {
+      setAttendance(prev => prev.filter(a => a.id !== id));
+      return;
+    }
+    const target = users.find(u => u.id === userId);
+    const record = {
+      id,
+      userId,
+      userName: target?.name || '',
+      date,
+      status,
+      note,
+      markedById: marker?.id || '',
+      markedByName: marker?.name || '',
+      markedAt: new Date().toISOString()
+    };
+    setAttendance(prev => [record, ...prev.filter(a => a.id !== id)]);
+  };
+
   // Post-Call Lead Outcome Update with Date/Time Support
   const updateLeadDisposition = async (leadId, dispositionName, callNotes = '', scheduledDateTime = '') => {
+    recordCall(dispositionName);
     if (!serverSyncActive) try {
       const res = await fetch(`${API_BASE_URL}/leads/${leadId}/disposition`, {
         method: 'POST',
@@ -3460,6 +3539,10 @@ export const CRMProvider = ({ children }) => {
       paidClients,
       deletePaidClient,
       togglePaidClientSegment,
+      // ─── Team Performance Tracking ─────────────────────────────────────
+      callStats,
+      attendance,
+      markAttendance,
       // ─── Leegality API Integration Config & Credentials ────────
       leegalityConfig,
       updateLeegalityConfig
