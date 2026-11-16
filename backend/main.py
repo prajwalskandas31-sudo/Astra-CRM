@@ -18,6 +18,7 @@ try:
     from backend import sync
     from backend import email_kit
     from backend import sale_review
+    from backend import client_info_telegram
     from backend import service_expiry
     from backend.db_init import init_database
 except ImportError:
@@ -32,6 +33,7 @@ except ImportError:
     import sync
     import email_kit
     import sale_review
+    import client_info_telegram
     import service_expiry
     from db_init import init_database
 
@@ -58,6 +60,7 @@ app.include_router(reports.router)
 app.include_router(sync.router)
 app.include_router(email_kit.router)
 app.include_router(sale_review.router)
+app.include_router(client_info_telegram.router)
 app.include_router(service_expiry.router)
 
 

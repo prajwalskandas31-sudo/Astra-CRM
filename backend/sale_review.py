@@ -29,10 +29,12 @@ try:
     from backend import store
     from backend.auth import get_current_user
     from backend.broadcasts import _load_env
+    from backend import client_info_telegram
 except ImportError:
     import store
     from auth import get_current_user
     from broadcasts import _load_env
+    import client_info_telegram
 
 
 AWAITING_STATUS = "Awaiting Telegram Approval"
@@ -170,9 +172,21 @@ def render(sale: dict, decision: Optional[str] = None) -> str:
         f"<b>Attachments:</b> {len(files)}" + (" (sent below)" if files else ""),
     ]
     lines += [f"• {_e(f.get('label') or 'Transaction proof')}: {_e(f.get('name'))}" for f in files]
+    link = ekyc_link(str(sale.get("id") or ""))
+    if link:
+        lines += ["", "🔐 <b>e-KYC &amp; E-Sign</b> (after approval, Super Admin sign-in)",
+                  f'<a href="{html.escape(link, quote=True)}">{html.escape(link)}</a>']
     if decision:
         lines += ["", decision]
     return "\n".join(lines)[:4096]
+
+
+def ekyc_link(sale_id: str) -> Optional[str]:
+    """The CRM link that starts e-KYC & E-Sign for this sale (Super Admin sign-in), when CRM_PUBLIC_URL is set."""
+    try:
+        return client_info_telegram.ekyc_link(client_info_telegram._crm_base(client_info_telegram.settings()), sale_id)
+    except Exception:
+        return None
 
 
 def _buttons(sale_id: str) -> dict:

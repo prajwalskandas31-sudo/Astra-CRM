@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
+import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
 import { 
   X, 
   Lock, 
@@ -423,6 +424,14 @@ export const ClientInformationModal = ({
     };
 
     const submitted = lead?.id ? await submitClientInformationReview(lead.id, finalData, transactionAttachments) : null;
+
+    // With the Approve / Reject review group on, the server posts the submission (with the e-KYC link)
+    // itself; otherwise the page posts it to the Client Information group as before.
+    if (submitted?.id && !submitted.viaTelegram) {
+      postClientInfoToTelegram({ saleId: submitted.id, leadId: lead.id, clientInfo: finalData, attachments: transactionAttachments })
+        .then(res => { if (res && !res.skipped) showToast('Client details posted to the Telegram group with the e-KYC link.', 'success'); })
+        .catch(err => showToast(`Telegram group not updated: ${err.message}`, 'warning'));
+    }
 
     showToast(submitted?.viaTelegram
       ? 'Client Information sent to the Telegram review group. It reaches the Sale Approval queue once approved there.'

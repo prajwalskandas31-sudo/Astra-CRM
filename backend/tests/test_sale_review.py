@@ -92,6 +92,7 @@ def test_posts_full_details_with_buttons_once_bound(crm, bot):
     for text in ("ABCDE1234F", "Mr. Ravi &lt;Kumar&gt;", "ravi@example.com", "9876543210", "Karnataka",
                  "Index Options", "3 Months", "UTR123", "₹1,18,000.00", "₹1,00,000.00", "proof.png"):
         assert text in msg["text"], text
+    assert "?ekyc=SL-tg2" not in msg["text"]  # no CRM_PUBLIC_URL in tests: no link
     buttons = msg["reply_markup"]["inline_keyboard"][0]
     assert [b["callback_data"] for b in buttons] == ["sra:SL-tg2", "srr:SL-tg2"]
     doc = [c for c in bot if c[0] == "sendDocument"][-1]
@@ -170,3 +171,8 @@ def test_without_a_token_sales_go_straight_to_the_queue(crm, bot, monkeypatch):
     monkeypatch.delenv("SALE_REVIEW_BOT_TOKEN", raising=False)
     body = push(crm, crm.token(EXEC), [sale("SL-plain", "Pending Super Admin Review", "Under Review by Super Admin")])
     assert body["saved"]["sales"] == ["SL-plain"]
+
+
+def test_includes_the_ekyc_link_when_the_crm_address_is_set(crm, bot, monkeypatch):
+    monkeypatch.setenv("CRM_PUBLIC_URL", "http://200.234.32.65:8080")
+    assert 'href="http://200.234.32.65:8080/?ekyc=SL-x"' in sr.render(sale("SL-x"))
