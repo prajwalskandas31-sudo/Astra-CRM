@@ -173,6 +173,52 @@ def _own_entry(user: dict, doc: dict) -> bool:
     return is_admin(user) or doc.get("id") == user["id"]
 
 
+def _is_date_key(value) -> bool:
+    try:
+        return isinstance(value, str) and len(value) == 10 and bool(time.strptime(value, "%Y-%m-%d"))
+    except ValueError:
+        return False
+
+
+def _call_stats_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    """Team Performance Tracking: one call counter per user per day ({userId}:{YYYY-MM-DD}), kept by
+    that user's own browser each time they save a call outcome. Only admins change or remove another's."""
+    if not is_admin(user):
+        if new is None:
+            return "Call counts cannot be deleted."
+        if any(doc is not None and doc.get("userId") != user["id"] for doc in (old, new)):
+            return "Calls are counted only for yourself."
+    if new is None:
+        return None
+    if not _is_date_key(new.get("date")) or new.get("id") != f"{new.get('userId')}:{new.get('date')}":
+        return "A call count needs a user, a YYYY-MM-DD date and the id {userId}:{date}."
+    counts = new.get("byDisposition") or {}
+    values = [new.get("total"), *counts.values()] if isinstance(counts, dict) else [None]
+    if not all(isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in values):
+        return "Call counts must be whole numbers."
+    return None
+
+
+ATTENDANCE_STATUSES = {"Present", "Absent", "Half Day", "Leave"}
+
+
+def _attendance_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    """Attendance is marked by someone the person reports to (directly or higher up): the scoped
+    write already limits it to the marker's team, and only a Super Admin may mark their own."""
+    for doc in (old, new):
+        if doc is not None and doc.get("userId") == user["id"] and user["role"] != "Super Admin":
+            return "Your attendance is marked by the person you report to."
+    if new is None:
+        return None
+    if not _is_date_key(new.get("date")) or new.get("id") != f"{new.get('userId')}:{new.get('date')}":
+        return "Attendance needs a user, a YYYY-MM-DD date and the id {userId}:{date}."
+    if new.get("status") not in ATTENDANCE_STATUSES:
+        return f"Attendance must be one of: {', '.join(sorted(ATTENDANCE_STATUSES))}."
+    # Recorded as whoever saved it, whatever the browser sent
+    new["markedById"], new["markedByName"] = user["id"], user.get("name") or ""
+    return None
+
+
 POLICIES: Dict[str, Policy] = {
     "leads": Policy(read=SCOPED, write=SCOPED, owner=_lead_owner, delete_min_rank=role_rank("Team Leader")),
     "sales": Policy(read=SCOPED, write=SCOPED, check=_sale_check,
@@ -184,7 +230,12 @@ POLICIES: Dict[str, Policy] = {
     "userShortcutSettings": Policy(read=SCOPED, write=SCOPED, owner=lambda s: s.get("userId")),
     "masterRecords": Policy(read=ADMIN, write=ADMIN),
     "eSignRecords": Policy(read=ADMIN, write=ADMIN),
-    "paidClients": Policy(read=ADMIN, write=ADMIN, check=_paid_check, on_delete=forget_paid_client),
+    # Executives, Team Leaders and Managers read the Paid clients of their own team's sales
+    "paidClients": Policy(read=SCOPED, write=ADMIN, check=_paid_check, on_delete=forget_paid_client,
+                          owner=lambda p: p.get("submittedByUserId")),
+    # Team Performance Tracking block
+    "callStats": Policy(read=SCOPED, write=SCOPED, owner=lambda c: c.get("userId"), check=_call_stats_check),
+    "attendance": Policy(read=SCOPED, write=SCOPED, owner=lambda a: a.get("userId"), check=_attendance_check),
     "services": Policy(read=EVERYONE, write=SUPER_ADMIN),
     "userCustomFields": Policy(read=EVERYONE, write=SUPER_ADMIN),
     # Key/value collections: one record {"id": key, "value": ...} per top-level key

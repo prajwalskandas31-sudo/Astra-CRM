@@ -37,6 +37,10 @@ def register_owner(collection: str, fn: Callable[[dict], Optional[str]]) -> None
     _owner_fns[collection] = fn
 
 
+def has_owner(collection: str) -> bool:
+    return collection in _owner_fns
+
+
 def owner_of(collection: str, data: Optional[dict]) -> Optional[str]:
     fn = _owner_fns.get(collection)
     return fn(data) if fn and data else None

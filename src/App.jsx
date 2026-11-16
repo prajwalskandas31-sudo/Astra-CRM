@@ -10,6 +10,7 @@ import { DispositionsManager } from './components/DispositionsManager';
 import { LeadUploadModule } from './components/LeadUploadModule';
 import { LeadSummarySuperAdmin } from './components/LeadSummarySuperAdmin';
 import { TeamMonitoring } from './components/TeamMonitoring';
+import { TeamPerformanceBlock } from './components/TeamPerformanceBlock';
 import { SaleApprovalWorkflow } from './components/SaleApprovalWorkflow';
 import { LeadReassignmentView } from './components/LeadReassignmentView';
 import { SystemSettings } from './components/SystemSettings';
@@ -85,6 +86,7 @@ const AppContent = () => {
       'lead-upload',
       'lead-summary',
       'team-monitoring',
+      'team-performance',
       'sale-approvals',
       'esign-block',
       'paid-block',
@@ -145,6 +147,7 @@ const AppContent = () => {
     'lead-upload': 'Lead Upload Module & Block 3 Report Sync',
     'lead-summary': 'Lead Summary & Super Admin Operations (Block 4)',
     'team-monitoring': 'Team Performance & Compliance Monitoring',
+    'team-performance': 'Team Performance Tracking',
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
@@ -185,6 +188,8 @@ const AppContent = () => {
         return <LeadSummarySuperAdmin />;
       case 'team-monitoring':
         return <TeamMonitoring />;
+      case 'team-performance':
+        return <TeamPerformanceBlock />;
       case 'sale-approvals':
         return <SaleApprovalWorkflow />;
       case 'esign-block':

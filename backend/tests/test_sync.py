@@ -207,3 +207,73 @@ def test_notification_ownership(crm, tok):
     assert push(crm, tok["exec"], "notifications", [{"id": "n-global", "title": "Hacked"}])["rejected"]["notifications"]
     assert push(crm, tok["exec"], "notifications", deletes=["n-global"])["rejected"]["notifications"]
     assert not push(crm, tok["exec"], "notifications", deletes=["n-mine"])["rejected"]["notifications"]
+
+
+def calls(user_id, date, total, **by_disposition):
+    return {"id": f"{user_id}:{date}", "userId": user_id, "date": date, "total": total, "byDisposition": by_disposition}
+
+
+def attendance(user_id, date, status):
+    return {"id": f"{user_id}:{date}", "userId": user_id, "date": date, "status": status}
+
+
+def test_call_counts_are_kept_by_their_owner_and_read_by_the_team(crm, tok):
+    assert not push(crm, tok["exec"], "callStats", [calls("usr-3", "2026-11-16", 3, Interested=2)])["rejected"]["callStats"]
+    # Nobody counts calls for someone else, nor deletes them, nor stores bad numbers
+    assert push(crm, tok["tl"], "callStats", [calls("usr-3", "2026-11-16", 99)])["rejected"]["callStats"]
+    assert push(crm, tok["exec"], "callStats", [calls("usr-6", "2026-11-16", 1)])["rejected"]["callStats"]
+    assert push(crm, tok["exec"], "callStats", deletes=["usr-3:2026-11-16"])["rejected"]["callStats"]
+    assert push(crm, tok["exec"], "callStats", [calls("usr-3", "2026-11-17", -1)])["rejected"]["callStats"]
+    assert push(crm, tok["exec"], "callStats", [calls("usr-3", "2026-11-17", 1, Interested="9")])["rejected"]["callStats"]
+    assert push(crm, tok["exec"], "callStats", [{**calls("usr-3", "2026-11-18", 1), "id": "usr-3:other"}])["rejected"]["callStats"]
+
+    # Admins may correct anyone's; each person reads only their own team's counts
+    assert not push(crm, tok["admin"], "callStats", [calls("usr-6", "2026-11-16", 4)])["rejected"]["callStats"]
+    assert ids(pull(crm, tok["exec"], "callStats"), "callStats") == {"usr-3:2026-11-16"}
+    assert "usr-3:2026-11-16" in ids(pull(crm, tok["tl"], "callStats"), "callStats")
+    assert "usr-6:2026-11-16" not in ids(pull(crm, tok["tl"], "callStats"), "callStats")
+    assert {"usr-3:2026-11-16", "usr-6:2026-11-16"} <= ids(pull(crm, tok["admin"], "callStats"), "callStats")
+
+
+def test_attendance_is_marked_by_the_people_above(crm, tok):
+    body = push(crm, tok["tl"], "attendance", [attendance("usr-3", "2026-11-16", "Present")])
+    assert not body["rejected"]["attendance"]
+    saved = crm.store.get("attendance", "usr-3:2026-11-16")
+    assert saved["markedById"] == "usr-10" and saved["markedByName"]
+
+    # Not for themselves, not outside their team, not with a made-up status
+    assert push(crm, tok["exec"], "attendance", [attendance("usr-3", "2026-11-17", "Present")])["rejected"]["attendance"]
+    assert push(crm, tok["tl"], "attendance", [attendance("usr-10", "2026-11-16", "Present")])["rejected"]["attendance"]
+    assert push(crm, tok["tl"], "attendance", [attendance("usr-6", "2026-11-16", "Present")])["rejected"]["attendance"]
+    assert push(crm, tok["tl"], "attendance", [attendance("usr-3", "2026-11-17", "Holiday")])["rejected"]["attendance"]
+    assert push(crm, tok["exec"], "attendance", deletes=["usr-3:2026-11-16"])["rejected"]["attendance"]
+
+    # Admins mark anyone; the executive sees their own day, but not others'
+    assert not push(crm, tok["admin"], "attendance", [attendance("usr-6", "2026-11-16", "Leave")])["rejected"]["attendance"]
+    assert ids(pull(crm, tok["exec"], "attendance"), "attendance") == {"usr-3:2026-11-16"}
+    assert not push(crm, tok["tl"], "attendance", deletes=["usr-3:2026-11-16"])["rejected"]["attendance"]
+
+
+def test_paid_clients_reach_whoever_registered_the_sale(crm, tok):
+    push(crm, tok["admin"], "paidClients", [{"id": "paid-ajay", "submittedByUserId": "usr-3", "serviceName": "S"},
+                                            {"id": "paid-anitha", "submittedByUserId": "usr-6", "serviceName": "S"}])
+    assert ids(pull(crm, tok["exec"], "paidClients"), "paidClients") == {"paid-ajay"}
+    assert "paid-ajay" in ids(pull(crm, tok["tl"], "paidClients"), "paidClients")
+    assert {"paid-ajay", "paid-anitha"} <= ids(pull(crm, tok["admin"], "paidClients"), "paidClients")
+    # Still only admins change them
+    assert push(crm, tok["exec"], "paidClients", [{"id": "paid-ajay", "submittedByUserId": "usr-3", "serviceName": "X"}])["rejected"]["paidClients"]
+
+
+def test_paid_clients_stored_before_owners_get_one_at_startup(crm, tok):
+    import backend.db_init as db_init
+    owner_fn = crm.store._owner_fns.pop("paidClients")
+    try:
+        crm.store.put("paidClients", "paid-old", {"id": "paid-old", "submittedByUserId": "usr-3", "serviceName": "S"})
+    finally:
+        crm.store.register_owner("paidClients", owner_fn)
+    assert "paid-old" not in ids(pull(crm, tok["exec"], "paidClients"), "paidClients")
+
+    crm.store.set_value("ownersBackfilled:paidClients", False)
+    db_init._backfill_owners()
+    assert "paid-old" in ids(pull(crm, tok["exec"], "paidClients"), "paidClients")
+    assert crm.store.get_value("ownersBackfilled:paidClients") is True
