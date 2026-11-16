@@ -89,8 +89,16 @@ export const SystemSettings = () => {
 
   // Financial Settings form state
   const [maxGrossInput, setMaxGrossInput] = useState(financialSettings?.maxGrossSales || 200000);
-  const [cFactorInput, setCFactorInput] = useState(financialSettings?.cDivisorFactor || 1.18);
+  // GST is entered as a percentage; it is stored as the divisor C = 1 + GST/100
+  const gstPercentFromC = (c) => +(((Number(c) || 1.18) - 1) * 100).toFixed(2);
+  const [gstPercentInput, setGstPercentInput] = useState(gstPercentFromC(financialSettings?.cDivisorFactor));
   const [overridePassInput, setOverridePassInput] = useState(financialSettings?.adminOverridePassword || 'admin123');
+
+  // Settings arrive from the server after first render — keep the inputs in step with them
+  useEffect(() => {
+    setMaxGrossInput(financialSettings?.maxGrossSales || 200000);
+    setGstPercentInput(gstPercentFromC(financialSettings?.cDivisorFactor));
+  }, [financialSettings?.maxGrossSales, financialSettings?.cDivisorFactor]);
 
 
   // IP Guard Password Authentication Gate
@@ -758,12 +766,22 @@ export const SystemSettings = () => {
         <form 
           onSubmit={(e) => {
             e.preventDefault();
+            const maxGross = parseFloat(maxGrossInput);
+            const gstPct = parseFloat(gstPercentInput);
+            if (!(maxGross > 0)) {
+              showToast('Maximum Gross Sale must be a number greater than 0.', 'warning');
+              return;
+            }
+            if (!(gstPct >= 0 && gstPct <= 100)) {
+              showToast('GST % must be between 0 and 100.', 'warning');
+              return;
+            }
             updateFinancialSettings({
-              maxGrossSales: parseFloat(maxGrossInput) || 200000,
-              cDivisorFactor: parseFloat(cFactorInput) || 1.18,
+              maxGrossSales: maxGross,
+              cDivisorFactor: +(1 + gstPct / 100).toFixed(4),
               adminOverridePassword: overridePassInput.trim() || 'admin123'
             });
-            showToast('Financial limits and formula parameters updated successfully.', 'success');
+            showToast(`Saved: max gross ₹${maxGross.toLocaleString('en-IN')}, GST ${gstPct}%.`, 'success');
           }}
           style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginTop: '14px' }}
         >
@@ -783,18 +801,20 @@ export const SystemSettings = () => {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>Value C (Formula Divisor: A ÷ C)</label>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600 }}>GST Percentage (%)</label>
             <input
               type="number"
               step="0.01"
-              value={cFactorInput}
-              onChange={(e) => setCFactorInput(e.target.value)}
-              placeholder="e.g. 1.18"
+              min="0"
+              max="100"
+              value={gstPercentInput}
+              onChange={(e) => setGstPercentInput(e.target.value)}
+              placeholder="e.g. 18"
               style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
               disabled={!canManageSettings}
             />
             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '3px', display: 'block' }}>
-              Default: 1.18 (Applicable for 18% GST back-calculation)
+              Default: 18%. Net = A ÷ C, where C = {(1 + (parseFloat(gstPercentInput) || 0) / 100).toFixed(4).replace(/\.?0+$/, '')}
             </span>
           </div>
 
