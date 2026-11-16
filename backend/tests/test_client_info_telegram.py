@@ -16,7 +16,7 @@ def tg(crm, monkeypatch):
     m = crm.client_info_telegram
     monkeypatch.setenv("TELEGRAM_CLIENT_INFO_BOT_TOKEN", "123:abc")
     monkeypatch.delenv("TELEGRAM_CLIENT_INFO_CHAT_ID", raising=False)
-    monkeypatch.delenv("CRM_PUBLIC_URL", raising=False)
+    monkeypatch.setenv("CRM_PUBLIC_URL", "http://200.234.32.65:8080/")
     crm.store.set_value(m.CHAT_ID_VALUE, None)
     calls = []
     replies = {}
@@ -93,13 +93,24 @@ def test_group_upgraded_to_supergroup_is_followed(tg):
     assert crm.store.get_value(m.CHAT_ID_VALUE) == "-100777"
 
 
-def test_public_url_overrides_and_requires_sign_in(tg, monkeypatch):
+def test_link_ignores_the_client_address_and_requires_sign_in(tg, monkeypatch):
     crm, m, calls, replies = tg
     monkeypatch.setenv("TELEGRAM_CLIENT_INFO_CHAT_ID", "-42")
     monkeypatch.setenv("CRM_PUBLIC_URL", "https://crm.example.com")
-    assert post(crm, crmUrl="javascript:alert(1)").json()["ekycLink"] == "https://crm.example.com/?ekyc=SL-1"
+    for bad in ("javascript:alert(1)", "https://evil.example/phish", "http://crm.example.com@evil.example/"):
+        assert post(crm, crmUrl=bad).json()["ekycLink"] == "https://crm.example.com/?ekyc=SL-1"
     res = crm.client.post("/api/client-info/telegram", json={"saleId": "SL-1", "details": {}})
     assert res.status_code in (401, 403)
+
+
+@pytest.mark.parametrize("public_url", ["javascript:alert(1)", "http://user:pw@evil.example/", "ftp://crm.example.com"])
+def test_without_a_safe_public_url_nothing_is_sent(tg, monkeypatch, public_url):
+    crm, m, calls, replies = tg
+    monkeypatch.setenv("TELEGRAM_CLIENT_INFO_CHAT_ID", "-42")
+    monkeypatch.setenv("CRM_PUBLIC_URL", public_url)
+    res = post(crm, crmUrl="https://evil.example/")
+    assert res.status_code == 503 and "CRM_PUBLIC_URL" in res.text
+    assert calls == []
 
 
 def test_missing_token_is_reported(tg, monkeypatch):

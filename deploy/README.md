@@ -136,7 +136,7 @@ already sent shows its Leegality status instead, so a second tap never spends an
 |---|---|
 | `TELEGRAM_CLIENT_INFO_BOT_TOKEN` | The bot's BotFather token |
 | `TELEGRAM_CLIENT_INFO_CHAT_ID` | Optional. Without it the CRM finds the group itself: send `/start@Client_info_page_updates_bot` in the group once (Telegram keeps that for 24 hours); the id is then remembered |
-| `CRM_PUBLIC_URL` | Optional. The address used in the e-KYC link; defaults to the address the CRM was opened at |
+| `CRM_PUBLIC_URL` | Required, e.g. `http://200.234.32.65:8080`. The only address the e-KYC link may use; the address the browser reports is never trusted |
 
 ## e-KYC & E-Sign (Leegality)
 

@@ -9,7 +9,7 @@ cannot spend Leegality credits on its own).
 backend/.env (never committed):
     TELEGRAM_CLIENT_INFO_BOT_TOKEN=<token from BotFather>
     TELEGRAM_CLIENT_INFO_CHAT_ID=<group chat id>   optional; found automatically, see _chat_id()
-    CRM_PUBLIC_URL=http://host:port                optional; else the address the CRM was opened at
+    CRM_PUBLIC_URL=http://host:port                required; the only address the e-KYC link may point to
 """
 import html
 import logging
@@ -130,7 +130,7 @@ def _chat_id(cfg: dict) -> str:
 class ClientInfoAlert(BaseModel):
     saleId: str
     leadId: Optional[str] = ""
-    crmUrl: Optional[str] = ""  # where the CRM was opened; the e-KYC link points back there
+    crmUrl: Optional[str] = ""  # ignored: older pages still send it, but the link never comes from the client
     details: dict
     attachmentNames: list = []
 
@@ -163,12 +163,13 @@ def ekyc_link(base: str, sale_id: str) -> str:
     return f"{base.split('?')[0].split('#')[0].rstrip('/')}/?{urlencode({'ekyc': sale_id})}"
 
 
-def _crm_base(cfg: dict, crm_url: str) -> str:
-    for candidate in (cfg["public_url"], crm_url):
-        parts = urlsplit(candidate or "")
-        if parts.scheme in ("http", "https") and parts.netloc:
-            return f"{parts.scheme}://{parts.netloc}{parts.path}"
-    raise HTTPException(status_code=400, detail="The CRM address for the e-KYC link is unknown. Set CRM_PUBLIC_URL in backend/.env.")
+def _crm_base(cfg: dict) -> str:
+    # The link goes to a whole group as a message from our own bot, so its address must come from the
+    # server's settings only. A client-sent address would let anyone post a look-alike phishing link.
+    parts = urlsplit(cfg["public_url"] or "")
+    if parts.scheme in ("http", "https") and parts.hostname and not (parts.username or parts.password):
+        return f"{parts.scheme}://{parts.netloc}{parts.path}"
+    raise HTTPException(status_code=503, detail="CRM_PUBLIC_URL is not set (or is not an http/https address) in backend/.env.")
 
 
 def build_message(alert: ClientInfoAlert, submitted_by: str, link: str, now: Optional[datetime] = None) -> str:
@@ -249,7 +250,7 @@ def post_client_info(alert: ClientInfoAlert, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=503, detail="TELEGRAM_CLIENT_INFO_BOT_TOKEN is not set in backend/.env")
     if not alert.saleId.strip():
         raise HTTPException(status_code=400, detail="saleId is required")
-    link = ekyc_link(_crm_base(cfg, alert.crmUrl or ""), alert.saleId.strip())
+    link = ekyc_link(_crm_base(cfg), alert.saleId.strip())
     text = build_message(alert, current_user.get("name") or current_user.get("email") or "Executive", link)
     try:
         chat_id = _chat_id(cfg)

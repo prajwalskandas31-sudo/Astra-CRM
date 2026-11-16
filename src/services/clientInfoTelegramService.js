@@ -22,7 +22,6 @@ export const postClientInfoToTelegram = async ({ saleId, leadId, clientInfo, att
     body: JSON.stringify({
       saleId,
       leadId: leadId || '',
-      crmUrl: `${window.location.origin}${window.location.pathname}`,
       details,
       attachmentNames: attachments.map(a => a?.name).filter(Boolean)
     })
