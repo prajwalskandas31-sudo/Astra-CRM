@@ -81,6 +81,34 @@ export const getTenureProgress = (record, today = todayKey()) => {
   return { total, used, left, percent: Math.round((used / total) * 100) };
 };
 
+// Trading segments a client can be enabled for in the Telegram Control Block; stored on the paid client as `segments`
+export const TRADING_SEGMENTS = [
+  'NSE DERIVATIVES',
+  'MCX DERIVATIVES',
+  'BSE DERIVATIVES',
+  'NSE BSE Equity'
+];
+
+// Which segment boxes start ticked for each service chosen on the Client Information page
+const SERVICE_SEGMENTS = {
+  'stock cash': ['NSE BSE Equity'],
+  'stock future': ['NSE DERIVATIVES'],
+  'stock options': ['NSE DERIVATIVES'],
+  'index futures': ['NSE DERIVATIVES'],
+  'index options': ['NSE DERIVATIVES'],
+  'nse derivatives': ['NSE DERIVATIVES'],
+  'bullions': ['MCX DERIVATIVES'],
+  'base metals': ['MCX DERIVATIVES'],
+  'energy': ['MCX DERIVATIVES'],
+  'mcx derivatives': ['MCX DERIVATIVES'],
+  'bse derivatives': ['BSE DERIVATIVES'],
+  'hni options - nse & bse': ['NSE DERIVATIVES', 'BSE DERIVATIVES']
+};
+
+/** Default segments for a service name; unknown or custom services start with nothing ticked. */
+export const defaultSegmentsForService = (serviceName) =>
+  [...(SERVICE_SEGMENTS[String(serviceName || '').trim().replace(/\s+/g, ' ').toLowerCase()] || [])];
+
 /**
  * The Paid block record stored when a client completes e-KYC & E-Sign.
  * Service name and tenure come from the Client Information page.
@@ -90,6 +118,7 @@ export const buildPaidClient = ({ sale, clientInfo = {}, lead, eSignRecord, sign
   const serviceTenure = eSignRecord?.serviceTenure || clientInfo.serviceTenure || sale?.serviceTenure || lead?.clientInfo?.serviceTenure || '';
   const serviceEndDate = computeServiceEndDate(serviceStartDate, serviceTenure);
   const alreadyOver = !!serviceEndDate && todayKey() >= serviceEndDate;
+  const serviceName = clientInfo.serviceName || sale?.serviceOpted || eSignRecord?.serviceName || 'Unspecified Service';
   return {
     id: 'paid-' + (sale?.id || Date.now()),
     saleId: sale?.id,
@@ -102,8 +131,9 @@ export const buildPaidClient = ({ sale, clientInfo = {}, lead, eSignRecord, sign
     email: eSignRecord?.email || clientInfo.email || sale?.email || '',
     panNumber: eSignRecord?.panNumber || clientInfo.panNumber || sale?.panNumber || '',
     clientState: clientInfo.clientState || '',
-    serviceName: clientInfo.serviceName || sale?.serviceOpted || eSignRecord?.serviceName || 'Unspecified Service',
+    serviceName,
     serviceTenure: serviceTenure || 'Unspecified Tenure',
+    segments: defaultSegmentsForService(serviceName),
     grossSales: eSignRecord?.grossSales || clientInfo.grossSales || sale?.amount || '',
     paymentDate: clientInfo.paymentDate || '',
     submittedByUserId: sale?.submittedByUserId || null,
