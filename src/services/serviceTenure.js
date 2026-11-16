@@ -71,6 +71,21 @@ export const isTenureOver = (record, today = todayKey()) =>
   !!record?.serviceEndDate && today >= record.serviceEndDate;
 
 /**
+ * The record disabled in the Telegram Control Block: every ticked segment cleared (remembered as
+ * segmentsBeforeExpiry), so trade calls stop. Mirrors disable() in backend/service_expiry.py.
+ */
+export const disableTelegram = (record, today = todayKey()) => {
+  const segments = Array.isArray(record.segments) ? record.segments : [];
+  return {
+    ...record,
+    segments: [],
+    segmentsBeforeExpiry: [...new Set([...(record.segmentsBeforeExpiry || []), ...segments])],
+    telegramDisabledAt: record.telegramDisabledAt || new Date().toISOString(),
+    expiredAt: record.expiredAt || today
+  };
+};
+
+/**
  * Tenure progress for display: days used / total / left and a 0-100 percentage.
  */
 export const getTenureProgress = (record, today = todayKey()) => {

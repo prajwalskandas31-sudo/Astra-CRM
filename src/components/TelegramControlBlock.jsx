@@ -1,10 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { TradeCallBroadcasts } from './TradeCallBroadcasts';
-import { TRADING_SEGMENTS } from '../services/serviceTenure';
+import { TRADING_SEGMENTS, isTenureOver, PAID_STATUS_EXPIRED } from '../services/serviceTenure';
 import { Send, Search, X } from 'lucide-react';
 
 export { TRADING_SEGMENTS };
+
+// Disabled on the day the service tenure ends (Paid block "Ends" date): no trade calls, boxes locked
+const isDisabled = (p) => p.status === PAID_STATUS_EXPIRED || isTenureOver(p);
+
+const formatDate = (key) => {
+  if (!key) return '';
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 export const TelegramControlBlock = () => {
   const { paidClients = [], togglePaidClientSegment } = useCRM();
@@ -15,6 +24,8 @@ export const TelegramControlBlock = () => {
     () => [...paidClients].sort((a, b) => (a.clientName || '').localeCompare(b.clientName || '')),
     [paidClients]
   );
+
+  const disabledCount = clients.filter(isDisabled).length;
 
   const q = search.trim().toLowerCase();
   const filteredClients = q
@@ -32,7 +43,9 @@ export const TelegramControlBlock = () => {
             </h3>
             <p>
               Clients who have completed E-Sign, with details from their Client Information page.
-              {' '}{clients.length} client{clients.length === 1 ? '' : 's'}.
+              {' '}{clients.length} client{clients.length === 1 ? '' : 's'}
+              {disabledCount > 0 && <>, {disabledCount} disabled because their service expired</>}.
+              Clients are disabled automatically the day their service tenure ends.
             </p>
           </div>
         </div>
@@ -71,6 +84,7 @@ export const TelegramControlBlock = () => {
                   <th>PAN ID</th>
                   <th>Service Name</th>
                   <th>Service Tenure</th>
+                  <th>Status</th>
                   {TRADING_SEGMENTS.map(seg => (
                     <th key={seg} style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.72rem' }}>{seg}</th>
                   ))}
@@ -79,20 +93,36 @@ export const TelegramControlBlock = () => {
               <tbody>
                 {filteredClients.map(p => {
                   const name = [p.clientPrefix, p.clientName].filter(Boolean).join(' ') || '—';
+                  const disabled = isDisabled(p);
                   return (
-                    <tr key={p.id}>
+                    <tr key={p.id} style={disabled ? { opacity: 0.6 } : undefined}>
                       <td style={{ fontWeight: 600 }}>{name}</td>
                       <td style={{ fontSize: '0.8rem' }}>{p.phone || '—'}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.panNumber || '—'}</td>
                       <td style={{ fontSize: '0.8rem' }}>{p.serviceName || '—'}</td>
                       <td><span className="badge" style={{ fontSize: '0.74rem' }}>{p.serviceTenure || '—'}</span></td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {disabled ? (
+                          <span className="badge" title={`Service ended ${formatDate(p.serviceEndDate)}; trade calls stopped`}
+                            style={{ fontSize: '0.72rem', fontWeight: 700, background: 'var(--status-danger-bg)', color: 'var(--status-danger)', border: '1px solid var(--status-danger-border)' }}>
+                            Disabled · Expired
+                          </span>
+                        ) : (
+                          <span className="badge"
+                            style={{ fontSize: '0.72rem', fontWeight: 700, background: 'var(--status-success-bg)', color: 'var(--status-success)', border: '1px solid var(--status-success-border)' }}>
+                            Active
+                          </span>
+                        )}
+                      </td>
                       {TRADING_SEGMENTS.map(seg => (
                         <td key={seg} style={{ textAlign: 'center' }}>
                           <input
                             type="checkbox"
-                            checked={Array.isArray(p.segments) && p.segments.includes(seg)}
+                            checked={!disabled && Array.isArray(p.segments) && p.segments.includes(seg)}
+                            disabled={disabled}
                             onChange={() => togglePaidClientSegment(p.id, seg)}
                             aria-label={`${seg} for ${name}`}
+                            title={disabled ? 'Service expired; renew the client to enable trade calls again' : undefined}
                           />
                         </td>
                       ))}

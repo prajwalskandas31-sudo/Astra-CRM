@@ -10,6 +10,7 @@ import {
   listWelcomeKitFiles, uploadWelcomeKitFile, deleteWelcomeKitFile, downloadWelcomeKitFile,
   previewWelcomeKit, sendWelcomeKit, getWelcomeKitLog, describeSend
 } from '../services/emailService';
+import { ServiceExpiryEmail } from './ServiceExpiryEmail';
 
 const SECURITY = [
   { value: 'ssl', label: 'SSL/TLS (port 465)', port: 465 },
@@ -352,6 +353,9 @@ export const EmailBlock = () => {
         </SectionHeader>
         <WelcomeKitSender sales={sales} onSent={async () => setLog(await getWelcomeKitLog())} />
       </div>
+
+      {/* ─── Service Expiry Email ─── */}
+      <ServiceExpiryEmail canEdit={canEdit} />
 
       {/* ─── Recent sends ─── */}
       {log.length > 0 && (
