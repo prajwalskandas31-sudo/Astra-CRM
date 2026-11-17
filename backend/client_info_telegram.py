@@ -180,6 +180,33 @@ def _e(value) -> str:
     return html.escape(_text(value)) or "—"
 
 
+def _number(value) -> str:
+    try:
+        return f"{float(value):g}"
+    except (TypeError, ValueError):
+        return _text(value)
+
+
+def sharing_rows(sharing, money=None) -> list:
+    """(label, plain value) rows for the "Sharing Present" block: each employee's payout and what is left."""
+    money = money or _rupees
+    sharing = sharing if isinstance(sharing, dict) else {}
+    if not sharing.get("present"):
+        return [("Sharing Present", "No")]
+    pct = sharing.get("mode") == "percentage"
+    rows = [("Sharing Present", "Yes, " + ("% of Gross Sales" if pct else "Fixed Value"))]
+    for s in sharing.get("shares") or []:
+        if not isinstance(s, dict):
+            continue
+        who = _text(s.get("name")) + (f" ({_text(s.get('employeeCode'))})" if _text(s.get("employeeCode")) else "")
+        payout = money(s.get("amount"))
+        rows.append((f"• {who}", f"{_number(s.get('value'))}% = {payout}" if pct else payout))
+    rows.append(("Total Shared", money(sharing.get("totalAmount"))
+                 + (f" ({_number(sharing.get('totalPercent'))}%)" if pct and sharing.get("totalPercent") is not None else "")))
+    rows.append(("Remaining Balance", money(sharing.get("remaining"))))
+    return rows
+
+
 def detail_lines(alert: ClientInfoAlert) -> list:
     """Every field of the Client Information Page, as HTML lines for a Telegram message."""
     d = alert.details or {}
@@ -209,6 +236,7 @@ def detail_lines(alert: ClientInfoAlert) -> list:
         ("Gross Sales", _rupees(d.get("grossSales"))),
         ("Net Sales", _rupees(d.get("netSales"))),
         ("GST", _rupees(d.get("gst"))),
+        *sharing_rows(d.get("employeeSharing")),
         ("Transaction Attachments", f"{len(alert.attachmentNames)} file(s)"
          + (f": {', '.join(_text(n) for n in alert.attachmentNames)}" if alert.attachmentNames else "")),
     ]

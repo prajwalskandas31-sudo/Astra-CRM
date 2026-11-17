@@ -3,6 +3,7 @@ import { useCRM, NEW_CLIENT, OLD_CLIENT } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
+import { EmployeeSharingSection, emptySharing, validateSharing, sharingPayload, SHARING_PERCENT, SHARING_FIXED } from './EmployeeSharingSection';
 import { 
   X, 
   Lock, 
@@ -74,8 +75,10 @@ export const ClientInformationModal = ({
   onSuccess = null 
 }) => {
   const { 
-    currentUser, 
-    services, 
+    currentUser,
+    users,
+    branches,
+    services,
     financialSettings, 
     checkDuplicatePhone2,
     submitClientInformationReview 
@@ -105,6 +108,7 @@ export const ClientInformationModal = ({
   });
 
   const [transactionAttachments, setTransactionAttachments] = useState([]);
+  const [employeeSharing, setEmployeeSharing] = useState(emptySharing);
   const [fieldErrors, setFieldErrors] = useState({});
   const [phone2Error, setPhone2Error] = useState('');
   const [isCustomService, setIsCustomService] = useState(false);
@@ -167,6 +171,16 @@ export const ClientInformationModal = ({
       } else {
         setTransactionAttachments([]);
       }
+
+      // A sale sent back for changes keeps its sharing split
+      const savedSharing = existing.employeeSharing;
+      setEmployeeSharing(savedSharing?.present ? {
+        present: true,
+        mode: savedSharing.mode === SHARING_PERCENT ? SHARING_PERCENT : SHARING_FIXED,
+        shares: (savedSharing.shares || []).map(s => ({
+          userId: s.userId, name: s.name, employeeCode: s.employeeCode || '', branch: s.branch || '', value: String(s.value ?? '')
+        }))
+      } : emptySharing());
 
       setFieldErrors({});
       setPhone2Error('');
@@ -400,9 +414,13 @@ export const ClientInformationModal = ({
       errors.attachments = 'Please upload at least 1 transaction attachment (up to 5 allowed)';
     }
 
+    // 7. Employee Sharing: total cannot exceed Gross Sales (fixed) or 100% (percentage)
+    const sharingError = validateSharing(employeeSharing, formData.grossSales);
+    if (sharingError) errors.employeeSharing = sharingError;
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showToast('Fill details', 'error');
+      showToast(Object.keys(errors).length === 1 && errors.employeeSharing ? errors.employeeSharing : 'Fill details', 'error');
 
       // Scroll to first error field
       setTimeout(() => {
@@ -420,6 +438,7 @@ export const ClientInformationModal = ({
     const finalData = {
       ...formData,
       transactionNumbers: validTxns,
+      employeeSharing: sharingPayload(employeeSharing, formData.grossSales),
       phone1: formData.phone1 || lead?.phone,
       agentName: currentUser?.name || 'Executive',
       agentId: currentUser?.id || 'usr-5'
@@ -1152,6 +1171,21 @@ export const ClientInformationModal = ({
                   ))}
                 </div>
               </div>
+
+              {/* Sharing Present: up to 5 employees share the Gross Sales (fixed ₹ or %) */}
+              <EmployeeSharingSection
+                sharing={employeeSharing}
+                onChange={(next) => {
+                  setEmployeeSharing(next);
+                  if (fieldErrors.employeeSharing) {
+                    setFieldErrors(prev => { const copy = { ...prev }; delete copy.employeeSharing; return copy; });
+                  }
+                }}
+                grossSales={formData.grossSales}
+                users={users || []}
+                branches={branches || []}
+                error={fieldErrors.employeeSharing || ''}
+              />
             </div>
 
             {/* ─── SECTION 4: EXTRA OPTIONS - TRANSACTION ATTACHMENTS ─── */}

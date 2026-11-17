@@ -168,6 +168,8 @@ def render(sale: dict, decision: Optional[str] = None) -> str:
         f"Gross Sales: <b>{_money(i.get('grossSales'))}</b>",
         f"Net Sales: {_money(i.get('netSales'))}",
         f"GST: {_money(i.get('gst'))}",
+        *[f"{html.escape(label)}: {html.escape(value)}"
+          for label, value in client_info_telegram.sharing_rows(i.get("employeeSharing"))],
         "",
         f"<b>Attachments:</b> {len(files)}" + (" (sent below)" if files else ""),
     ]
