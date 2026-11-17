@@ -174,6 +174,38 @@ export const DEFAULT_COMPANY_PROFILE = {
   bankAccounts: []
 };
 
+// Login Disclaimer pop-up (System Settings): every user must accept it right after signing in.
+// The message is plain text (line breaks kept); limits match backend/sync.py.
+export const LOGIN_DISCLAIMER_LIMITS = { title: 150, message: 10000 };
+export const LOGIN_DISCLAIMER_BUTTON = 'I have read the terms and conditions';
+export const DEFAULT_LOGIN_DISCLAIMER = {
+  enabled: true,
+  title: 'Terms & Conditions of Use',
+  message: [
+    'This CRM and all client, lead and business information in it are confidential and belong to the company.',
+    '',
+    'By continuing, you agree that:',
+    '• You will use this CRM only for authorised company work.',
+    '• You will not copy, download, share or disclose any client data outside the company.',
+    '• You will not share your login ID or password with anyone.',
+    '• Your activity in the CRM is recorded and may be reviewed at any time.',
+    '• Misuse of the CRM or its data can lead to disciplinary and legal action.',
+    '',
+    'If you do not agree, sign out now.'
+  ].join('\n')
+};
+
+// Short fingerprint of a login session + disclaimer text, so acceptance is remembered for this login only
+// and asked again when the Super Admin changes the text (the token itself is never stored here).
+const fingerprint = (text) => {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}-${text.length.toString(36)}`;
+};
+const DISCLAIMER_ACK_KEY = 'crm_login_disclaimer_ack';
+// If the server cannot be reached, the cached disclaimer is shown after this long instead of waiting forever
+const DISCLAIMER_SYNC_WAIT_MS = 10000;
+
 // Client type on the Client Information Page. Values must match backend/old_client_review.py and sync.py.
 export const NEW_CLIENT = 'New Client';
 export const OLD_CLIENT = 'Old Client';
@@ -1124,6 +1156,22 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_company_profile', JSON.stringify(companyProfile));
   }, [companyProfile]);
 
+  // ─── Login Disclaimer (Super Admin managed; shown after every sign-in) ─────
+  const [loginDisclaimer, setLoginDisclaimer] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_login_disclaimer') || 'null');
+      if (parsed && typeof parsed === 'object') return { ...DEFAULT_LOGIN_DISCLAIMER, ...parsed };
+    } catch (e) {}
+    return DEFAULT_LOGIN_DISCLAIMER;
+  });
+  const [disclaimerAck, setDisclaimerAck] = useState(() => {
+    try { return localStorage.getItem(DISCLAIMER_ACK_KEY) || ''; } catch (e) { return ''; }
+  });
+
+  useEffect(() => {
+    cacheSet('crm_login_disclaimer', JSON.stringify(loginDisclaimer));
+  }, [loginDisclaimer]);
+
   // ─── Branch Profiles (Super Admin managed; users are assigned by branchId) ─
   const [branches, setBranches] = useState(() => {
     try {
@@ -1258,7 +1306,7 @@ export const CRMProvider = ({ children }) => {
   const isSyncAdmin = isSyncSuperAdmin || syncRole === 'Admin';
   const hadLocal = (key) => LOCAL_KEYS_AT_START.has(key);
   const idsOf = (list) => new Set(list.map(i => i.id));
-  useServerSync({
+  const serverDataLoaded = useServerSync({
     leads: { value: leads, setValue: setLeads, kind: 'list', canWrite: true, importLocal: hadLocal('crm_leads'), defaultIds: idsOf(DEFAULT_LEADS) },
     sales: { value: sales, setValue: setSales, kind: 'list', canWrite: true, importLocal: hadLocal('crm_sales'), defaultIds: idsOf(DEFAULT_SALES) },
     assignmentInstances: { value: assignmentInstances, setValue: setAssignmentInstances, kind: 'list', canWrite: true, importLocal: hadLocal('crm_assignment_instances') },
@@ -1278,6 +1326,8 @@ export const CRMProvider = ({ children }) => {
       keepWhenServerEmpty: true, defaults: DEFAULT_VOICE_AGENT_SETTINGS },
     companyProfile: { value: companyProfile, setValue: setCompanyProfile, kind: 'map', canWrite: isSyncSuperAdmin,
       keepWhenServerEmpty: true, defaults: DEFAULT_COMPANY_PROFILE },
+    loginDisclaimer: { value: loginDisclaimer, setValue: setLoginDisclaimer, kind: 'map', canWrite: isSyncSuperAdmin,
+      keepWhenServerEmpty: true, defaults: DEFAULT_LOGIN_DISCLAIMER },
     branches: { value: branches, setValue: setBranches, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_branches') },
     callStats: { value: callStats, setValue: setCallStats, kind: 'list', canWrite: true, importLocal: false },
     attendance: { value: attendance, setValue: setAttendance, kind: 'list', canWrite: true, importLocal: false },
@@ -1287,6 +1337,34 @@ export const CRMProvider = ({ children }) => {
     token: authToken,
     isSuperAdmin: isSyncSuperAdmin,
   });
+
+  // ─── Login Disclaimer gate ─────────────────────────────────────────────────
+  // Hosted: wait for the server's copy of the disclaimer (a new browser only has the default text),
+  // unless the server cannot be reached for a while.
+  const [disclaimerWaitOver, setDisclaimerWaitOver] = useState(false);
+  useEffect(() => {
+    setDisclaimerWaitOver(false);
+    if (!authToken) return undefined;
+    const timer = setTimeout(() => setDisclaimerWaitOver(true), DISCLAIMER_SYNC_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [authToken]);
+  const loginDisclaimerReady = !serverSyncActive || serverDataLoaded || disclaimerWaitOver;
+  const disclaimerKey = fingerprint(`${authToken}|${loginDisclaimer.title || ''}|${loginDisclaimer.message || ''}`);
+  const disclaimerAccepted = !!authToken && disclaimerAck === disclaimerKey;
+  // Shown while signed in until accepted; while the latest text is still loading after a new sign-in
+  // it is shown too (with its button disabled), so the app never opens before the disclaimer appears.
+  const loginDisclaimerPending = !!authToken && !!currentUser && !disclaimerAccepted &&
+    (loginDisclaimer.enabled !== false || !loginDisclaimerReady);
+
+  const acknowledgeLoginDisclaimer = () => {
+    if (!loginDisclaimerReady) return;
+    setDisclaimerAck(disclaimerKey);
+    cacheSet(DISCLAIMER_ACK_KEY, disclaimerKey);
+  };
+
+  const updateLoginDisclaimer = (updated) => {
+    setLoginDisclaimer(prev => ({ ...prev, ...updated }));
+  };
 
   // Theme & UX settings
   const [themeMode, setThemeMode] = useState('dark');
@@ -1615,6 +1693,8 @@ export const CRMProvider = ({ children }) => {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_user');
     localStorage.removeItem('crm_simulated_role');
+    localStorage.removeItem(DISCLAIMER_ACK_KEY);
+    setDisclaimerAck('');
   };
 
   // User Actions
@@ -3537,6 +3617,12 @@ export const CRMProvider = ({ children }) => {
       // ─── Company Profile ────────────────────────────────────
       companyProfile,
       updateCompanyProfile,
+      // ─── Login Disclaimer ───────────────────────────────────
+      loginDisclaimer,
+      updateLoginDisclaimer,
+      loginDisclaimerPending,
+      loginDisclaimerReady,
+      acknowledgeLoginDisclaimer,
       // ─── Branch Profiles ────────────────────────────────────
       branches,
       addBranch,
