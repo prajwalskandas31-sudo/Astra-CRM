@@ -189,3 +189,13 @@ def test_review_message_shows_the_employee_sharing(crm, bot):
     assert "• Ajay &lt;A&gt; (EMP-7): ₹18,000.00" in text
     assert "Remaining Balance: ₹1,00,000.00" in text
     assert "Sharing Present: No" in sr.render(sale("SL-none"))
+
+
+def test_review_message_shows_the_modes_of_payment(crm, bot):
+    s = sale("SL-modes")
+    s["fullClientInfo"]["paymentModes"] = [{"mode": "NEFT", "amount": 100000}, {"mode": "UPI", "amount": 18000}]
+    text = sr.render(s)
+    assert "Mode of Payment: 2 mode(s)" in text
+    assert "• NEFT: ₹1,00,000.00" in text
+    assert "Total Paid: ₹1,18,000.00" in text
+    assert "Mode of Payment: —" in sr.render(sale("SL-nomodes"))
