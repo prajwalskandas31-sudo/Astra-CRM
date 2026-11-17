@@ -75,6 +75,8 @@ def index(reports):
             {"segment": "NSE_FO", "instrument_type": "PE", "underlying_symbol": "NIFTY", "underlying_key": "NSE_INDEX|Nifty 50", "expiry": ms(2026, 11, 17), "instrument_key": "b"},
             {"segment": "NSE_FO", "instrument_type": "CE", "underlying_symbol": "NIFTY", "underlying_key": "NSE_INDEX|Nifty 50", "expiry": ms(2026, 11, 24), "instrument_key": "c"},
             {"segment": "NSE_FO", "instrument_type": "FUT", "underlying_symbol": "NIFTY", "underlying_key": "NSE_INDEX|Nifty 50", "expiry": ms(2026, 11, 24), "instrument_key": "d", "trading_symbol": "NIFTY FUT"},
+            # Keeps an option expiry in the future for the tests that build reports on today's date
+            {"segment": "NSE_FO", "instrument_type": "CE", "underlying_symbol": "NIFTY", "underlying_key": "NSE_INDEX|Nifty 50", "expiry": ms(2099, 12, 29), "instrument_key": "z"},
             {"segment": "NSE_EQ", "instrument_type": "EQ", "instrument_key": "NSE_EQ|INE002A01018", "trading_symbol": "RELIANCE"},
         ],
         "MCX": [
@@ -109,7 +111,8 @@ def test_equity_and_unknown_symbols(reports):
 
 
 # ---------- PDF ----------
-PAGE2 = ("**Technical Rationale: NIFTY 24500 CE (17 Nov 2026 expiry), Buy**\n\nThis is a Buy on the NIFTY 24500 CE contract.\n\n"
+# No expiry date in the text: the pipeline tests run on the real clock, so the resolved expiry moves
+PAGE2 = ("**Technical Rationale: NIFTY 24500 CE, Buy**\n\nThis is a Buy on the NIFTY 24500 CE contract.\n\n"
          "Entry at 120 ... The view is invalidated if the premium falls to 100.\n\n**Rationale for records:** Entry 120, stop-loss 100.")
 CALL = {"symbol": "NIFTY", "underlying": "NIFTY", "instrument": "option", "side": "Buy", "strike": "24500",
         "optionType": "CE", "entry": "120", "stopLoss": "100", "targets": ["150", "180"]}
