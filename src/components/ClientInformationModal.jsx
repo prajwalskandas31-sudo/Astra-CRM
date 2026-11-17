@@ -3,6 +3,7 @@ import { useCRM, NEW_CLIENT, OLD_CLIENT } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
+import { PaymentModesSection, emptyPaymentModes, validatePaymentModes, paymentModesPayload, paymentModesFromSaved } from './PaymentModesSection';
 import { EmployeeSharingSection, emptySharing, validateSharing, sharingPayload, SHARING_PERCENT, SHARING_FIXED } from './EmployeeSharingSection';
 import { checkPanExists, normalizePan, PAN_PATTERN, panDuplicateMessage } from '../services/panCheck';
 import { 
@@ -114,6 +115,7 @@ export const ClientInformationModal = ({
 
   const [transactionAttachments, setTransactionAttachments] = useState([]);
   const [employeeSharing, setEmployeeSharing] = useState(emptySharing);
+  const [paymentModes, setPaymentModes] = useState(emptyPaymentModes);
   const [fieldErrors, setFieldErrors] = useState({});
   const [phone2Error, setPhone2Error] = useState('');
   const [panError, setPanError] = useState('');
@@ -189,6 +191,7 @@ export const ClientInformationModal = ({
           userId: s.userId, name: s.name, employeeCode: s.employeeCode || '', branch: s.branch || '', value: String(s.value ?? '')
         }))
       } : emptySharing());
+      setPaymentModes(paymentModesFromSaved(existing.paymentModes));
 
       setFieldErrors({});
       setPhone2Error('');
@@ -466,9 +469,17 @@ export const ClientInformationModal = ({
     const sharingError = validateSharing(employeeSharing, formData.grossSales);
     if (sharingError) errors.employeeSharing = sharingError;
 
+    // 8. Mode of Payment: 1 to 10 modes, each named with an amount; total cannot exceed Gross Sales
+    const paymentModeErrors = validatePaymentModes(paymentModes, formData.grossSales);
+    if (Object.keys(paymentModeErrors).length) errors.paymentModes = paymentModeErrors;
+
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showToast(Object.keys(errors).length === 1 && errors.employeeSharing ? errors.employeeSharing : 'Fill details', 'error');
+      const onlyError = Object.keys(errors).length === 1 ? Object.keys(errors)[0] : '';
+      const toastText = onlyError === 'employeeSharing' ? errors.employeeSharing
+        : onlyError === 'paymentModes' && errors.paymentModes.total ? errors.paymentModes.total
+        : 'Fill details';
+      showToast(toastText, 'error');
 
       // Scroll to first error field
       setTimeout(() => {
@@ -487,6 +498,7 @@ export const ClientInformationModal = ({
       ...formData,
       transactionNumbers: validTxns,
       employeeSharing: sharingPayload(employeeSharing, formData.grossSales),
+      paymentModes: paymentModesPayload(paymentModes),
       phone1: formData.phone1 || lead?.phone,
       agentName: currentUser?.name || 'Executive',
       agentId: currentUser?.id || 'usr-5'
@@ -1242,6 +1254,19 @@ export const ClientInformationModal = ({
                 users={users || []}
                 branches={branches || []}
                 error={fieldErrors.employeeSharing || ''}
+              />
+
+              {/* Mode of Payment: up to 10 custom modes, each with the amount paid through it */}
+              <PaymentModesSection
+                rows={paymentModes}
+                onChange={(next) => {
+                  setPaymentModes(next);
+                  if (fieldErrors.paymentModes) {
+                    setFieldErrors(prev => { const copy = { ...prev }; delete copy.paymentModes; return copy; });
+                  }
+                }}
+                grossSales={formData.grossSales}
+                errors={fieldErrors.paymentModes || {}}
               />
             </div>
 

@@ -141,3 +141,14 @@ def test_sharing_absent_or_fixed(crm):
                            "shares": [{"name": "Ajay", "employeeCode": "EMP-7", "value": 500, "amount": 500}]})
     assert rows == [("Sharing Present", "Yes, Fixed Value"), ("• Ajay (EMP-7)", "₹500.00"),
                     ("Total Shared", "₹500.00"), ("Remaining Balance", "₹4,498.00")]
+
+
+def test_payment_modes_list_each_mode_and_the_total(crm):
+    m = crm.client_info_telegram
+    modes = [{"mode": "UPI <GPay>", "amount": 3000}, {"mode": "Cash", "amount": 1998.5}, {"mode": "", "amount": 9}]
+    text = "\n".join(m.detail_lines(m.ClientInfoAlert(saleId="SL-1", details={**DETAILS, "paymentModes": modes})))
+    assert "<b>Mode of Payment:</b> 2 mode(s)" in text
+    assert "<b>• UPI &lt;GPay&gt;:</b> ₹3,000.00" in text
+    assert "<b>• Cash:</b> ₹1,998.50" in text
+    assert "<b>Total Paid:</b> ₹4,998.50" in text
+    assert m.payment_mode_rows(None) == [("Mode of Payment", "—")]
