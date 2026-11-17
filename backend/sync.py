@@ -7,6 +7,7 @@ read and write which records, enforced here on every pull and push, so a browser
 receives the records its user may see.
 """
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
@@ -460,3 +461,47 @@ def push(req: PushRequest, current_user: dict = Depends(get_current_user)):
                 saved[name].append(rid)
             store.delete_many(name, plain_deletes)
     return {"saved": saved, "rejected": rejected, "cursor": store.cursor()}
+
+
+# ==========================================
+# PAN duplicate check (Client Information form)
+# ==========================================
+PAN_PATTERN = re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]")
+# Where a PAN may already be on file, and how the form names that place
+PAN_SOURCES = (("paidClients", "an existing paid client"), ("eSignRecords", "an e-signed client"),
+               ("sales", "a submitted sale"), ("leads", "another lead's client information"))
+
+
+def _pans_of(doc: dict) -> set:
+    found = {doc.get("panNumber")}
+    for key in ("clientInfo", "fullClientInfo"):
+        if isinstance(doc.get(key), dict):
+            found.add(doc[key].get("panNumber"))
+    return {str(p).replace(" ", "").upper() for p in found if p}
+
+
+def _counts_as_on_file(collection: str, doc: dict) -> bool:
+    # A sale turned down in review never made the PAN a client's
+    if collection == "sales":
+        status = f"{doc.get('status') or ''} {doc.get('stage') or ''}".lower()
+        return "reject" not in status and "declin" not in status
+    return True
+
+
+@router.get("/pan-check")
+def pan_check(pan: str = Query(..., max_length=20), leadId: str = Query("", max_length=200),
+              current_user: dict = Depends(get_current_user)):
+    """Whether a PAN is already on file anywhere in the CRM, whoever's team holds it. Answers only
+    yes/no and the kind of record, never the other client's details. Records of `leadId` itself
+    (this client's own earlier submission) do not count."""
+    pan = pan.replace(" ", "").upper()
+    if not PAN_PATTERN.fullmatch(pan):
+        raise HTTPException(status_code=400, detail="Enter a valid 10-character PAN (e.g. ABCDE1234F).")
+    for collection, label in PAN_SOURCES:
+        for doc in store.containing(collection, pan):
+            own = doc.get("id") if collection == "leads" else doc.get("leadId")
+            if leadId and own == leadId:
+                continue
+            if pan in _pans_of(doc) and _counts_as_on_file(collection, doc):
+                return {"exists": True, "source": label}
+    return {"exists": False}
