@@ -228,10 +228,17 @@ export const ClientInformationModal = ({
 
   useEffect(() => {
     if (!isOpen) return undefined;
+    // An Old Client's PAN is expected to be on file already, so only New Client is checked
+    if (formData.clientType === OLD_CLIENT) {
+      panCheckSeq.current += 1; // drop any check still in flight
+      setPanError('');
+      setPanChecking(false);
+      return undefined;
+    }
     const timer = setTimeout(() => { runPanCheck(formData.panNumber); }, 350);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.panNumber, isOpen, lead?.id]);
+  }, [formData.panNumber, formData.clientType, isOpen, lead?.id]);
   // Old Client: every service this client has had (Paid block + earlier sales), matched by lead, phone or PAN
   const subscriptionHistory = useMemo(() => buildSubscriptionHistory({
     lead: isOpen ? lead : null,
@@ -428,8 +435,8 @@ export const ClientInformationModal = ({
     // 1. Mandatory Core Fields (per PDF Matrix)
     if (!formData.panNumber?.trim()) {
       errors.panNumber = 'Fill details';
-    } else {
-      // Checking Rule: a PAN already on file elsewhere in the database blocks submission
+    } else if (formData.clientType !== OLD_CLIENT) {
+      // Checking Rule: a PAN already on file elsewhere in the database blocks a New Client submission
       const panCheck = await runPanCheck(formData.panNumber);
       if (panCheck.exists) {
         errors.panNumber = 'PAN already exists';

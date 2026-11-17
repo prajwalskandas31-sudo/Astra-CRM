@@ -48,3 +48,8 @@ Telegram_Bots_Developer_Handover.pdf
 
 # Playwright MCP page snapshots (can contain typed logins)
 .playwright-mcp/
+
+# Loose client/reference documents kept in the folder, not in the repo
+branch profile .pdf
+kra.docx
+sms_api_documentation_v2.pdf
