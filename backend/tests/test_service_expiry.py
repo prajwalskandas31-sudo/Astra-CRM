@@ -47,7 +47,7 @@ def test_expired_client_is_disabled_in_telegram_and_emailed_once(crm, sa, smtp):
     enable(crm, sa, subject="{serviceName} ended for {clientName}",
            body="Hi {clientName}, your {serviceName} ({serviceTenure}) ended on {endDate}.")
     paid(crm, "p-due", "2026-11-16")
-    paid(crm, "p-running", "2026-11-17", phone="9123456780")
+    paid(crm, "p-running", "2099-12-31", phone="9123456780")  # active_recipients uses the real date
 
     result = crm.service_expiry.run_check(TODAY)
     assert result["disabled"] == ["p-due"]

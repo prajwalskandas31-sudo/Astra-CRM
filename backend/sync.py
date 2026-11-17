@@ -7,6 +7,7 @@ read and write which records, enforced here on every pull and push, so a browser
 receives the records its user may see.
 """
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
@@ -243,6 +244,27 @@ def _attendance_check(user: dict, old: Optional[dict], new: Optional[dict]) -> O
     return None
 
 
+# Login Disclaimer pop-up (System Settings): shown to every user right after they sign in
+LOGIN_DISCLAIMER_FIELDS = {"enabled": bool, "title": str, "message": str}
+LOGIN_DISCLAIMER_MAX_CHARS = {"title": 150, "message": 10000}
+
+
+def _login_disclaimer_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    if new is None:
+        return None
+    key, value = new.get("id"), new.get("value")
+    if key not in LOGIN_DISCLAIMER_FIELDS:
+        return f"Unknown Login Disclaimer setting '{key}'."
+    if not isinstance(value, LOGIN_DISCLAIMER_FIELDS[key]):
+        return f"Login Disclaimer '{key}' has the wrong type."
+    limit = LOGIN_DISCLAIMER_MAX_CHARS.get(key)
+    if limit and len(value) > limit:
+        return f"Login Disclaimer {key} can be at most {limit} characters."
+    if key == "message" and not value.strip():
+        return "The Login Disclaimer message cannot be empty."
+    return None
+
+
 POLICIES: Dict[str, Policy] = {
     "leads": Policy(read=SCOPED, write=SCOPED, owner=_lead_owner, delete_min_rank=role_rank("Team Leader")),
     "sales": Policy(read=SCOPED, write=SCOPED, check=_sale_check, on_write=sale_review.on_sale_write,
@@ -267,6 +289,7 @@ POLICIES: Dict[str, Policy] = {
     "financialSettings": Policy(read=EVERYONE, write=SUPER_ADMIN, redact=_redact_passwords),
     "voiceAgentSettings": Policy(read=EVERYONE, write=SUPER_ADMIN),
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
+    "loginDisclaimer": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_login_disclaimer_check),
     # Branch Profiles block; every user creator picks from these names
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
     # "Company Assets Provided" items offered in Add User (max 10)
@@ -460,3 +483,47 @@ def push(req: PushRequest, current_user: dict = Depends(get_current_user)):
                 saved[name].append(rid)
             store.delete_many(name, plain_deletes)
     return {"saved": saved, "rejected": rejected, "cursor": store.cursor()}
+
+
+# ==========================================
+# PAN duplicate check (Client Information form)
+# ==========================================
+PAN_PATTERN = re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]")
+# Where a PAN may already be on file, and how the form names that place
+PAN_SOURCES = (("paidClients", "an existing paid client"), ("eSignRecords", "an e-signed client"),
+               ("sales", "a submitted sale"), ("leads", "another lead's client information"))
+
+
+def _pans_of(doc: dict) -> set:
+    found = {doc.get("panNumber")}
+    for key in ("clientInfo", "fullClientInfo"):
+        if isinstance(doc.get(key), dict):
+            found.add(doc[key].get("panNumber"))
+    return {str(p).replace(" ", "").upper() for p in found if p}
+
+
+def _counts_as_on_file(collection: str, doc: dict) -> bool:
+    # A sale turned down in review never made the PAN a client's
+    if collection == "sales":
+        status = f"{doc.get('status') or ''} {doc.get('stage') or ''}".lower()
+        return "reject" not in status and "declin" not in status
+    return True
+
+
+@router.get("/pan-check")
+def pan_check(pan: str = Query(..., max_length=20), leadId: str = Query("", max_length=200),
+              current_user: dict = Depends(get_current_user)):
+    """Whether a PAN is already on file anywhere in the CRM, whoever's team holds it. Answers only
+    yes/no and the kind of record, never the other client's details. Records of `leadId` itself
+    (this client's own earlier submission) do not count."""
+    pan = pan.replace(" ", "").upper()
+    if not PAN_PATTERN.fullmatch(pan):
+        raise HTTPException(status_code=400, detail="Enter a valid 10-character PAN (e.g. ABCDE1234F).")
+    for collection, label in PAN_SOURCES:
+        for doc in store.containing(collection, pan):
+            own = doc.get("id") if collection == "leads" else doc.get("leadId")
+            if leadId and own == leadId:
+                continue
+            if pan in _pans_of(doc) and _counts_as_on_file(collection, doc):
+                return {"exists": True, "source": label}
+    return {"exists": False}

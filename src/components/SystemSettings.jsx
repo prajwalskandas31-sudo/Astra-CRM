@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { getLeegalityBackendStatus, getLeegalityWallet } from '../services/leegalityService';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
+import { LoginDisclaimerSettings } from './LoginDisclaimerSettings';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 
 export const SystemSettings = () => {
@@ -304,6 +305,8 @@ export const SystemSettings = () => {
         </div>
       </div>
 
+      {/* Mandatory pop-up every user accepts right after signing in */}
+      <LoginDisclaimerSettings />
 
       {/* Employee Document Types Manager (Similar to Dispositions, Max 10 slots) */}
       <div className="directory-card" style={{ padding: '20px 24px' }}>

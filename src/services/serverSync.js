@@ -9,7 +9,7 @@
  * The server decides per record who may see and change what; anything it rejects is reverted by
  * re-downloading the collection.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { API_BASE_URL } from './backendConfig';
 
 const POLL_MS = 5000;
@@ -73,6 +73,7 @@ const fromDocs = (spec, docs) => {
  *   importLocal: on a brand-new server, the Super Admin's browser uploads the records it held locally
  *   defaultIds: demo records that are never uploaded; defaults (maps): values for keys the server lacks
  * @param options {enabled, token, isSuperAdmin, onRejected(name, rejections)}
+ * @returns true once the first full download from the server has been applied
  */
 export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRejected }) => {
   const specsRef = useRef(collections);
@@ -82,6 +83,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
 
   const state = useRef({ cursor: 0, baselines: {}, ready: false, pushing: false, pushAgain: false, pulling: false });
   const pushTimer = useRef(null);
+  const [loaded, setLoaded] = useState(false);
   const names = Object.keys(collections);
   const namesKey = names.join(',');
 
@@ -171,6 +173,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
       applyPull(body);
       if (full && !s.ready) {
         s.ready = true;
+        setLoaded(true);
         schedulePush(0);  // publish anything the first pull decided to keep (imports, defaults)
       }
     } catch {
@@ -254,6 +257,7 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
   useEffect(() => {
     if (!enabled || !token) return undefined;
     state.current = { cursor: 0, baselines: {}, ready: false, pushing: false, pushAgain: false, pulling: false };
+    setLoaded(false);
     pull(true);
     let lastFull = Date.now();
     let timer;
@@ -286,4 +290,6 @@ export const useServerSync = (collections, { enabled, token, isSuperAdmin, onRej
   useEffect(() => {
     if (enabled && token && state.current.ready) schedulePush();
   }, [enabled, token, ...values]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  return loaded;
 };
