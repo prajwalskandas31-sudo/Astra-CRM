@@ -9,7 +9,7 @@ import { useEffect, useRef } from 'react';
 import { API_BASE_URL, isBackendEnabled, readErrorDetail } from './backendConfig';
 
 const FIELDS = ['panNumber', 'clientCategory', 'clientPrefix', 'clientName', 'firmName', 'gstin', 'email', 'phone1', 'phone2',
-  'clientState', 'paymentDate', 'serviceName', 'serviceTenure', 'transactionNumbers', 'grossSales', 'netSales', 'gst'];
+  'clientState', 'paymentDate', 'serviceName', 'serviceTenure', 'transactionNumbers', 'grossSales', 'netSales', 'gst', 'employeeSharing', 'paymentModes'];
 
 /**
  * New Client: the group message ends with the e-KYC link.

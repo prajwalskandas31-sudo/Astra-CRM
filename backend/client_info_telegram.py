@@ -207,6 +207,24 @@ def sharing_rows(sharing, money=None) -> list:
     return rows
 
 
+def payment_mode_rows(modes, money=None) -> list:
+    """(label, plain value) rows for the "Mode of Payment" block: each mode with its amount, then the total."""
+    money = money or _rupees
+    modes = [m for m in (modes if isinstance(modes, list) else []) if isinstance(m, dict) and _text(m.get("mode"))]
+    if not modes:
+        return [("Mode of Payment", "—")]
+    rows = [("Mode of Payment", f"{len(modes)} mode(s)")]
+    total = 0.0
+    for m in modes:
+        rows.append((f"• {_text(m.get('mode'))}", money(m.get("amount"))))
+        try:
+            total += float(m.get("amount") or 0)
+        except (TypeError, ValueError):
+            pass
+    rows.append(("Total Paid", money(total)))
+    return rows
+
+
 def detail_lines(alert: ClientInfoAlert) -> list:
     """Every field of the Client Information Page, as HTML lines for a Telegram message."""
     d = alert.details or {}
@@ -237,6 +255,7 @@ def detail_lines(alert: ClientInfoAlert) -> list:
         ("Net Sales", _rupees(d.get("netSales"))),
         ("GST", _rupees(d.get("gst"))),
         *sharing_rows(d.get("employeeSharing")),
+        *payment_mode_rows(d.get("paymentModes")),
         ("Transaction Attachments", f"{len(alert.attachmentNames)} file(s)"
          + (f": {', '.join(_text(n) for n in alert.attachmentNames)}" if alert.attachmentNames else "")),
     ]

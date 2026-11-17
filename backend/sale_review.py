@@ -170,6 +170,8 @@ def render(sale: dict, decision: Optional[str] = None) -> str:
         f"GST: {_money(i.get('gst'))}",
         *[f"{html.escape(label)}: {html.escape(value)}"
           for label, value in client_info_telegram.sharing_rows(i.get("employeeSharing"))],
+        *[f"{html.escape(label)}: {html.escape(value)}"
+          for label, value in client_info_telegram.payment_mode_rows(i.get("paymentModes"))],
         "",
         f"<b>Attachments:</b> {len(files)}" + (" (sent below)" if files else ""),
     ]
