@@ -117,3 +117,27 @@ def test_missing_token_is_reported(tg, monkeypatch):
     crm, m, calls, replies = tg
     monkeypatch.delenv("TELEGRAM_CLIENT_INFO_BOT_TOKEN")
     assert post(crm).status_code == 503
+
+
+SHARING = {"present": True, "mode": "percentage", "totalPercent": 15, "totalAmount": 26700, "remaining": 151300,
+           "shares": [{"name": "Ajay <A>", "employeeCode": "EMP-7", "value": 10, "amount": 17800},
+                      {"name": "Ravi", "employeeCode": "", "value": 5, "amount": 8900}]}
+
+
+def test_sharing_lists_each_payout_and_the_remaining_balance(crm):
+    m = crm.client_info_telegram
+    text = "\n".join(m.detail_lines(m.ClientInfoAlert(saleId="SL-1", details={**DETAILS, "employeeSharing": SHARING})))
+    assert "<b>Sharing Present:</b> Yes, % of Gross Sales" in text
+    assert "<b>• Ajay &lt;A&gt; (EMP-7):</b> 10% = ₹17,800.00" in text
+    assert "<b>• Ravi:</b> 5% = ₹8,900.00" in text
+    assert "<b>Total Shared:</b> ₹26,700.00 (15%)" in text
+    assert "<b>Remaining Balance:</b> ₹1,51,300.00" in text
+
+
+def test_sharing_absent_or_fixed(crm):
+    m = crm.client_info_telegram
+    assert m.sharing_rows(None) == [("Sharing Present", "No")]
+    rows = m.sharing_rows({"present": True, "mode": "fixed", "totalAmount": 500, "remaining": 4498,
+                           "shares": [{"name": "Ajay", "employeeCode": "EMP-7", "value": 500, "amount": 500}]})
+    assert rows == [("Sharing Present", "Yes, Fixed Value"), ("• Ajay (EMP-7)", "₹500.00"),
+                    ("Total Shared", "₹500.00"), ("Remaining Balance", "₹4,498.00")]

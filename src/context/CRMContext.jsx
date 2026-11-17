@@ -2881,6 +2881,7 @@ export const CRMProvider = ({ children }) => {
       serviceTenure: clientInfoData.serviceTenure,
       transactionNumbers: clientInfoData.transactionNumbers || [clientInfoData.transactionId],
       transactionAttachments: transactionAttachments,
+      employeeSharing: clientInfoData.employeeSharing || { present: false },
       clientCategory: clientInfoData.clientCategory,
       clientState: clientInfoData.clientState,
       phone1: clientInfoData.phone1,

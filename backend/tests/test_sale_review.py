@@ -176,3 +176,16 @@ def test_without_a_token_sales_go_straight_to_the_queue(crm, bot, monkeypatch):
 def test_includes_the_ekyc_link_when_the_crm_address_is_set(crm, bot, monkeypatch):
     monkeypatch.setenv("CRM_PUBLIC_URL", "http://200.234.32.65:8080")
     assert 'href="http://200.234.32.65:8080/?ekyc=SL-x"' in sr.render(sale("SL-x"))
+
+
+def test_review_message_shows_the_employee_sharing(crm, bot):
+    s = sale("SL-share")
+    s["fullClientInfo"]["employeeSharing"] = {
+        "present": True, "mode": "fixed", "totalAmount": 18000, "remaining": 100000,
+        "shares": [{"name": "Ajay <A>", "employeeCode": "EMP-7", "value": 18000, "amount": 18000}]}
+    text = sr.render(s)
+    assert "Sharing Present: Yes, Fixed Value" in text
+    assert "• Ajay &lt;A&gt; (EMP-7): ₹1,18,000.00" not in text
+    assert "• Ajay &lt;A&gt; (EMP-7): ₹18,000.00" in text
+    assert "Remaining Balance: ₹1,00,000.00" in text
+    assert "Sharing Present: No" in sr.render(sale("SL-none"))
