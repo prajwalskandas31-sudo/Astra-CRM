@@ -216,7 +216,7 @@ export const OLD_CLIENT_STATUS = {
 };
 export const OLD_CLIENT_STAGE = { awaiting: 'Awaiting Telegram Approval (Old Client)' };
 // Sales still with the executive (sync.py OPEN_SALE_STATUSES): a new submission for the lead replaces these
-const OPEN_SALE_STATUSES = ['Pending Super Admin Review', 'Pending Super Admin Approval', 'Rejected by Super Admin', 'Rejected',
+export const OPEN_SALE_STATUSES = ['Pending Super Admin Review', 'Pending Super Admin Approval', 'Rejected by Super Admin', 'Rejected',
   'Awaiting Telegram Approval', 'Rejected in Telegram Review', OLD_CLIENT_STATUS.awaiting, OLD_CLIENT_STATUS.declined];
 export const isOldClientSale = (sale) => sale?.clientType === OLD_CLIENT;
 

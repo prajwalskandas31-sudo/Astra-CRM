@@ -50,7 +50,7 @@ STAGE_DECLINED = "Declined in Telegram Review"
 
 DETAIL_FIELDS = ("panNumber", "clientCategory", "clientPrefix", "clientName", "firmName", "gstin", "gstCertificateFile",
                  "email", "phone1", "phone2", "clientState", "paymentDate", "serviceName", "serviceTenure",
-                 "transactionNumbers", "grossSales", "netSales", "gst")
+                 "serviceEndDate", "expiryInherited", "transactionNumbers", "grossSales", "netSales", "gst")
 
 log = logging.getLogger("old_client_review")
 router = APIRouter(prefix="/api/client-info/old-client", tags=["old-client-review"])
@@ -72,7 +72,9 @@ def _clean_details(details: dict) -> dict:
     out = {}
     for key in DETAIL_FIELDS:
         value = (details or {}).get(key)
-        if isinstance(value, list):
+        if key == "expiryInherited":  # the expiry is the client's active subscription's own
+            out[key] = value is True
+        elif isinstance(value, list):
             out[key] = [cit._text(v)[:200] for v in value if cit._text(v)][:10]
         else:
             out[key] = cit._text(value)[:500]
@@ -290,10 +292,13 @@ def _email_invoice(record: dict, issued: datetime) -> dict:
     name = cit.client_name(d) or "Client"
     gross, gst = invoice.amount(d.get("grossSales")), invoice.amount(d.get("gst"))
     service = " ".join(x for x in (d.get("serviceName"), f"({d['serviceTenure']})" if d.get("serviceTenure") else "") if x)
+    expiry = cit.service_expiry(d)
+    validity = f"Your service is valid until {expiry}.\n\n" if expiry else ""
     body = (f"Dear {name},\n\n"
             f"Thank you for continuing with {company}. Please find attached invoice {record['invoiceNumber']}"
             f"{' for ' + service if service else ''}.\n\n"
             f"Amount paid: {invoice.rupees(gross)} (including GST of {invoice.rupees(gst)}).\n\n"
+            f"{validity}"
             f"If you have any questions, simply reply to this email.\n\nWarm regards,\n{company}")
     msg = email_kit._message(settings, d["email"], f"Invoice {record['invoiceNumber']} from {company}", body)
     file_name = f"Invoice {record['invoiceNumber'].replace('/', '-')}.pdf"
