@@ -244,6 +244,27 @@ def _attendance_check(user: dict, old: Optional[dict], new: Optional[dict]) -> O
     return None
 
 
+# Login Disclaimer pop-up (System Settings): shown to every user right after they sign in
+LOGIN_DISCLAIMER_FIELDS = {"enabled": bool, "title": str, "message": str}
+LOGIN_DISCLAIMER_MAX_CHARS = {"title": 150, "message": 10000}
+
+
+def _login_disclaimer_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    if new is None:
+        return None
+    key, value = new.get("id"), new.get("value")
+    if key not in LOGIN_DISCLAIMER_FIELDS:
+        return f"Unknown Login Disclaimer setting '{key}'."
+    if not isinstance(value, LOGIN_DISCLAIMER_FIELDS[key]):
+        return f"Login Disclaimer '{key}' has the wrong type."
+    limit = LOGIN_DISCLAIMER_MAX_CHARS.get(key)
+    if limit and len(value) > limit:
+        return f"Login Disclaimer {key} can be at most {limit} characters."
+    if key == "message" and not value.strip():
+        return "The Login Disclaimer message cannot be empty."
+    return None
+
+
 POLICIES: Dict[str, Policy] = {
     "leads": Policy(read=SCOPED, write=SCOPED, owner=_lead_owner, delete_min_rank=role_rank("Team Leader")),
     "sales": Policy(read=SCOPED, write=SCOPED, check=_sale_check, on_write=sale_review.on_sale_write,
@@ -268,6 +289,7 @@ POLICIES: Dict[str, Policy] = {
     "financialSettings": Policy(read=EVERYONE, write=SUPER_ADMIN, redact=_redact_passwords),
     "voiceAgentSettings": Policy(read=EVERYONE, write=SUPER_ADMIN),
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
+    "loginDisclaimer": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_login_disclaimer_check),
     # Branch Profiles block; every user creator picks from these names
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
     # "Company Assets Provided" items offered in Add User (max 10)

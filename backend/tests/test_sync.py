@@ -107,6 +107,28 @@ def test_company_profile_is_read_by_all_and_changed_only_by_super_admin(crm, tok
     assert seen["sebiRegistrationNumber"] == "INH000012345"
 
 
+def test_login_disclaimer_is_read_by_all_and_changed_only_by_super_admin(crm, tok):
+    entry = {"id": "message", "value": "Client data is confidential.\nDo not share it."}
+    assert push(crm, tok["admin"], "loginDisclaimer", [entry])["rejected"]["loginDisclaimer"]
+    assert push(crm, tok["exec"], "loginDisclaimer", [entry])["rejected"]["loginDisclaimer"]
+    assert not push(crm, tok["sa"], "loginDisclaimer", [entry])["rejected"]["loginDisclaimer"]
+    assert not push(crm, tok["sa"], "loginDisclaimer", [{"id": "enabled", "value": False}])["rejected"]["loginDisclaimer"]
+    seen = {i["id"]: i["value"] for i in pull(crm, tok["exec"], "loginDisclaimer")["collections"]["loginDisclaimer"]["items"]}
+    assert seen == {"message": entry["value"], "enabled": False}
+
+
+def test_login_disclaimer_rejects_bad_settings(crm, tok):
+    bad = [
+        {"id": "buttonColor", "value": "red"},           # unknown setting
+        {"id": "enabled", "value": "yes"},                # wrong type
+        {"id": "message", "value": "   "},                # empty message
+        {"id": "message", "value": "x" * 10001},          # too long
+        {"id": "title", "value": "t" * 151},
+    ]
+    for entry in bad:
+        assert push(crm, tok["sa"], "loginDisclaimer", [entry])["rejected"]["loginDisclaimer"], entry
+
+
 def test_company_bank_accounts_sync_as_a_list(crm, tok):
     accounts = [{"id": "bank-1", "bankName": "HDFC Bank", "accountNumber": "50200012345678", "ifscCode": "HDFC0001234",
                  "accountType": "Current", "bankBranch": "Surat", "upiId": "co@hdfcbank", "paymentGatewayLink": ""}]

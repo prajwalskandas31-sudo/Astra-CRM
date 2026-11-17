@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import { ToastProvider, useToast } from './components/ToastNotification';
 import { LoginPage } from './components/LoginPage';
+import { LoginDisclaimerModal } from './components/LoginDisclaimerModal';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { CRMDashboard } from './components/CRMDashboard';
@@ -64,7 +65,10 @@ import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchMo
 import { useEKycDeepLink } from './services/clientInfoTelegramService';
 
 const AppContent = () => {
-  const { authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign, sales } = useCRM();
+  const {
+    authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign, sales,
+    loginDisclaimer, loginDisclaimerPending, loginDisclaimerReady, acknowledgeLoginDisclaimer, handleLogout, companyProfile
+  } = useCRM();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
@@ -110,7 +114,7 @@ const AppContent = () => {
   // The e-KYC link at the end of the Client Information message in Telegram (?ekyc=<saleId>):
   // runs the same "Trigger e-KYC & E-Sign" as Sale Approvals once the user has signed in.
   useEKycDeepLink({
-    signedIn: !!authToken && !!currentUser,
+    signedIn: !!authToken && !!currentUser && !loginDisclaimerPending,
     sales,
     onStart: async (sale) => {
       setActiveTab('sale-approvals');
@@ -141,6 +145,21 @@ const AppContent = () => {
 
   if (!authToken || !currentUser) {
     return <LoginPage />;
+  }
+
+  // Mandatory Login Disclaimer: the CRM is not rendered at all until it is accepted
+  if (loginDisclaimerPending) {
+    return (
+      <LoginDisclaimerModal
+        title={loginDisclaimer?.title}
+        message={loginDisclaimer?.message}
+        companyName={companyProfile?.companyName}
+        userName={currentUser?.name}
+        ready={loginDisclaimerReady}
+        onAccept={acknowledgeLoginDisclaimer}
+        onSignOut={handleLogout}
+      />
+    );
   }
 
   const tabTitles = {
