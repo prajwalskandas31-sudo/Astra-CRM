@@ -65,6 +65,23 @@ def test_submit_posts_every_detail_and_a_review_link_the_submitter_never_gets(oc
     assert crm.store.get(m.REVIEWS, m._hash(token))["status"] == "pending"
 
 
+def test_payment_joining_an_active_subscription_shows_its_expiry_to_the_group_and_the_client(oc):
+    crm, m, calls, mails = oc
+    submit(crm, details={**DETAILS, "serviceEndDate": "2027-02-10", "expiryInherited": True})
+    assert "<b>Service Expiry:</b> 10 Feb 2027 (same as the active subscription)" in calls[-1][1]["text"]
+    crm.client.post(f"{link_from(calls)}/approve", data={"reviewer": "Srinivas"})
+    body = mails[0].get_body(("plain",)).get_content()
+    assert "Your service is valid until 10 Feb 2027." in body
+
+
+def test_no_expiry_line_when_none_is_sent(oc):
+    crm, m, calls, mails = oc
+    submit(crm)
+    assert "Service Expiry" not in calls[-1][1]["text"]
+    crm.client.post(f"{link_from(calls)}/approve", data={"reviewer": "Srinivas"})
+    assert "valid until" not in mails[0].get_body(("plain",)).get_content()
+
+
 def test_submit_rejects_a_bad_client_email(oc):
     crm, *_ = oc
     assert submit(crm, details={**DETAILS, "email": "not-an-email"}).status_code == 400

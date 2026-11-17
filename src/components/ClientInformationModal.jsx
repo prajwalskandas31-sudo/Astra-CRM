@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useCRM, NEW_CLIENT, OLD_CLIENT } from '../context/CRMContext';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useCRM, NEW_CLIENT, OLD_CLIENT, OPEN_SALE_STATUSES } from '../context/CRMContext';
+import { buildSubscriptionHistory, activeSubscriptions, formatDay } from '../services/subscriptionHistory';
+import { computeServiceEndDate } from '../services/serviceTenure';
+import { SubscriptionHistoryPanel } from './SubscriptionHistoryPanel';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
@@ -226,6 +229,20 @@ export const ClientInformationModal = ({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.panNumber, isOpen, lead?.id]);
+  // Old Client: every service this client has had (Paid block + earlier sales), matched by lead, phone or PAN
+  const subscriptionHistory = useMemo(() => buildSubscriptionHistory({
+    lead: isOpen ? lead : null,
+    panNumber: formData.panNumber,
+    phones: [formData.phone2],
+    paidClients,
+    sales,
+    openSaleStatuses: OPEN_SALE_STATUSES
+  }), [isOpen, lead, formData.panNumber, formData.phone2, paidClients, sales]);
+  const activeSubs = useMemo(() => activeSubscriptions(subscriptionHistory), [subscriptionHistory]);
+  // A new payment joins the active subscription and keeps its exact expiry date (the latest one by default)
+  const [joinedExpiry, setJoinedExpiry] = useState('');
+  const joinedSub = activeSubs.find(s => s.endDate === joinedExpiry) || activeSubs[0] || null;
+  useEffect(() => { setJoinedExpiry(''); }, [lead]);
 
   // Recalculate Net Sales & GST whenever grossSales changes
   const calculateFinancials = (grossVal) => {
@@ -493,6 +510,13 @@ export const ClientInformationModal = ({
     };
 
     const oldClient = formData.clientType === OLD_CLIENT;
+    if (oldClient) {
+      // Paying while a subscription is live: the payment ends on that subscription's exact expiry date.
+      // Otherwise it runs its own tenure from the payment date.
+      finalData.serviceEndDate = joinedSub?.endDate || computeServiceEndDate(formData.paymentDate, formData.serviceTenure) || '';
+      finalData.expiryInherited = !!joinedSub;
+      finalData.linkedSubscriptionId = joinedSub?.id || '';
+    }
     const submitted = lead?.id ? await submitClientInformationReview(lead.id, finalData, transactionAttachments) : null;
 
     if (submitted?.id && oldClient) {
@@ -706,7 +730,16 @@ export const ClientInformationModal = ({
                   ? 'No e-KYC and no Welcome Kit. Sent to the Telegram group for approval; once approved, only the invoice is emailed to the client.'
                   : 'Goes to Super Admin review, then e-KYC & E-Sign and the Welcome Kit.'}
               </span>
+              {formData.clientType === NEW_CLIENT && subscriptionHistory.length > 0 && (
+                <span style={{ flexBasis: '100%', fontSize: '0.76rem', color: '#f59e0b' }}>
+                  This client already has {subscriptionHistory.length} service{subscriptionHistory.length === 1 ? '' : 's'} on record
+                  {activeSubs.length ? `, active until ${formatDay(activeSubs[0].endDate)}` : ''}. Choose Old Client to see the history.
+                </span>
+              )}
             </div>
+
+            {/* ─── Old Client: previously opted and currently live services ─── */}
+            {formData.clientType === OLD_CLIENT && <SubscriptionHistoryPanel history={subscriptionHistory} />}
 
             {/* ─── SECTION 1: Identity & Category Matrix ─── */}
             <div style={{
@@ -1097,6 +1130,40 @@ export const ClientInformationModal = ({
                     ))}
                   </select>
                 </div>
+
+                {/* Old Client: Service Expiry Date, locked to the active subscription's expiry */}
+                {formData.clientType === OLD_CLIENT && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Lock size={11} color="var(--text-muted)" /> Service Expiry Date
+                    </label>
+                    {activeSubs.length > 1 ? (
+                      <select
+                        value={joinedSub?.endDate || ''}
+                        onChange={(e) => setJoinedExpiry(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
+                      >
+                        {activeSubs.map(s => (
+                          <option key={s.endDate} value={s.endDate}>{formatDay(s.endDate)} ({s.serviceName})</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        readOnly
+                        value={joinedSub
+                          ? formatDay(joinedSub.endDate)
+                          : formatDay(computeServiceEndDate(formData.paymentDate, formData.serviceTenure) || '')}
+                        style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem', cursor: 'not-allowed', opacity: 0.85 }}
+                      />
+                    )}
+                    <span style={{ display: 'block', marginTop: '4px', fontSize: '0.7rem', color: joinedSub ? '#10b981' : 'var(--text-muted)' }}>
+                      {joinedSub
+                        ? `Same as the active ${joinedSub.serviceName} subscription. This payment ends with it.`
+                        : 'No active subscription: runs the Service Tenure from the Payment Date.'}
+                    </span>
+                  </div>
+                )}
 
                 {/* Gross Sales (A) */}
                 <div className="form-group" style={{ margin: 0 }}>

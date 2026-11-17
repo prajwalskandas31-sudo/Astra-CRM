@@ -176,6 +176,15 @@ def client_name(details: dict) -> str:
     return " ".join(p for p in (_text(details.get("clientPrefix")), _text(details.get("clientName"))) if p)
 
 
+def service_expiry(details: dict) -> str:
+    """An Old Client payment's expiry as "10 Feb 2027"; "" when none was sent (New Client sales)."""
+    end = _text(details.get("serviceEndDate"))
+    try:
+        return datetime.strptime(end, "%Y-%m-%d").strftime("%d %b %Y") if end else ""
+    except ValueError:
+        return end
+
+
 def _e(value) -> str:
     return html.escape(_text(value)) or "—"
 
@@ -232,6 +241,8 @@ def detail_lines(alert: ClientInfoAlert) -> list:
         ("Payment Date", d.get("paymentDate")),
         ("Service Name", d.get("serviceName")),
         ("Service Tenure", d.get("serviceTenure")),
+        *([("Service Expiry", service_expiry(d) + (" (same as the active subscription)" if d.get("expiryInherited") is True else ""))]
+          if service_expiry(d) else []),
         ("Transaction No(s)", d.get("transactionNumbers")),
         ("Gross Sales", _rupees(d.get("grossSales"))),
         ("Net Sales", _rupees(d.get("netSales"))),
