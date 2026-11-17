@@ -3,6 +3,7 @@ import { useCRM, NEW_CLIENT, OLD_CLIENT } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
+import { checkPanExists, normalizePan, PAN_PATTERN, panDuplicateMessage } from '../services/panCheck';
 import { 
   X, 
   Lock, 
@@ -78,7 +79,11 @@ export const ClientInformationModal = ({
     services, 
     financialSettings, 
     checkDuplicatePhone2,
-    submitClientInformationReview 
+    submitClientInformationReview,
+    leads,
+    sales,
+    eSignRecords,
+    paidClients
   } = useCRM();
   const { showToast } = useToast();
 
@@ -107,6 +112,9 @@ export const ClientInformationModal = ({
   const [transactionAttachments, setTransactionAttachments] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [phone2Error, setPhone2Error] = useState('');
+  const [panError, setPanError] = useState('');
+  const [panChecking, setPanChecking] = useState(false);
+  const panCheckSeq = useRef(0);
   const [isCustomService, setIsCustomService] = useState(false);
   
   // Admin Gross Limit Override Modal State
@@ -170,9 +178,40 @@ export const ClientInformationModal = ({
 
       setFieldErrors({});
       setPhone2Error('');
+      setPanError('');
       setIsLimitOverridden(false);
     }
   }, [lead, services, financialSettings]);
+
+  // PAN duplicate check against the whole database, as soon as a complete PAN is typed
+  const runPanCheck = async (rawPan) => {
+    const seq = ++panCheckSeq.current;
+    const pan = normalizePan(rawPan);
+    if (!PAN_PATTERN.test(pan)) {
+      setPanError('');
+      setPanChecking(false);
+      return { exists: false };
+    }
+    setPanChecking(true);
+    try {
+      const result = await checkPanExists(pan, lead?.id, { leads, sales, eSignRecords, paidClients });
+      if (seq === panCheckSeq.current) setPanError(result.exists ? panDuplicateMessage(result.source) : '');
+      return result;
+    } catch {
+      // Server unreachable: do not block the form on a check that could not run
+      if (seq === panCheckSeq.current) setPanError('');
+      return { exists: false };
+    } finally {
+      if (seq === panCheckSeq.current) setPanChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const timer = setTimeout(() => { runPanCheck(formData.panNumber); }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.panNumber, isOpen, lead?.id]);
 
   // Recalculate Net Sales & GST whenever grossSales changes
   const calculateFinancials = (grossVal) => {
@@ -353,7 +392,16 @@ export const ClientInformationModal = ({
     const errors = {};
 
     // 1. Mandatory Core Fields (per PDF Matrix)
-    if (!formData.panNumber?.trim()) errors.panNumber = 'Fill details';
+    if (!formData.panNumber?.trim()) {
+      errors.panNumber = 'Fill details';
+    } else {
+      // Checking Rule: a PAN already on file elsewhere in the database blocks submission
+      const panCheck = await runPanCheck(formData.panNumber);
+      if (panCheck.exists) {
+        errors.panNumber = 'PAN already exists';
+        showToast(panDuplicateMessage(panCheck.source), 'error');
+      }
+    }
     if (!formData.clientName?.trim()) errors.clientName = 'Fill details';
     if (!formData.email?.trim()) errors.email = 'Fill details';
     if (!formData.paymentDate?.trim()) errors.paymentDate = 'Fill details';
@@ -660,7 +708,11 @@ export const ClientInformationModal = ({
                 <div className="form-group" style={{ margin: 0 }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}>
                     <span>PAN Number <span style={{ color: '#ef4444' }}>*</span></span>
-                    {fieldErrors.panNumber && <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Fill details</span>}
+                    {panError
+                      ? <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>PAN already exists</span>
+                      : panChecking
+                      ? <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>Checking…</span>
+                      : fieldErrors.panNumber && <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Fill details</span>}
                   </label>
                   <input
                     type="text"
@@ -668,15 +720,20 @@ export const ClientInformationModal = ({
                     onChange={(e) => handleChange('panNumber', e.target.value.toUpperCase())}
                     placeholder="e.g. ABCDE1234F"
                     maxLength={10}
-                    className={fieldErrors.panNumber ? 'client-form-input-error' : ''}
+                    className={fieldErrors.panNumber || panError ? 'client-form-input-error' : ''}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       fontSize: '0.84rem',
                       textTransform: 'uppercase',
-                      borderColor: fieldErrors.panNumber ? '#ef4444' : undefined
+                      borderColor: fieldErrors.panNumber || panError ? '#ef4444' : undefined
                     }}
                   />
+                  {panError && (
+                    <span style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: '3px', display: 'block' }}>
+                      ⚠️ {panError}
+                    </span>
+                  )}
                 </div>
 
                 {/* 2. Client Category (Individual / Non-Individual) */}

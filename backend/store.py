@@ -262,6 +262,15 @@ def all_json(collection: str, owners: Optional[Iterable[str]] = None) -> list:
     return _select_live(backend().text_column, collection, owners)
 
 
+def containing(collection: str, text: str) -> list:
+    """Live records whose stored JSON contains `text` (any case): a cheap SQL pre-filter, so the
+    caller parses only likely matches instead of a whole collection. `text` must hold no % or _."""
+    db = backend()
+    rows = _rows(f"SELECT {db.text_column} FROM records WHERE collection = ? AND deleted = ? AND UPPER({db.text_column}) LIKE ?",
+                 (collection, False, f"%{text.upper()}%"))
+    return [db.load(r[0]) for r in rows]
+
+
 def get_many(collection: str, record_ids: Iterable[str]) -> dict:
     """{id: record} for the ids that exist."""
     db = backend()
