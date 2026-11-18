@@ -1085,6 +1085,19 @@ export const ClientInformationModal = ({
                 </h4>
               </div>
 
+              {/* Mode of Payment: up to 10 custom modes, each with the amount paid through it */}
+              <PaymentModesSection
+                rows={paymentModes}
+                onChange={(next) => {
+                  setPaymentModes(next);
+                  if (fieldErrors.paymentModes) {
+                    setFieldErrors(prev => { const copy = { ...prev }; delete copy.paymentModes; return copy; });
+                  }
+                }}
+                grossSales={formData.grossSales}
+                errors={fieldErrors.paymentModes || {}}
+              />
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
                 {/* Date of Payment */}
                 <div className="form-group" style={{ margin: 0 }}>
@@ -1328,19 +1341,6 @@ export const ClientInformationModal = ({
                 users={users || []}
                 branches={branches || []}
                 error={fieldErrors.employeeSharing || ''}
-              />
-
-              {/* Mode of Payment: up to 10 custom modes, each with the amount paid through it */}
-              <PaymentModesSection
-                rows={paymentModes}
-                onChange={(next) => {
-                  setPaymentModes(next);
-                  if (fieldErrors.paymentModes) {
-                    setFieldErrors(prev => { const copy = { ...prev }; delete copy.paymentModes; return copy; });
-                  }
-                }}
-                grossSales={formData.grossSales}
-                errors={fieldErrors.paymentModes || {}}
               />
             </div>
 
