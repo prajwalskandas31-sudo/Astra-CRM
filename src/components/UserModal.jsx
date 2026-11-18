@@ -26,6 +26,9 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+// How a user is paid; must match PAY_TYPES in backend/main.py
+const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
+
 // Helper to parse CSV lines handling quoted values with commas
 const parseCSVLine = (line) => {
   const result = [];
@@ -99,6 +102,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     familyReferenceNumber: userToEdit ? (userToEdit.familyReferenceNumber || '') : '',
     referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
     branchId: userToEdit ? (userToEdit.branchId || '') : '',
+    payType: userToEdit ? (userToEdit.payType || '') : '',
     companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
 
@@ -154,6 +158,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           familyReferenceNumber: userToEdit.familyReferenceNumber || '',
           referredBy: userToEdit.referredBy || '',
           branchId: userToEdit.branchId || '',
+          payType: userToEdit.payType || '',
           companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
@@ -175,6 +180,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           familyReferenceNumber: '',
           referredBy: '',
           branchId: '',
+          payType: '',
           companyAssets: []
         });
         setAttachedDocs([]);
@@ -802,6 +808,16 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     {formData.branchId && !branches.some(b => b.id === formData.branchId) && (
                       <option value={formData.branchId}>(deleted branch)</option>
                     )}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Pay Type</label>
+                  <select name="payType" value={formData.payType} onChange={handleChange}>
+                    <option value="">-- Select pay type --</option>
+                    {PAY_TYPES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
                   </select>
                 </div>
 
