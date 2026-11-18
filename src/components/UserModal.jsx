@@ -111,8 +111,9 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     currentUser,
     branches = [],
     addUser, 
-    updateUser, 
-    downloadUserDocument 
+    updateUser,
+    changeUserPassword,
+    downloadUserDocument
   } = useCRM();
   const { showToast } = useToast();
 
@@ -646,18 +647,21 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
       const payDetails = payDetailsForSave(formData.payType, formData.payDetails);
 
       if (userToEdit) {
+        const { password: newPassword, ...profileFields } = formData;
         try {
           await updateUser(userToEdit.id, {
-            ...formData,
+            ...profileFields,
             payDetails,
             documents: attachedDocs,
             customFieldValues
           });
+          // The profile update ignores passwords; a new one typed here goes through the password endpoint.
+          if (newPassword) await changeUserPassword(userToEdit.id, newPassword);
         } catch (err) {
           showToast(err.message || 'Failed to update user.', 'error');
           return;
         }
-        showToast(`User '${formData.name}' details updated.`, 'success');
+        showToast(`User '${formData.name}' details${newPassword ? ' and password' : ''} updated.`, 'success');
       } else {
         const cleanName = (formData.name || 'User').trim();
         const autoEmail = formData.email && formData.email.trim() 
@@ -762,6 +766,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="e.g. ABHINAYA M"
+                    autoComplete="off"
                     required
                   />
                 </div>
@@ -774,6 +779,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     value={formData.mobile}
                     onChange={handleChange}
                     placeholder="e.g. 7331113490"
+                    autoComplete="off"
                     required
                   />
                 </div>
@@ -786,6 +792,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     value={formData.password}
                     onChange={handleChange}
                     placeholder={userToEdit ? 'Leave blank to keep unchanged' : '••••••••'}
+                    autoComplete="new-password"
                     required={!userToEdit}
                   />
                 </div>
