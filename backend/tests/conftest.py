@@ -51,8 +51,9 @@ def crm(tmp_path_factory):
     import backend.service_expiry as service_expiry
     import backend.broadcast_group as broadcast_group
     import backend.kra as kra
+    import backend.client_master as client_master
     import backend.db_init as db_init
-    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, broadcast_group, kra, db_init):
+    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, broadcast_group, kra, client_master, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
     # Never import the real backend/data files into the test database
@@ -82,7 +83,7 @@ def crm(tmp_path_factory):
     return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts, reports=reports,
                            store=store, email_kit=email_kit, service_expiry=service_expiry, leegality=leegality,
                            client_info_telegram=client_info_telegram, old_client_review=old_client_review, invoice=invoice,
-                           broadcast_group=broadcast_group, kra=kra, login=login, token=token)
+                           broadcast_group=broadcast_group, kra=kra, client_master=client_master, login=login, token=token)
 
 
 def bearer(tok):

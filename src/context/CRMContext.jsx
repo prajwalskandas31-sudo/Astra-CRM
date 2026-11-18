@@ -654,6 +654,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'client-master',
+    name: 'Client MASTER',
+    category: 'Sales & Approvals',
+    description: 'Find any client by PAN or mobile number: their Client Information Page details, Leegality signing date, invoices (download) and grievance files (up to 10 uploads per day, rename, date filter). Checked by the server too (backend/client_master.py).',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',
