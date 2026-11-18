@@ -11,6 +11,7 @@ The link carries a random token; only its SHA-256 is stored, and it is never ret
 who submitted, so they cannot approve their own sale. The details the reviewer sees and the address the
 invoice goes to are the server's copy taken at submission, not anything sent with the decision.
 """
+import base64
 import hashlib
 import html
 import logging
@@ -35,6 +36,7 @@ except ImportError:
 
 
 REVIEWS = "oldClientReviews"  # server-only collection (not in sync.POLICIES, so never sent to browsers)
+INVOICE_PDFS = "invoicePdfs"  # server-only: the exact invoice PDF emailed, by review id (Client Master downloads it)
 IST = timezone(timedelta(hours=5, minutes=30))
 SENDING_TIMEOUT = timedelta(minutes=5)  # a crashed "sending" claim can be retried after this
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
@@ -304,6 +306,7 @@ def _email_invoice(record: dict, issued: datetime) -> dict:
     file_name = f"Invoice {record['invoiceNumber'].replace('/', '-')}.pdf"
     msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=file_name)
     email_kit._smtp_send(settings, msg)
+    store.put(INVOICE_PDFS, record["id"], {"id": record["id"], "data": base64.b64encode(pdf).decode("ascii")})
     return {"from": settings["senderEmail"], "fileName": file_name, **email_kit._save_to_sent(settings, msg)}
 
 

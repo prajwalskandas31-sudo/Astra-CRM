@@ -22,6 +22,7 @@ try:
     from backend import old_client_review
     from backend import service_expiry
     from backend import broadcast_group
+    from backend import client_master
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -39,6 +40,7 @@ except ImportError:
     import old_client_review
     import service_expiry
     import broadcast_group
+    import client_master
     from db_init import init_database
 
 
@@ -68,6 +70,7 @@ app.include_router(client_info_telegram.router)
 app.include_router(old_client_review.router)
 app.include_router(service_expiry.router)
 app.include_router(broadcast_group.router)
+app.include_router(client_master.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
