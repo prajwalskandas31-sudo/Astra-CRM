@@ -86,6 +86,11 @@ export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = 
   const isPct = sharing.mode === SHARING_PERCENT;
   const { gross, shares, totalValue, totalAmount, remaining } = computeSharing(sharing, grossSales);
   const overLimit = isPct ? totalValue > 100 : totalAmount > gross;
+  // Shown live as soon as the shares overshoot Gross Sales, without waiting for Send to Review
+  const liveError = overLimit && shares.length > 0
+    ? `Total shared ${inr(totalAmount)} is more than Gross Sales ${inr(gross)} (remaining balance ${inr(remaining)}). Reduce the shares — the form cannot be sent to review until the remaining balance is ₹0.00 or more.`
+    : '';
+  const shownError = error || liveError;
 
   const set = (patch) => onChange({ ...sharing, ...patch });
 
@@ -239,10 +244,10 @@ export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = 
                       onChange={(e) => setValue(s.userId, e.target.value)}
                       aria-label={`${isPct ? 'Percentage' : 'Amount'} for ${s.name}`}
                       placeholder={isPct ? 'e.g. 10' : 'e.g. 500'}
-                      className={(error && (!(parseFloat(s.value) > 0) || overLimit)) ? 'client-form-input-error' : ''}
+                      className={(overLimit || (error && !(parseFloat(s.value) > 0))) ? 'client-form-input-error' : ''}
                       style={{
                         width: '100%', fontSize: '0.82rem', padding: isPct ? '6px 24px 6px 10px' : '6px 10px 6px 22px',
-                        borderColor: (error && (!(parseFloat(s.value) > 0) || overLimit)) ? '#ef4444' : undefined
+                        borderColor: (overLimit || (error && !(parseFloat(s.value) > 0))) ? '#ef4444' : undefined
                       }} />
                   </div>
                   <div style={{ textAlign: 'right', fontSize: '0.86rem', fontWeight: 700, color: '#818cf8' }}>{inr(s.amount)}</div>
@@ -257,7 +262,7 @@ export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = 
             </div>
           )}
 
-          {error && <span style={{ color: '#ef4444', fontSize: '0.74rem' }}>{error}</span>}
+          {shownError && <span role="alert" style={{ color: '#ef4444', fontSize: '0.74rem' }}>{shownError}</span>}
         </div>
       )}
     </div>

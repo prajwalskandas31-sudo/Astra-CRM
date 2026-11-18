@@ -353,9 +353,9 @@ def handle_callback(query: dict) -> None:
     sale, applied = decide(sale_id, action == APPROVE, by)
     when = datetime.now(IST).strftime("%d %b %Y, %I:%M %p IST")
     if applied:
-        footer = (f"✅ <b>APPROVED</b> by {_e(by)} · {when}\nMoved to the Sale Approval &amp; Automated Verification Queue."
+        footer = (f"✅ <b>APPROVED</b> by {_e(by)} · {when}\nMoved to the onboarding process."
                   if action == APPROVE else f"❌ <b>REJECTED</b> by {_e(by)} · {when}\nSent back to the executive.")
-        text = "Approved – moved to the Sale Approval queue." if action == APPROVE else "Rejected – sent back to the executive."
+        text = "Approved – moved to the onboarding process." if action == APPROVE else "Rejected – sent back to the executive."
     elif sale is None:
         footer, text = "⚠️ This submission was withdrawn or replaced in the CRM.", "This submission no longer exists."
     else:
