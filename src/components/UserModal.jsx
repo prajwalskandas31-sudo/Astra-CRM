@@ -29,6 +29,32 @@ import * as XLSX from 'xlsx';
 // How a user is paid; must match PAY_TYPES in backend/main.py
 const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
 
+// Numeric pay figures asked for under a Pay Type; must match PAY_DETAIL_FIELDS in backend/main.py
+const PAY_DETAIL_FIELDS = {
+  'Salary plus Incentives': [
+    { key: 'fixedSalary', label: 'Fixed Salary (₹)', placeholder: 'e.g. 25000', step: '1' },
+    { key: 'targetValue', label: 'Target (₹)', placeholder: 'e.g. 300000', step: '1' },
+    { key: 'incentivePercent', label: 'Incentive (%)', placeholder: 'e.g. 2.5', step: '0.01', max: 100 },
+  ],
+};
+
+// Saved figures -> form strings
+const payDetailsToForm = (details) => {
+  const out = {};
+  Object.entries(details || {}).forEach(([k, v]) => { if (v !== null && v !== undefined) out[k] = String(v); });
+  return out;
+};
+
+// Form strings -> numbers for the current Pay Type only, blanks left out
+const payDetailsForSave = (payType, details) => {
+  const out = {};
+  (PAY_DETAIL_FIELDS[payType] || []).forEach(({ key }) => {
+    const raw = String(details?.[key] ?? '').trim();
+    if (raw !== '') out[key] = Number(raw);
+  });
+  return out;
+};
+
 // Helper to parse CSV lines handling quoted values with commas
 const parseCSVLine = (line) => {
   const result = [];
@@ -103,6 +129,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
     branchId: userToEdit ? (userToEdit.branchId || '') : '',
     payType: userToEdit ? (userToEdit.payType || '') : '',
+    payDetails: userToEdit ? payDetailsToForm(userToEdit.payDetails) : {},
     companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
 
@@ -159,6 +186,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: userToEdit.referredBy || '',
           branchId: userToEdit.branchId || '',
           payType: userToEdit.payType || '',
+          payDetails: payDetailsToForm(userToEdit.payDetails),
           companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
@@ -181,6 +209,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: '',
           branchId: '',
           payType: '',
+          payDetails: {},
           companyAssets: []
         });
         setAttachedDocs([]);
@@ -597,10 +626,23 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         return;
       }
 
+      const badFigure = (PAY_DETAIL_FIELDS[formData.payType] || []).find(({ key, max }) => {
+        const raw = String(formData.payDetails?.[key] ?? '').trim();
+        if (raw === '') return false;
+        const n = Number(raw);
+        return !Number.isFinite(n) || n < 0 || (max !== undefined && n > max);
+      });
+      if (badFigure) {
+        showToast(`${badFigure.label} must be ${badFigure.max !== undefined ? `between 0 and ${badFigure.max}` : '0 or more'}.`, 'warning');
+        return;
+      }
+      const payDetails = payDetailsForSave(formData.payType, formData.payDetails);
+
       if (userToEdit) {
         try {
           await updateUser(userToEdit.id, {
             ...formData,
+            payDetails,
             documents: attachedDocs,
             customFieldValues
           });
@@ -619,6 +661,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         try {
           await addUser({
             ...formData,
+            payDetails,
             name: cleanName,
             email: autoEmail,
             password: autoPass,
@@ -820,6 +863,26 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     ))}
                   </select>
                 </div>
+
+                {(PAY_DETAIL_FIELDS[formData.payType] || []).map(({ key, label, placeholder, step, max }) => (
+                  <div className="form-group" key={key}>
+                    <label>{label}</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max={max}
+                      step={step}
+                      value={formData.payDetails?.[key] ?? ''}
+                      onChange={e => {
+                        const value = e.target.value;
+                        setFormData(prev => ({ ...prev, payDetails: { ...prev.payDetails, [key]: value } }));
+                      }}
+                      onWheel={e => e.currentTarget.blur()}
+                      placeholder={placeholder}
+                    />
+                  </div>
+                ))}
 
                 <CompanyAssetsField
                   value={formData.companyAssets}

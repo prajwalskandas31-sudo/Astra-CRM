@@ -25,7 +25,7 @@ ROLE_RANK = {"Super Admin": 5, "Admin": 4, "Manager": 3, "Team Leader": 2, "Team
 ADMIN_ROLES = ["Super Admin", "Admin"]
 
 # Fields never sent to non-admin users; password hashes are never sent to anyone.
-SENSITIVE_USER_FIELDS = {"bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "documents"}
+SENSITIVE_USER_FIELDS = {"bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "documents", "payDetails"}
 SECRET_USER_FIELDS = {"password", "passwordHash", "tokenVersion"}
 
 security = HTTPBearer()
