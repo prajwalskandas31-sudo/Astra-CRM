@@ -52,8 +52,9 @@ def crm(tmp_path_factory):
     import backend.broadcast_group as broadcast_group
     import backend.kra as kra
     import backend.client_master as client_master
+    import backend.salary as salary
     import backend.db_init as db_init
-    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, broadcast_group, kra, client_master, db_init):
+    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, broadcast_group, kra, client_master, salary, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
     # Never import the real backend/data files into the test database

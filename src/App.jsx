@@ -55,6 +55,7 @@ import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
 import { KraBlock } from './components/KraBlock';
 import { ClientMasterBlock } from './components/ClientMasterBlock';
+import { SalaryBlock } from './components/SalaryBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
 import { BranchProfilesBlock } from './components/BranchProfilesBlock';
@@ -96,6 +97,7 @@ const AppContent = () => {
       'sale-approvals',
       'esign-block',
       'paid-block',
+      'salary-block',
       'kra-block',
       'client-master',
       'telegram-control',
@@ -178,6 +180,7 @@ const AppContent = () => {
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
+    'salary-block': 'Salary Block - Commission, Salary and Salary plus Incentives',
     'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
     'client-master': 'Client MASTER - Client Details, Leegality Signing, Invoices & Grievances',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
@@ -227,6 +230,8 @@ const AppContent = () => {
         );
       case 'paid-block':
         return <PaidBlock />;
+      case 'salary-block':
+        return <SalaryBlock />;
       case 'kra-block':
         return <KraBlock />;
       case 'client-master':

@@ -31,6 +31,9 @@ const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
 
 // Numeric pay figures asked for under a Pay Type; must match PAY_DETAIL_FIELDS in backend/main.py
 const PAY_DETAIL_FIELDS = {
+  'Commission': [
+    { key: 'commissionPercent', label: 'Commission (%)', placeholder: 'e.g. 10', step: '0.01', max: 100 },
+  ],
   'Salary': [
     { key: 'fixedSalary', label: 'Fixed Salary Value (₹)', placeholder: 'e.g. 25000', step: '1' },
     { key: 'targetValue', label: 'Target Value (₹)', placeholder: 'e.g. 300000', step: '1' },
