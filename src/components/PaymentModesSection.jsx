@@ -13,6 +13,16 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 export const paymentModesTotal = (rows) => round2((rows || []).reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0));
 
+// Credit Card and Payment Gateway payments lose a 2% charge, so only 98% of them counts as Gross Sales
+export const CARD_FEE_RATE = 0.02;
+export const isCardFeeMode = (mode) => /credits*card|payments*gateway/i.test(mode || '');
+
+export const cardFeeTotal = (rows) => round2((rows || []).reduce(
+  (sum, r) => sum + (isCardFeeMode(r.mode) ? (parseFloat(r.amount) || 0) * CARD_FEE_RATE : 0), 0));
+
+// Gross Sales (A) = everything paid, less the 2% charge on Credit Card / Payment Gateway amounts
+export const grossFromPaymentModes = (rows) => round2(paymentModesTotal(rows) - cardFeeTotal(rows));
+
 // Field errors keyed by row ("mode_0", "amount_0") plus "total"; empty object when valid
 export const validatePaymentModes = (rows, grossSales) => {
   const errors = {};
@@ -27,10 +37,11 @@ export const validatePaymentModes = (rows, grossSales) => {
     seen.add(name.toLowerCase());
     if (!(parseFloat(r.amount) > 0)) errors[`amount_${i}`] = 'Enter an amount above 0';
   });
-  const gross = parseFloat(grossSales) || 0;
-  const total = paymentModesTotal(list);
-  if (!errors.total && gross > 0 && total > gross) {
-    errors.total = `Total paid ₹${total.toLocaleString('en-IN')} exceeds Gross Sales ₹${gross.toLocaleString('en-IN')}`;
+  // Gross Sales is filled from these rows; a stale value (e.g. an older saved sale) must be refreshed
+  const gross = round2(parseFloat(grossSales) || 0);
+  const expected = grossFromPaymentModes(list);
+  if (!errors.total && expected > 0 && Math.abs(gross - expected) > 0.01) {
+    errors.total = `Gross Sales ₹${gross.toLocaleString('en-IN')} does not match the Mode of Payment (₹${expected.toLocaleString('en-IN')})`;
   }
   return errors;
 };
@@ -47,10 +58,10 @@ export const paymentModesFromSaved = (saved) => (Array.isArray(saved) && saved.l
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export const PaymentModesSection = ({ rows, onChange, grossSales, errors = {} }) => {
-  const gross = parseFloat(grossSales) || 0;
+export const PaymentModesSection = ({ rows, onChange, errors = {} }) => {
   const total = paymentModesTotal(rows);
-  const balance = round2(gross - total);
+  const fee = cardFeeTotal(rows);
+  const gross = grossFromPaymentModes(rows);
 
   const update = (idx, patch) => onChange(rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const add = () => { if (rows.length < MAX_PAYMENT_MODES) onChange([...rows, emptyPaymentMode()]); };
@@ -124,7 +135,8 @@ export const PaymentModesSection = ({ rows, onChange, grossSales, errors = {} })
         fontSize: '0.8rem', borderRadius: 'var(--radius-sm)', background: 'rgba(99, 102, 241, 0.05)'
       }}>
         <span>Total paid: <strong>{inr(total)}</strong></span>
-        <span>Gross Sales balance: <strong style={{ color: balance < 0 ? '#ef4444' : balance === 0 ? '#10b981' : 'var(--text-primary)' }}>{inr(balance)}</strong></span>
+        {fee > 0 && <span>Card / Gateway charge (2%): <strong style={{ color: '#ef4444' }}>− {inr(fee)}</strong></span>}
+        <span>Gross Sales (A): <strong style={{ color: '#10b981' }}>{inr(gross)}</strong></span>
       </div>
       {errors.total && <span style={{ color: '#ef4444', fontSize: '0.74rem', display: 'block', marginTop: '4px' }}>{errors.total}</span>}
     </div>
