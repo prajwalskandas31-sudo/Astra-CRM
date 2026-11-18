@@ -374,6 +374,9 @@ def _clean_pay_type(pay_type: Optional[str]) -> str:
 
 # Pay Type -> the numeric pay figures it carries: {key: (label, max allowed or None)}
 PAY_DETAIL_FIELDS = {
+    "Commission": {
+        "commissionPercent": ("Commission %", 100),
+    },
     "Salary": {
         "fixedSalary": ("Fixed Salary Value", None),
         "targetValue": ("Target Value", None),

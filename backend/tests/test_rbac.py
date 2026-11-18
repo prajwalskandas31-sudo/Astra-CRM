@@ -187,6 +187,18 @@ def test_salary_plus_incentive_figures_saved_validated_and_hidden(crm, tokens):
     assert crm.store.get("users", EXEC_ID)["payDetails"] == {}
 
 
+def test_commission_percent_saved_validated_and_scoped_to_commission(crm, tokens):
+    body = {"payType": "Commission", "payDetails": {"commissionPercent": "12.5", "fixedSalary": 25000}}
+    assert put_user(crm, tokens["sa"], EXEC_ID, body) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {"commissionPercent": 12.5}
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"commissionPercent": 100.5}}) == 400
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"commissionPercent": -1}}) == 400
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"payDetails": {"commissionPercent": 50}}) == 403
+    # Switching away from Commission drops the percentage
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Salary"}) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {}
+
+
 def test_salary_pay_type_keeps_fixed_salary_and_target_only(crm, tokens):
     body = {"name": "Salary Person", "mobile": "9555555555", "password": STRONG, "email": "sp@x.com",
             "reportingTo": "x", "payType": "Salary",
