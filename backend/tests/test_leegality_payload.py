@@ -98,6 +98,7 @@ def test_dispatch_sends_the_template_fields_as_leegality_downloaded_them(monkeyp
     fake_leegality = _fake_leegality(sent)
 
     monkeypatch.setattr(leegality, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://x"})
+    monkeypatch.setattr(leegality, "_sign_types", leegality._default_sign_types)
     monkeypatch.setattr(leegality, "_leegality", fake_leegality)
     monkeypatch.setattr(leegality, "_wallet", lambda settings: {})
     monkeypatch.setattr(leegality, "_delivery_config", lambda *a: {})
@@ -127,6 +128,7 @@ def test_agreement_sent_to_the_workflows_saved_signer_is_cancelled(monkeypatch):
     sent = {}
     saved_signer = {"name": "af", "email": "signer@example.com", "phone": "9000000001"}
     monkeypatch.setattr(leegality, "_settings", lambda: {"token": "t", "salt": "", "base_url": "https://x"})
+    monkeypatch.setattr(leegality, "_sign_types", leegality._default_sign_types)
     monkeypatch.setattr(leegality, "_leegality", _fake_leegality(sent, saved_signer))
     monkeypatch.setattr(leegality, "_update_record", lambda doc_id, record: pytest.fail("must not be recorded as sent"))
     monkeypatch.setattr(leegality, "stored_primary_signature", _png_data_url)

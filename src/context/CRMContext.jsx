@@ -3043,7 +3043,7 @@ export const CRMProvider = ({ children }) => {
         disposition: 'Awaiting Client E-Sign',
         history: [...(l.history || []), {
           date: new Date().toISOString().split('T')[0],
-          text: `Leegality e-KYC & E-Sign request created (Doc ID: ${docId}, Workflow: KKliSJp). Leegality: ${leegalityMessage}`
+          text: `Leegality e-KYC & E-Sign request created (Doc ID: ${docId}, Workflow: ${apiResult.profileId || 'KKliSJp'}${apiResult.signatureTypes?.requested?.length ? `, signature types: ${apiResult.signatureTypes.requested.join(' + ')}` : ''}). Leegality: ${leegalityMessage}`
         }]
       } : l));
     }
