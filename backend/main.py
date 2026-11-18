@@ -23,6 +23,7 @@ try:
     from backend import service_expiry
     from backend import broadcast_group
     from backend import kra
+    from backend import salary
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -41,6 +42,7 @@ except ImportError:
     import service_expiry
     import broadcast_group
     import kra
+    import salary
     from db_init import init_database
 
 
@@ -71,6 +73,7 @@ app.include_router(old_client_review.router)
 app.include_router(service_expiry.router)
 app.include_router(broadcast_group.router)
 app.include_router(kra.router)
+app.include_router(salary.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -371,6 +374,13 @@ def _clean_pay_type(pay_type: Optional[str]) -> str:
 
 # Pay Type -> the numeric pay figures it carries: {key: (label, max allowed or None)}
 PAY_DETAIL_FIELDS = {
+    "Commission": {
+        "commissionPercent": ("Commission %", 100),
+    },
+    "Salary": {
+        "fixedSalary": ("Fixed Salary", None),
+        "targetValue": ("Target", None),
+    },
     "Salary plus Incentives": {
         "fixedSalary": ("Fixed Salary", None),
         "targetValue": ("Target", None),
