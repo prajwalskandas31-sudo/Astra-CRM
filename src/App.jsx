@@ -53,6 +53,7 @@ import { FeatureAccessBlock } from './components/FeatureAccessBlock';
 import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
+import { KraBlock } from './components/KraBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
 import { BranchProfilesBlock } from './components/BranchProfilesBlock';
@@ -94,6 +95,7 @@ const AppContent = () => {
       'sale-approvals',
       'esign-block',
       'paid-block',
+      'kra-block',
       'telegram-control',
       'research-reports',
       'lead-reassignment',
@@ -174,6 +176,7 @@ const AppContent = () => {
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
+    'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
@@ -221,6 +224,8 @@ const AppContent = () => {
         );
       case 'paid-block':
         return <PaidBlock />;
+      case 'kra-block':
+        return <KraBlock />;
       case 'telegram-control':
         return <TelegramControlBlock />;
       case 'lead-reassignment':
