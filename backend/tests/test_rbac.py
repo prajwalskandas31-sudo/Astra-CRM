@@ -173,22 +173,28 @@ def test_pay_type_saved_and_validated(crm, tokens):
     assert put_user(crm, tokens["exec"], EXEC_ID, {"payType": "Salary"}) == 403
 
 
-def test_salary_values_saved_only_for_salary_pay_type(crm, tokens):
+def test_salary_plus_incentive_figures_saved_validated_and_hidden(crm, tokens):
+    body = {"payType": "Salary plus Incentives",
+            "payDetails": {"fixedSalary": "25000", "targetValue": 300000, "incentivePercent": "2.5", "bogus": 1}}
+    assert put_user(crm, tokens["sa"], EXEC_ID, body) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {"fixedSalary": 25000, "targetValue": 300000, "incentivePercent": 2.5}
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"incentivePercent": 101}}) == 400
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"fixedSalary": -1}}) == 400
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"targetValue": "abc"}}) == 400
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"payDetails": {"fixedSalary": 99999}}) == 403
+    # Switching to a Pay Type without these figures clears them
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Commission"}) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {}
+
+
+def test_salary_pay_type_keeps_fixed_salary_and_target_only(crm, tokens):
     body = {"name": "Salary Person", "mobile": "9555555555", "password": STRONG, "email": "sp@x.com",
-            "reportingTo": "x", "payType": "Salary", "fixedSalary": 25000, "targetValue": 100000}
+            "reportingTo": "x", "payType": "Salary",
+            "payDetails": {"fixedSalary": 25000, "targetValue": "100000", "incentivePercent": 5}}
     created = crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"]))
     assert created.status_code == 200
-    assert created.json()["fixedSalary"] == 25000 and created.json()["targetValue"] == 100000
+    assert created.json()["payDetails"] == {"fixedSalary": 25000, "targetValue": 100000}
 
-    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Salary", "fixedSalary": 30000, "targetValue": 90000}) == 200
-    assert crm.store.get("users", EXEC_ID)["fixedSalary"] == 30000
-    assert put_user(crm, tokens["admin"], EXEC_ID, {"targetValue": 120000}) == 200
-    stored = crm.store.get("users", EXEC_ID)
-    assert stored["fixedSalary"] == 30000 and stored["targetValue"] == 120000
-    assert put_user(crm, tokens["sa"], EXEC_ID, {"fixedSalary": -1}) == 400
-    assert put_user(crm, tokens["exec"], EXEC_ID, {"fixedSalary": 99999}) == 403
-
-    # Leaving the Salary pay type clears the amounts
-    assert put_user(crm, tokens["sa"], EXEC_ID, {"payType": "Commission"}) == 200
-    stored = crm.store.get("users", EXEC_ID)
-    assert stored["fixedSalary"] is None and stored["targetValue"] is None
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Salary", "payDetails": {"fixedSalary": 30000, "targetValue": 90000}}) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {"fixedSalary": 30000, "targetValue": 90000}
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"targetValue": -5}}) == 400
