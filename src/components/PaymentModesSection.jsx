@@ -68,7 +68,7 @@ export const PaymentModesSection = ({ rows, onChange, errors = {} }) => {
   const remove = (idx) => onChange(rows.filter((_, i) => i !== idx));
 
   return (
-    <div style={{ marginTop: '14px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+    <div style={{ marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '8px' }}>
         <label style={{ fontSize: '0.78rem', fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Wallet size={14} /> Mode of Payment <span style={{ color: '#ef4444' }}>*</span>
