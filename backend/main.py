@@ -245,7 +245,12 @@ def _find_login_user(identifier: str):
     exact = [u for u in users if ident in ((u.get("email") or "").lower(), (u.get("employeeId") or "").lower())]
     if exact:
         return exact[0] if len(exact) == 1 else None
-    if len(ident) < 10 or not ident.isdigit():
+    if not ident.isdigit():
+        # Full user name, as typed on the Add User page (case and extra spaces ignored; names are unique).
+        name = " ".join(ident.split())
+        named = [u for u in users if " ".join((u.get("name") or "").lower().split()) == name]
+        return named[0] if len(named) == 1 else None
+    if len(ident) < 10:
         return None
     matches = [u for u in users if ident == _digits(u.get("mobile"))]
     # An identifier that matches more than one account is refused rather than guessed.
@@ -275,7 +280,7 @@ def login(req: LoginRequest, request: Request):
 
     if not user or not verify_password(req.password, user.get("passwordHash")):
         record_failure(ip_key, account_key)
-        raise HTTPException(status_code=401, detail="Invalid credentials. Check your email/employee ID and password.")
+        raise HTTPException(status_code=401, detail="Invalid credentials. Check your username/email/mobile and password.")
 
     if user["status"] != "Active":
         raise HTTPException(status_code=403, detail="Account is disabled/inactive. Contact Super Admin.")

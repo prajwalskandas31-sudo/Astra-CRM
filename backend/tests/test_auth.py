@@ -17,6 +17,19 @@ def test_login_by_email_employee_id_and_mobile(crm):
         assert crm.login(identifier, pw).status_code == 200, identifier
 
 
+def test_user_added_by_super_admin_logs_in_by_name_email_and_mobile(crm):
+    new_user = {"name": "Kavya  Ramesh", "mobile": "9123456780", "email": "Kavya.R@Example.com",
+                "password": NEW_PASSWORD, "role": "Executive", "reportingTo": "Sreenivasulu"}
+    res = crm.client.post("/api/users", json=new_user, headers=bearer(crm.token(SA)))
+    assert res.status_code == 200, res.text
+    for identifier in ("Kavya  Ramesh", "kavya ramesh", " KAVYA RAMESH ", "kavya.r@example.com", "9123456780", "+91234 56780"):
+        res = crm.login(identifier, NEW_PASSWORD)
+        assert res.status_code == 200, identifier
+        assert res.json()["user"]["email"] == "kavya.r@example.com"
+    assert crm.login("Kavya Ramesh", "wrong-password").status_code == 401
+    assert crm.login("Kavya", NEW_PASSWORD).status_code == 401  # partial names never match
+
+
 def test_old_seed_and_master_passwords_rejected(crm):
     for pw in ("admin123", "superadmin123", "123456"):
         assert crm.login(ADMIN, pw).status_code == 401
