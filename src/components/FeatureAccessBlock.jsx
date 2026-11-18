@@ -57,6 +57,7 @@ const FEATURE_ICONS = {
   'lead-upload-reports': FileText,
   'sale-approvals': CheckCircle,
   'esign-block': FileSignature,
+  'kra-block': ShieldCheck,
   'register-sale': CheckCircle2,
   'lead-summary': PieChart,
   'system-settings': Settings,

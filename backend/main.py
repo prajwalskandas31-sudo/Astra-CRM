@@ -22,6 +22,7 @@ try:
     from backend import old_client_review
     from backend import service_expiry
     from backend import broadcast_group
+    from backend import kra
     from backend import client_master
     from backend.db_init import init_database
 except ImportError:
@@ -40,6 +41,7 @@ except ImportError:
     import old_client_review
     import service_expiry
     import broadcast_group
+    import kra
     import client_master
     from db_init import init_database
 
@@ -70,6 +72,7 @@ app.include_router(client_info_telegram.router)
 app.include_router(old_client_review.router)
 app.include_router(service_expiry.router)
 app.include_router(broadcast_group.router)
+app.include_router(kra.router)
 app.include_router(client_master.router)
 
 
@@ -117,6 +120,7 @@ class UserCreate(BaseModel):
     familyReferenceNumber: Optional[str] = ""
     referredBy: Optional[str] = ""
     branchId: Optional[str] = ""
+    payType: Optional[str] = ""
     companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
 
@@ -134,6 +138,7 @@ class UserUpdate(BaseModel):
     familyReferenceNumber: Optional[str] = None
     referredBy: Optional[str] = None
     branchId: Optional[str] = None
+    payType: Optional[str] = None
     companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
 
@@ -347,12 +352,22 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "familyReferenceNumber": req.familyReferenceNumber or "",
         "referredBy": req.referredBy or "",
         "branchId": req.branchId or "",
+        "payType": _clean_pay_type(req.payType),
         "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
     }
     set_user_password(new_user, req.password)
     _save_user(new_user)
     return public_user(new_user)
+
+PAY_TYPES = ("Commission", "Salary", "Salary plus Incentives")
+
+def _clean_pay_type(pay_type: Optional[str]) -> str:
+    """How the user is paid: one of PAY_TYPES, or "" when not set."""
+    value = (pay_type or "").strip()
+    if value and value not in PAY_TYPES:
+        raise HTTPException(status_code=400, detail=f"Pay Type must be one of: {', '.join(PAY_TYPES)}.")
+    return value
 
 def _clean_asset_ids(asset_ids: Optional[List[str]]) -> List[str]:
     """Ids of the company assets handed to a user, without blanks or repeats."""
@@ -377,7 +392,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -406,6 +421,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.familyReferenceNumber is not None: user["familyReferenceNumber"] = req.familyReferenceNumber
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.branchId is not None: user["branchId"] = req.branchId
+    if req.payType is not None: user["payType"] = _clean_pay_type(req.payType)
     if req.companyAssets is not None: user["companyAssets"] = _clean_asset_ids(req.companyAssets)
     if req.documents is not None: user["documents"] = req.documents
 

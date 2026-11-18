@@ -160,3 +160,14 @@ def test_company_assets_are_saved_on_create_and_set_by_admins_only(crm, tokens):
     assert put_user(crm, tokens["exec"], EXEC_ID, {"companyAssets": ["ast-3"]}) == 403
     assert put_user(crm, tokens["admin"], EXEC_ID, {"companyAssets": ["ast-3"]}) == 200
     assert crm.store.get("users", EXEC_ID)["companyAssets"] == ["ast-3"]
+
+
+# ---- Pay Type
+
+def test_pay_type_saved_and_validated(crm, tokens):
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payType": "Salary plus Incentives"}) == 200
+    users = crm.client.get("/api/users", headers=bearer(tokens["sa"])).json()
+    assert next(u for u in users if u["id"] == EXEC_ID)["payType"] == "Salary plus Incentives"
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Commission"}) == 200
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payType": "Bonus"}) == 400
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"payType": "Salary"}) == 403

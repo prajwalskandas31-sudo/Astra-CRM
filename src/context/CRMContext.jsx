@@ -647,6 +647,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
   },
   {
+    id: 'kra-block',
+    name: 'KRA Block (CVL KRA)',
+    category: 'Sales & Approvals',
+    description: "Clients from the Client Information page by PAN: Trigger KRA fetches the client's KYC from CVL KRA and saves the KRA file on the server to download. Users see only their own team's clients; Admins see all.",
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'client-master',
     name: 'Client MASTER',
     category: 'Sales & Approvals',
