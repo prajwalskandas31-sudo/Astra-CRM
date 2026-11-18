@@ -338,6 +338,7 @@ export const UserDirectory = () => {
                     </td>
                     <td>
                       <span className="badge badge-role">{u.role}</span>
+                      {u.payType && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>{u.payType}</div>}
                     </td>
                     <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{u.expiryDate || '27-07-2027'}</td>
                     <td>
