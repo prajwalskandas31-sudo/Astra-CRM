@@ -6,7 +6,7 @@ import { SubscriptionHistoryPanel } from './SubscriptionHistoryPanel';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
 import { postClientInfoToTelegram } from '../services/clientInfoTelegramService';
-import { PaymentModesSection, emptyPaymentModes, validatePaymentModes, paymentModesPayload, paymentModesFromSaved } from './PaymentModesSection';
+import { PaymentModesSection, emptyPaymentModes, validatePaymentModes, paymentModesPayload, paymentModesFromSaved, grossFromPaymentModes } from './PaymentModesSection';
 import { EmployeeSharingSection, emptySharing, validateSharing, sharingPayload, SHARING_PERCENT, SHARING_FIXED } from './EmployeeSharingSection';
 import { checkPanExists, normalizePan, PAN_PATTERN, panDuplicateMessage } from '../services/panCheck';
 import { 
@@ -148,7 +148,10 @@ export const ClientInformationModal = ({
         ? existing.transactionNumbers
         : (existing.transactionId ? [existing.transactionId] : ['']);
 
-      const gross = existing.grossSales || existing.saleAmount || (lead.value ? String(lead.value).replace(/[^0-9]/g, '') : '50000');
+      // Gross Sales comes from the Mode of Payment rows; older sales without rows keep their saved value
+      const savedModes = paymentModesFromSaved(existing.paymentModes);
+      const modesGross = grossFromPaymentModes(savedModes);
+      const gross = modesGross > 0 ? String(modesGross) : String(existing.grossSales || existing.saleAmount || '');
       const cFactor = financialSettings?.cDivisorFactor || 1.18;
       const numGross = parseFloat(gross) || 0;
       const calcNet = (numGross / cFactor).toFixed(2);
@@ -194,7 +197,7 @@ export const ClientInformationModal = ({
           userId: s.userId, name: s.name, employeeCode: s.employeeCode || '', branch: s.branch || '', value: String(s.value ?? '')
         }))
       } : emptySharing());
-      setPaymentModes(paymentModesFromSaved(existing.paymentModes));
+      setPaymentModes(savedModes);
 
       setFieldErrors({});
       setPhone2Error('');
@@ -1090,11 +1093,14 @@ export const ClientInformationModal = ({
                 rows={paymentModes}
                 onChange={(next) => {
                   setPaymentModes(next);
+                  // Gross Sales (A) follows the payments: their total, less 2% on Credit Card / Payment Gateway
+                  const nextGross = grossFromPaymentModes(next);
+                  const nextGrossStr = nextGross > 0 ? String(nextGross) : '';
+                  if (nextGrossStr !== String(formData.grossSales ?? '')) handleChange('grossSales', nextGrossStr);
                   if (fieldErrors.paymentModes) {
                     setFieldErrors(prev => { const copy = { ...prev }; delete copy.paymentModes; return copy; });
                   }
                 }}
-                grossSales={formData.grossSales}
                 errors={fieldErrors.paymentModes || {}}
               />
 
@@ -1208,8 +1214,9 @@ export const ClientInformationModal = ({
                     <input
                       type="number"
                       value={formData.grossSales}
-                      onChange={(e) => handleChange('grossSales', e.target.value)}
-                      placeholder="e.g. 50000"
+                      readOnly
+                      title="Filled from the Mode of Payment"
+                      placeholder="Enter the Mode of Payment"
                       className={fieldErrors.grossSales ? 'client-form-input-error' : ''}
                       style={{
                         width: '100%',
@@ -1220,7 +1227,7 @@ export const ClientInformationModal = ({
                     />
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                    Max limit: ₹{financialSettings?.maxGrossSales?.toLocaleString('en-IN') || '2,00,000'} {isLimitOverridden && '(Override Active)'}
+                    Auto from Mode of Payment (2% off Credit Card / Payment Gateway) · Max limit: ₹{financialSettings?.maxGrossSales?.toLocaleString('en-IN') || '2,00,000'} {isLimitOverridden && '(Override Active)'}
                   </span>
                 </div>
 
@@ -1624,8 +1631,7 @@ export const ClientInformationModal = ({
                       setShowOverrideModal(false);
                       setOverridePasswordInput('');
                       setOverridePasswordError('');
-                      // Revert to limit
-                      handleChange('grossSales', String(financialSettings?.maxGrossSales || 200000));
+                      // Gross Sales follows the Mode of Payment, so it stays as is: Send to Review blocks it until the amounts are lowered or an override is given
                     }}
                     style={{ fontSize: '0.82rem', padding: '6px 14px' }}
                   >
