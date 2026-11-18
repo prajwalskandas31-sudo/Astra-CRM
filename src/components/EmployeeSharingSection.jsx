@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Users, Search, X, ChevronDown, Check } from 'lucide-react';
 
 // "Sharing Present" block of the Client Information Page: up to 5 employees (any branch) share the
-// sale's Gross Sales (A), each by a fixed ₹ amount or a % of Gross Sales.
+// sale's Net Sales (B = A ÷ C), each by a fixed ₹ amount or a % of Net Sales.
 export const MAX_SHARING_EMPLOYEES = 5;
 export const SHARING_FIXED = 'fixed';
 export const SHARING_PERCENT = 'percentage';
@@ -11,38 +11,38 @@ export const emptySharing = () => ({ present: false, mode: SHARING_FIXED, shares
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-// Payout per employee, totals and what is left of Gross Sales once they are paid
-export const computeSharing = (sharing, grossSales) => {
-  const gross = parseFloat(grossSales) || 0;
+// Payout per employee, totals and what is left of Net Sales once they are paid
+export const computeSharing = (sharing, netSales) => {
+  const net = parseFloat(netSales) || 0;
   const pct = sharing?.mode === SHARING_PERCENT;
   const shares = (sharing?.shares || []).map(s => {
     const value = parseFloat(s.value) || 0;
-    return { ...s, amount: round2(pct ? (gross * value) / 100 : value) };
+    return { ...s, amount: round2(pct ? (net * value) / 100 : value) };
   });
   const totalValue = round2(shares.reduce((sum, s) => sum + (parseFloat(s.value) || 0), 0));
   const totalAmount = round2(shares.reduce((sum, s) => sum + s.amount, 0));
-  return { gross, shares, totalValue, totalAmount, remaining: round2(gross - totalAmount) };
+  return { net, shares, totalValue, totalAmount, remaining: round2(net - totalAmount) };
 };
 
 // Error text for the block, or '' when it is valid
-export const validateSharing = (sharing, grossSales) => {
+export const validateSharing = (sharing, netSales) => {
   if (!sharing?.present) return '';
   if (!sharing.shares?.length) return 'Select at least 1 employee';
   if (sharing.shares.length > MAX_SHARING_EMPLOYEES) return `Select at most ${MAX_SHARING_EMPLOYEES} employees`;
   if (sharing.shares.some(s => !(parseFloat(s.value) > 0))) return 'Enter a share above 0 for every selected employee';
-  const { gross, totalValue, totalAmount } = computeSharing(sharing, grossSales);
+  const { net, totalValue, totalAmount } = computeSharing(sharing, netSales);
   if (sharing.mode === SHARING_PERCENT) {
-    if (totalValue > 100) return `Total share is ${totalValue}%, it cannot exceed 100% of Gross Sales`;
-  } else if (totalAmount > gross) {
-    return `Total share ₹${totalAmount.toLocaleString('en-IN')} exceeds Gross Sales ₹${gross.toLocaleString('en-IN')}`;
+    if (totalValue > 100) return `Total share is ${totalValue}%, it cannot exceed 100% of Net Sales`;
+  } else if (totalAmount > net) {
+    return `Total share ₹${totalAmount.toLocaleString('en-IN')} exceeds Net Sales ₹${net.toLocaleString('en-IN')}`;
   }
   return '';
 };
 
 // What gets saved on the sale: the computed payouts travel with it so reviewers see exact figures
-export const sharingPayload = (sharing, grossSales) => {
+export const sharingPayload = (sharing, netSales) => {
   if (!sharing?.present) return { present: false };
-  const { shares, totalValue, totalAmount, remaining } = computeSharing(sharing, grossSales);
+  const { shares, totalValue, totalAmount, remaining } = computeSharing(sharing, netSales);
   return {
     present: true,
     mode: sharing.mode,
@@ -58,7 +58,7 @@ export const sharingPayload = (sharing, grossSales) => {
 
 const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = [], branches = [], error = '' }) => {
+export const EmployeeSharingSection = ({ sharing, onChange, netSales, users = [], branches = [], error = '' }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const boxRef = useRef(null);
@@ -84,11 +84,11 @@ export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = 
 
   const selectedIds = new Set(sharing.shares.map(s => s.userId));
   const isPct = sharing.mode === SHARING_PERCENT;
-  const { gross, shares, totalValue, totalAmount, remaining } = computeSharing(sharing, grossSales);
-  const overLimit = isPct ? totalValue > 100 : totalAmount > gross;
-  // Shown live as soon as the shares overshoot Gross Sales, without waiting for Send to Review
+  const { net, shares, totalValue, totalAmount, remaining } = computeSharing(sharing, netSales);
+  const overLimit = isPct ? totalValue > 100 : totalAmount > net;
+  // Shown live as soon as the shares overshoot Net Sales, without waiting for Send to Review
   const liveError = overLimit && shares.length > 0
-    ? `Total shared ${inr(totalAmount)} is more than Gross Sales ${inr(gross)} (remaining balance ${inr(remaining)}). Reduce the shares — the form cannot be sent to review until the remaining balance is ₹0.00 or more.`
+    ? `Total shared ${inr(totalAmount)} is more than Net Sales ${inr(net)} (remaining balance ${inr(remaining)}). Reduce the shares — the form cannot be sent to review until the remaining balance is ₹0.00 or more.`
     : '';
   const shownError = error || liveError;
 
@@ -216,7 +216,7 @@ export const EmployeeSharingSection = ({ sharing, onChange, grossSales, users = 
                 Fixed Value (₹)
               </button>
               <button type="button" role="radio" aria-checked={isPct} onClick={() => set({ mode: SHARING_PERCENT })} style={pill(isPct)}>
-                Percentage (% of Gross Sales)
+                Percentage (% of Net Sales)
               </button>
             </div>
           </div>

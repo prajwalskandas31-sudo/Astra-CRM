@@ -493,7 +493,7 @@ export const ClientInformationModal = ({
     }
 
     // 7. Employee Sharing: total cannot exceed Gross Sales (fixed) or 100% (percentage)
-    const sharingError = validateSharing(employeeSharing, formData.grossSales);
+    const sharingError = validateSharing(employeeSharing, formData.netSales);
     if (sharingError) errors.employeeSharing = sharingError;
 
     // 8. Mode of Payment: 1 to 10 modes, each named with an amount; total cannot exceed Gross Sales
@@ -524,7 +524,7 @@ export const ClientInformationModal = ({
     const finalData = {
       ...formData,
       transactionNumbers: validTxns,
-      employeeSharing: sharingPayload(employeeSharing, formData.grossSales),
+      employeeSharing: sharingPayload(employeeSharing, formData.netSales),
       paymentModes: paymentModesPayload(paymentModes),
       phone1: formData.phone1 || lead?.phone,
       agentName: currentUser?.name || 'Executive',
@@ -1344,7 +1344,7 @@ export const ClientInformationModal = ({
                     setFieldErrors(prev => { const copy = { ...prev }; delete copy.employeeSharing; return copy; });
                   }
                 }}
-                grossSales={formData.grossSales}
+                netSales={formData.netSales}
                 users={users || []}
                 branches={branches || []}
                 error={fieldErrors.employeeSharing || ''}
