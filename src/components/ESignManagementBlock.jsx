@@ -4,6 +4,7 @@ import { useToast } from './ToastNotification';
 import { HarshalParmarESign } from './HarshalParmarESign';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
+import { SignatureTypesCard } from './SignatureTypesCard';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
 import { downloadLeegalityFile } from '../services/leegalityService';
 import { sendWelcomeKit, describeSend } from '../services/emailService';
@@ -477,6 +478,9 @@ export const ESignManagementBlock = () => {
           </div>
         </div>
       </div>
+
+      {/* ─── CLIENT SIGNATURE TYPES (AADHAAR / VIRTUAL SIGN) ─── */}
+      {currentUser?.role === 'Super Admin' && <SignatureTypesCard />}
 
       {/* ─── CONFIRMED AGREEMENTS REGISTRY (FILLED AFTER CONFIRMATION) ─── */}
       <div style={{

@@ -227,7 +227,7 @@ export const SaleApprovalWorkflow = () => {
                           color: isVoicePending ? '#60a5fa' : 'var(--status-warning)', 
                           border: `1px solid ${isVoicePending ? 'rgba(59, 130, 246, 0.3)' : 'var(--status-warning-border)'}` 
                         }}>
-                          {s.stage || s.status}
+                          {s.stage === 'Under Review by Super Admin' ? 'E-Sign is pending' : (s.stage || s.status)}
                         </span>
                       </td>
                       <td>

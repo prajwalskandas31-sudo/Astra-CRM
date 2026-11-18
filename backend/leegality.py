@@ -252,6 +252,87 @@ class ESignDispatchRequest(BaseModel):
     signatoryName: Optional[str] = None
 
 
+# ==========================================
+# Client signature types (Aadhaar eSign / Virtual Sign)
+# ==========================================
+# Leegality's create API has no field for signature types: they are fixed on the workflow
+# (Invite > Signature Type). So each on/off combination is sent through its own workflow,
+# and every dispatch reads back the types Leegality applied and cancels the document on a mismatch.
+SIGN_TYPES = "leegalitySignatureTypes"
+SIGN_TYPE_LABELS = {"aadhaar": "Aadhaar", "virtualSign": "Virtual Sign"}
+COMBO_LABELS = {"aadhaar": "Aadhaar only", "virtualSign": "Virtual Sign only", "both": "Aadhaar + Virtual Sign"}
+_PROFILE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _default_sign_types():
+    # Workflow KKliSJp is configured with Aadhaar off and Virtual Sign on (Leegality dashboard, Nov 2026)
+    return {"aadhaar": False, "virtualSign": True,
+            "workflows": {"aadhaar": "", "virtualSign": _template_map()["profileId"], "both": ""}}
+
+
+def _sign_types():
+    saved = store.get_value(SIGN_TYPES, None) or {}
+    cfg = _default_sign_types()
+    cfg.update({k: bool(saved[k]) for k in ("aadhaar", "virtualSign") if k in saved})
+    cfg["workflows"].update({k: v for k, v in (saved.get("workflows") or {}).items() if k in COMBO_LABELS})
+    return cfg
+
+
+def _combo(cfg):
+    if cfg["aadhaar"] and cfg["virtualSign"]:
+        return "both"
+    if cfg["aadhaar"]:
+        return "aadhaar"
+    if cfg["virtualSign"]:
+        return "virtualSign"
+    return None
+
+
+def _active_workflow(cfg):
+    combo = _combo(cfg)
+    if combo is None:
+        raise HTTPException(status_code=400, detail="Both Aadhaar and Virtual Sign are turned off in the E-Sign Block; turn at least one on.")
+    profile_id = (cfg["workflows"].get(combo) or "").strip()
+    if not profile_id:
+        raise HTTPException(status_code=400, detail=f"No Leegality workflow is set for '{COMBO_LABELS[combo]}'. Enter its workflow ID "
+                                                    f"in E-Sign Block > Client Signature Types.")
+    return combo, profile_id
+
+
+def _signature_kinds(allowed):
+    """Leegality's allowedSignatures values ('AADHAAR', 'Aadhaar eSign', 'VIRTUAL_SIGN', ...) as the CRM's two keys."""
+    kinds = set()
+    for value in allowed or []:
+        text = (value if isinstance(value, str) else (value or {}).get("type") or (value or {}).get("name") or "").lower()
+        if "aadhaar" in text or "aadhar" in text:
+            kinds.add("aadhaar")
+        elif "virtual" in text:
+            kinds.add("virtualSign")
+    return kinds
+
+
+def _signature_type_check(delivery, invitee, cfg):
+    """Compare the client's allowed signature types on the new document with the CRM toggles.
+    Returns (status, message): status is 'matched', 'mismatch' or 'unverified'."""
+    wanted = {k for k in SIGN_TYPE_LABELS if cfg[k]}
+    signer = next((i for i in delivery.get("invitees") or []
+                   if _contact_key(i.get("name"), i.get("email"), i.get("phone")) == _contact_key(**invitee)), None)
+    allowed = (signer or {}).get("allowedSignatures") or []
+    if delivery.get("error") or not allowed:
+        return "unverified", f"Leegality did not report the client's signature types ({delivery.get('error') or 'none returned'})."
+    got = _signature_kinds(allowed)
+    if got == wanted:
+        return "matched", f"Leegality allows: {', '.join(allowed)}"
+    names = lambda kinds: " + ".join(SIGN_TYPE_LABELS[k] for k in SIGN_TYPE_LABELS if k in kinds) or "neither"
+    return "mismatch", f"the CRM asked for {names(wanted)} but the workflow allows {names(got)} ({', '.join(allowed)})"
+
+
+class SignatureTypesRequest(BaseModel):
+    aadhaar: bool
+    virtualSign: bool
+    workflows: dict = {}
+
+
 def _wallet(settings):
     """eSign credit balance straight from Leegality (unused / reserved / consumed / expired / total)."""
     _, body = _leegality("GET", "/v3.0/wallet/balance/details", settings)
@@ -292,6 +373,35 @@ def leegality_wallet(current_user: dict = Depends(require_roles(["Super Admin"])
     return _wallet(_settings())
 
 
+def _sign_types_view(cfg):
+    combo = _combo(cfg)
+    return {**cfg, "activeCombo": combo, "activeWorkflow": (cfg["workflows"].get(combo) or "") if combo else "",
+            "comboLabels": COMBO_LABELS}
+
+
+@router.get("/signature-types")
+def get_signature_types(current_user: dict = Depends(require_roles(["Super Admin"]))):
+    return _sign_types_view(_sign_types())
+
+
+@router.put("/signature-types")
+def save_signature_types(req: SignatureTypesRequest, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    workflows = {}
+    for combo, value in (req.workflows or {}).items():
+        if combo not in COMBO_LABELS:
+            continue
+        value = str(value or "").strip()
+        if value and not _PROFILE_ID.match(value):
+            raise HTTPException(status_code=400, detail=f"'{value}' is not a Leegality workflow ID (letters, digits, - and _ only, "
+                                                        f"e.g. KKliSJp from the workflow's profileId in its URL).")
+        workflows[combo] = value
+    cfg = {**_sign_types(), "aadhaar": req.aadhaar, "virtualSign": req.virtualSign}
+    cfg["workflows"] = {**cfg["workflows"], **workflows}
+    _active_workflow(cfg)  # refuse a setting that could not be sent
+    store.set_value(SIGN_TYPES, {**cfg, "updatedBy": current_user.get("name"), "updatedAt": datetime.now(timezone.utc).isoformat()})
+    return _sign_types_view(_sign_types())
+
+
 def _delivery_config(document_id, settings, expected_template_id):
     """What Leegality actually configured on the new document: template, notification channels and allowed
     signature types. These come from the workflow, and the create API cannot override them, so read them back after every send."""
@@ -324,19 +434,23 @@ def _contact_key(name, email, phone):
     return (" ".join((name or "").split()).casefold(), (email or "").strip().lower(), "".join(ch for ch in (phone or "") if ch.isdigit())[-10:])
 
 
-def _reject_substituted_signer(data, invitee, settings):
+def _cancel(document_id, settings):
+    _, body = _leegality("DELETE", "/v3.0/sign/request", settings, params={"documentId": document_id})
+    return "cancelled" if body.get("status") == 1 else f"NOT cancelled ({_messages(body)}); cancel it in Leegality"
+
+
+def _reject_substituted_signer(data, invitee, settings, profile_id):
     """A workflow with a saved signer ignores the invitee in the request and sends to its own contact instead.
     Then the agreement would reach someone other than the client, so delete it before it can be signed."""
     used = (data.get("invitees") or [{}])[0]
     if _contact_key(used.get("name"), used.get("email"), used.get("phone")) == _contact_key(**invitee):
         return
-    _, body = _leegality("DELETE", "/v3.0/sign/request", settings, params={"documentId": data["documentId"]})
-    cancelled = "cancelled" if body.get("status") == 1 else f"NOT cancelled ({_messages(body)}); cancel it in Leegality"
+    cancelled = _cancel(data["documentId"], settings)
     raise HTTPException(
         status_code=409,
         detail=f"Leegality sent the agreement to the workflow's saved signer ({used.get('name')}, {used.get('email')}, "
                f"{used.get('phone')}) instead of the client ({invitee['name']}, {invitee['email']}, {invitee['phone']}). "
-               f"Document {data['documentId']} was {cancelled}. Fix: in Leegality, edit workflow KKliSJp and remove the "
+               f"Document {data['documentId']} was {cancelled}. Fix: in Leegality, edit workflow {profile_id} and remove the "
                f"signer's saved name, email and phone so they come from the CRM."
     )
 
@@ -354,6 +468,8 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         raise HTTPException(status_code=400, detail=f"{' and '.join(missing)} missing on the Client Information Page; Leegality needs both email and phone.")
 
     option_idx = _tenure_option(tmap, req.serviceTenure)
+    sign_cfg = _sign_types()
+    combo, profile_id = _active_workflow(sign_cfg)
     executed_at = _now(tmap)
 
     fields = [_field(tmap["dateField"], type=tmap["dateField"].get("type", "text"), value=executed_at.strftime(tmap["dateField"]["format"]))]
@@ -367,7 +483,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
     invitee = {"name": req.clientName.strip(), "email": email, "phone": phone}
 
     payload = {
-        "profileId": tmap["profileId"],
+        "profileId": profile_id,
         "irn": f"CRM-{req.saleId}"[:255],
         "file": {"name": f"RA Terms & Conditions - {req.clientName.strip()}"[:255], "fields": fields},
         "invitees": [invitee],
@@ -378,12 +494,28 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         raise HTTPException(status_code=422, detail=f"Leegality rejected the request: {_messages(body)}")
 
     data = body["data"]
-    _reject_substituted_signer(data, invitee, settings)
+    _reject_substituted_signer(data, invitee, settings, profile_id)
+    delivery = _delivery_config(data["documentId"], settings, tmap["templateId"])
+    check_status, check_message = _signature_type_check(delivery, invitee, sign_cfg)
+    if check_status == "mismatch":
+        cancelled = _cancel(data["documentId"], settings)
+        raise HTTPException(
+            status_code=409,
+            detail=f"Signature types do not match: {check_message}. Document {data['documentId']} was {cancelled}. "
+                   f"Fix: in Leegality, open workflow {profile_id} > Invite > Signature Type and set it to "
+                   f"{COMBO_LABELS[combo]}, or enter the right workflow for '{COMBO_LABELS[combo]}' in E-Sign Block > Client Signature Types."
+        )
     record = _update_record(data["documentId"], {
         "documentId": data["documentId"],
         "saleId": req.saleId,
         "irn": data.get("irn"),
-        "profileId": tmap["profileId"],
+        "profileId": profile_id,
+        "signatureTypes": {
+            "requested": [SIGN_TYPE_LABELS[k] for k in SIGN_TYPE_LABELS if sign_cfg[k]],
+            "combo": combo,
+            "check": check_status,
+            "message": check_message,
+        },
         "clientName": req.clientName,
         "serviceTenure": req.serviceTenure,
         "tenureOption": tmap["tenureCheckbox"]["options"][option_idx]["label"],
@@ -397,7 +529,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         "webhookEvents": [],
         "walletAfterDispatch": _wallet(settings),
         "templateId": tmap["templateId"],
-        "deliveryConfig": _delivery_config(data["documentId"], settings, tmap["templateId"]),
+        "deliveryConfig": delivery,
         "sentContact": {"email": email, "phone": phone},
     })
     return record

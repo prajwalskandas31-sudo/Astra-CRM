@@ -165,6 +165,20 @@ export const getEKycLight = (sale) => {
 };
 
 /**
+ * Which signature types the client may use (Aadhaar eSign / Virtual Sign) and the Leegality workflow
+ * behind each combination. Leegality fixes signature types on the workflow, so the backend picks the
+ * workflow matching these toggles and cancels any document whose types do not match.
+ * Returns { aadhaar, virtualSign, workflows: { aadhaar, virtualSign, both }, activeCombo, activeWorkflow, comboLabels }.
+ */
+export const getSignatureTypes = async () => (await backendFetch('/leegality/signature-types')).json();
+
+export const saveSignatureTypes = async ({ aadhaar, virtualSign, workflows }) =>
+  (await backendFetch('/leegality/signature-types', {
+    method: 'PUT',
+    body: JSON.stringify({ aadhaar, virtualSign, workflows })
+  })).json();
+
+/**
  * eSign credit balance from Leegality: { unused, reserved, consumed, expired, total }.
  */
 export const getLeegalityWallet = async () => (await backendFetch('/leegality/wallet')).json();
