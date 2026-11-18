@@ -23,6 +23,7 @@ try:
     from backend import service_expiry
     from backend import broadcast_group
     from backend import kra
+    from backend import client_master
     from backend import salary
     from backend.db_init import init_database
 except ImportError:
@@ -42,6 +43,7 @@ except ImportError:
     import service_expiry
     import broadcast_group
     import kra
+    import client_master
     import salary
     from db_init import init_database
 
@@ -73,6 +75,7 @@ app.include_router(old_client_review.router)
 app.include_router(service_expiry.router)
 app.include_router(broadcast_group.router)
 app.include_router(kra.router)
+app.include_router(client_master.router)
 app.include_router(salary.router)
 
 
@@ -378,8 +381,8 @@ PAY_DETAIL_FIELDS = {
         "commissionPercent": ("Commission %", 100),
     },
     "Salary": {
-        "fixedSalary": ("Fixed Salary", None),
-        "targetValue": ("Target", None),
+        "fixedSalary": ("Fixed Salary Value", None),
+        "targetValue": ("Target Value", None),
     },
     "Salary plus Incentives": {
         "fixedSalary": ("Fixed Salary", None),

@@ -86,17 +86,21 @@ def credits(sale: dict) -> list:
     net = _num(sale.get("netSales") if sale.get("netSales") not in (None, "") else info.get("netSales"))
     primary = sale.get("submittedByUserId") or sale.get("employeeId")
     sharing = sale.get("employeeSharing") or info.get("employeeSharing") or {}
+    net = max(net, 0.0)
     out = []
+    left = net
     if isinstance(sharing, dict) and sharing.get("present"):
         pct = sharing.get("mode") == "percentage"
-        for share in sharing.get("shares") or []:
-            if not share.get("userId"):
+        for share in (sharing.get("shares") or [])[:5]:
+            if not isinstance(share, dict) or not share.get("userId"):
                 continue
-            value = _num(share.get("value"))
-            out.append((share["userId"], net * value / 100 if pct else value))
-    shared = sum(amount for _, amount in out)
+            value = max(_num(share.get("value")), 0.0)
+            # Never negative, and all shares together never more than the sale's Net Sales
+            amount = min(net * min(value, 100.0) / 100 if pct else value, left)
+            left -= amount
+            out.append((share["userId"], amount))
     if primary:
-        out.append((primary, max(net - shared, 0.0)))
+        out.append((primary, left))
     return out
 
 

@@ -35,8 +35,8 @@ const PAY_DETAIL_FIELDS = {
     { key: 'commissionPercent', label: 'Commission (%)', placeholder: 'e.g. 10', step: '0.01', max: 100 },
   ],
   'Salary': [
-    { key: 'fixedSalary', label: 'Fixed Salary (₹)', placeholder: 'e.g. 25000', step: '1' },
-    { key: 'targetValue', label: 'Target (₹)', placeholder: 'e.g. 300000', step: '1' },
+    { key: 'fixedSalary', label: 'Fixed Salary Value (₹)', placeholder: 'e.g. 25000', step: '1' },
+    { key: 'targetValue', label: 'Target Value (₹)', placeholder: 'e.g. 300000', step: '1' },
   ],
   'Salary plus Incentives': [
     { key: 'fixedSalary', label: 'Fixed Salary (₹)', placeholder: 'e.g. 25000', step: '1' },

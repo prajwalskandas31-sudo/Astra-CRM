@@ -54,6 +54,7 @@ import { LeadHistoryBlock } from './components/LeadHistoryBlock';
 import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
 import { KraBlock } from './components/KraBlock';
+import { ClientMasterBlock } from './components/ClientMasterBlock';
 import { SalaryBlock } from './components/SalaryBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
@@ -98,6 +99,7 @@ const AppContent = () => {
       'paid-block',
       'salary-block',
       'kra-block',
+      'client-master',
       'telegram-control',
       'research-reports',
       'lead-reassignment',
@@ -180,6 +182,7 @@ const AppContent = () => {
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
     'salary-block': 'Salary Block - Commission, Salary and Salary plus Incentives',
     'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
+    'client-master': 'Client MASTER - Client Details, Leegality Signing, Invoices & Grievances',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
@@ -231,6 +234,8 @@ const AppContent = () => {
         return <SalaryBlock />;
       case 'kra-block':
         return <KraBlock />;
+      case 'client-master':
+        return <ClientMasterBlock />;
       case 'telegram-control':
         return <TelegramControlBlock />;
       case 'lead-reassignment':

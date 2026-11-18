@@ -185,3 +185,16 @@ def test_salary_plus_incentive_figures_saved_validated_and_hidden(crm, tokens):
     # Switching to a Pay Type without these figures clears them
     assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Commission"}) == 200
     assert crm.store.get("users", EXEC_ID)["payDetails"] == {}
+
+
+def test_salary_pay_type_keeps_fixed_salary_and_target_only(crm, tokens):
+    body = {"name": "Salary Person", "mobile": "9555555555", "password": STRONG, "email": "sp@x.com",
+            "reportingTo": "x", "payType": "Salary",
+            "payDetails": {"fixedSalary": 25000, "targetValue": "100000", "incentivePercent": 5}}
+    created = crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"]))
+    assert created.status_code == 200
+    assert created.json()["payDetails"] == {"fixedSalary": 25000, "targetValue": 100000}
+
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Salary", "payDetails": {"fixedSalary": 30000, "targetValue": 90000}}) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {"fixedSalary": 30000, "targetValue": 90000}
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"targetValue": -5}}) == 400

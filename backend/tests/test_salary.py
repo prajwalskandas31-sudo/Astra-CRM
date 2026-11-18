@@ -104,3 +104,13 @@ def test_pay_details_saved_per_pay_type(crm):
     assert crm.store.get("users", uid)["payDetails"] == {"fixedSalary": 20000, "targetValue": 100000}
     bad = crm.client.put(f"/api/users/{uid}", headers=h, json={"payType": "Commission", "payDetails": {"commissionPercent": 150}})
     assert bad.status_code == 400
+
+
+def test_bad_sharing_values_never_credit_more_than_net_sales(crm):
+    sal = crm.main.salary
+    over = {"present": True, "mode": "percentage", "shares": [{"userId": "a", "value": 80}, {"userId": "b", "value": 80}]}
+    got = dict(sal.credits(sale("X", "p", 1000, "2026-11-01", sharing=over)))
+    assert got == {"a": 800, "b": 200, "p": 0}
+    negative = {"present": True, "mode": "fixed", "shares": [{"userId": "a", "value": -5000}]}
+    got = dict(sal.credits(sale("Y", "p", 1000, "2026-11-01", sharing=negative)))
+    assert got == {"a": 0, "p": 1000}
