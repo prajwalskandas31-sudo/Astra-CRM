@@ -118,6 +118,8 @@ class UserCreate(BaseModel):
     referredBy: Optional[str] = ""
     branchId: Optional[str] = ""
     payType: Optional[str] = ""
+    fixedSalary: Optional[float] = None
+    targetValue: Optional[float] = None
     companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
 
@@ -136,6 +138,8 @@ class UserUpdate(BaseModel):
     referredBy: Optional[str] = None
     branchId: Optional[str] = None
     payType: Optional[str] = None
+    fixedSalary: Optional[float] = None
+    targetValue: Optional[float] = None
     companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
 
@@ -350,6 +354,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "referredBy": req.referredBy or "",
         "branchId": req.branchId or "",
         "payType": _clean_pay_type(req.payType),
+        **_salary_values(_clean_pay_type(req.payType), req.fixedSalary, req.targetValue),
         "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
     }
@@ -365,6 +370,15 @@ def _clean_pay_type(pay_type: Optional[str]) -> str:
     if value and value not in PAY_TYPES:
         raise HTTPException(status_code=400, detail=f"Pay Type must be one of: {', '.join(PAY_TYPES)}.")
     return value
+
+def _salary_values(pay_type: str, fixed_salary: Optional[float], target_value: Optional[float]) -> dict:
+    """Fixed Salary and Target Value: kept only for the "Salary" pay type, never negative."""
+    if pay_type != "Salary":
+        return {"fixedSalary": None, "targetValue": None}
+    for label, value in (("Fixed Salary", fixed_salary), ("Target Value", target_value)):
+        if value is not None and value < 0:
+            raise HTTPException(status_code=400, detail=f"{label} cannot be negative.")
+    return {"fixedSalary": fixed_salary, "targetValue": target_value}
 
 def _clean_asset_ids(asset_ids: Optional[List[str]]) -> List[str]:
     """Ids of the company assets handed to a user, without blanks or repeats."""
@@ -389,7 +403,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "fixedSalary", "targetValue", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -419,6 +433,12 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.branchId is not None: user["branchId"] = req.branchId
     if req.payType is not None: user["payType"] = _clean_pay_type(req.payType)
+    if req.payType is not None or req.fixedSalary is not None or req.targetValue is not None:
+        user.update(_salary_values(
+            user.get("payType", ""),
+            req.fixedSalary if req.fixedSalary is not None else user.get("fixedSalary"),
+            req.targetValue if req.targetValue is not None else user.get("targetValue"),
+        ))
     if req.companyAssets is not None: user["companyAssets"] = _clean_asset_ids(req.companyAssets)
     if req.documents is not None: user["documents"] = req.documents
 

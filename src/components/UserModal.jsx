@@ -103,6 +103,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
     branchId: userToEdit ? (userToEdit.branchId || '') : '',
     payType: userToEdit ? (userToEdit.payType || '') : '',
+    fixedSalary: userToEdit?.fixedSalary ?? '',
+    targetValue: userToEdit?.targetValue ?? '',
     companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
 
@@ -159,6 +161,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: userToEdit.referredBy || '',
           branchId: userToEdit.branchId || '',
           payType: userToEdit.payType || '',
+          fixedSalary: userToEdit.fixedSalary ?? '',
+          targetValue: userToEdit.targetValue ?? '',
           companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
         setAttachedDocs(userToEdit.documents ? [...userToEdit.documents] : []);
@@ -181,6 +185,8 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: '',
           branchId: '',
           payType: '',
+          fixedSalary: '',
+          targetValue: '',
           companyAssets: []
         });
         setAttachedDocs([]);
@@ -597,10 +603,21 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         return;
       }
 
+      const isSalary = formData.payType === 'Salary';
+      if (isSalary && (formData.fixedSalary === '' || formData.targetValue === '')) {
+        showToast('Please enter the Fixed Salary Value and Target Value for a Salary user.', 'warning');
+        return;
+      }
+      const salaryFields = {
+        fixedSalary: isSalary ? Number(formData.fixedSalary) : null,
+        targetValue: isSalary ? Number(formData.targetValue) : null
+      };
+
       if (userToEdit) {
         try {
           await updateUser(userToEdit.id, {
             ...formData,
+            ...salaryFields,
             documents: attachedDocs,
             customFieldValues
           });
@@ -619,6 +636,7 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         try {
           await addUser({
             ...formData,
+            ...salaryFields,
             name: cleanName,
             email: autoEmail,
             password: autoPass,
@@ -820,6 +838,39 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     ))}
                   </select>
                 </div>
+
+                {formData.payType === 'Salary' && (
+                  <>
+                    <div className="form-group">
+                      <label>Fixed Salary Value (₹) *</label>
+                      <input
+                        type="number"
+                        name="fixedSalary"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        placeholder="e.g. 25000"
+                        value={formData.fixedSalary}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Target Value (₹) *</label>
+                      <input
+                        type="number"
+                        name="targetValue"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        placeholder="e.g. 100000"
+                        value={formData.targetValue}
+                        onChange={handleChange}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
 
                 <CompanyAssetsField
                   value={formData.companyAssets}
