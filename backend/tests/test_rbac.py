@@ -171,3 +171,17 @@ def test_pay_type_saved_and_validated(crm, tokens):
     assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Commission"}) == 200
     assert put_user(crm, tokens["sa"], EXEC_ID, {"payType": "Bonus"}) == 400
     assert put_user(crm, tokens["exec"], EXEC_ID, {"payType": "Salary"}) == 403
+
+
+def test_salary_plus_incentive_figures_saved_validated_and_hidden(crm, tokens):
+    body = {"payType": "Salary plus Incentives",
+            "payDetails": {"fixedSalary": "25000", "targetValue": 300000, "incentivePercent": "2.5", "bogus": 1}}
+    assert put_user(crm, tokens["sa"], EXEC_ID, body) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {"fixedSalary": 25000, "targetValue": 300000, "incentivePercent": 2.5}
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"incentivePercent": 101}}) == 400
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"fixedSalary": -1}}) == 400
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"targetValue": "abc"}}) == 400
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"payDetails": {"fixedSalary": 99999}}) == 403
+    # Switching to a Pay Type without these figures clears them
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Commission"}) == 200
+    assert crm.store.get("users", EXEC_ID)["payDetails"] == {}

@@ -118,6 +118,7 @@ class UserCreate(BaseModel):
     referredBy: Optional[str] = ""
     branchId: Optional[str] = ""
     payType: Optional[str] = ""
+    payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
 
@@ -136,6 +137,7 @@ class UserUpdate(BaseModel):
     referredBy: Optional[str] = None
     branchId: Optional[str] = None
     payType: Optional[str] = None
+    payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
 
@@ -350,6 +352,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "referredBy": req.referredBy or "",
         "branchId": req.branchId or "",
         "payType": _clean_pay_type(req.payType),
+        "payDetails": _clean_pay_details(req.payType, req.payDetails),
         "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
     }
@@ -365,6 +368,33 @@ def _clean_pay_type(pay_type: Optional[str]) -> str:
     if value and value not in PAY_TYPES:
         raise HTTPException(status_code=400, detail=f"Pay Type must be one of: {', '.join(PAY_TYPES)}.")
     return value
+
+# Pay Type -> the numeric pay figures it carries: {key: (label, max allowed or None)}
+PAY_DETAIL_FIELDS = {
+    "Salary plus Incentives": {
+        "fixedSalary": ("Fixed Salary", None),
+        "targetValue": ("Target", None),
+        "incentivePercent": ("Incentive %", 100),
+    },
+}
+
+def _clean_pay_details(pay_type: Optional[str], details: Optional[dict]) -> dict:
+    """The pay figures for this Pay Type as non-negative numbers; blanks are dropped, other keys ignored."""
+    fields = PAY_DETAIL_FIELDS.get((pay_type or "").strip(), {})
+    clean = {}
+    for key, (label, limit) in fields.items():
+        raw = (details or {}).get(key)
+        if raw is None or str(raw).strip() == "":
+            continue
+        try:
+            value = float(str(raw).strip())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{label} must be a number.")
+        if value != value or value < 0 or (limit is not None and value > limit):
+            bound = f"between 0 and {limit}" if limit is not None else "0 or more"
+            raise HTTPException(status_code=400, detail=f"{label} must be {bound}.")
+        clean[key] = int(value) if value.is_integer() else value
+    return clean
 
 def _clean_asset_ids(asset_ids: Optional[List[str]]) -> List[str]:
     """Ids of the company assets handed to a user, without blanks or repeats."""
@@ -389,7 +419,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -419,6 +449,10 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.branchId is not None: user["branchId"] = req.branchId
     if req.payType is not None: user["payType"] = _clean_pay_type(req.payType)
+    if req.payType is not None or req.payDetails is not None:
+        # Figures that don't belong to the (new) Pay Type are dropped
+        details = req.payDetails if req.payDetails is not None else user.get("payDetails")
+        user["payDetails"] = _clean_pay_details(user.get("payType"), details)
     if req.companyAssets is not None: user["companyAssets"] = _clean_asset_ids(req.companyAssets)
     if req.documents is not None: user["documents"] = req.documents
 
