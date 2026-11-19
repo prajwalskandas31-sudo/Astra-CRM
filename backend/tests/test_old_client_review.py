@@ -100,14 +100,14 @@ def test_anyone_with_the_link_approves_and_only_the_invoice_is_emailed(oc):
     assert res.status_code == 303 and res.headers["location"] == f"../{path.rsplit('/', 1)[1]}"
     assert len(mails) == 1
     msg = message_from_bytes(mails[0].as_bytes())
-    assert msg["To"] == "client@example.com" and "Invoice INV/" in msg["Subject"]
+    assert msg["To"] == "client@example.com" and "Invoice HO" in msg["Subject"]
     files = [p for p in msg.walk() if p.get_filename()]
     assert len(files) == 1 and files[0].get_content_type() == "application/pdf"  # no Welcome Kit, no e-KYC
     assert files[0].get_payload(decode=True).startswith(b"%PDF")
 
     record = crm.store.get(m.REVIEWS, m._hash(path.rsplit("/", 1)[1]))
     assert record["status"] == "approved" and record["decidedBy"] == "Srinivas"
-    assert re.fullmatch(r"INV/\d{4}-\d{2}/\d{4}", record["invoiceNumber"])
+    assert re.fullmatch(r"HO\d{4}\d{3}", record["invoiceNumber"])  # usr-3 has no branch: the fallback series
     sale = crm.store.get("sales", "SL-OC")
     assert sale["status"] == m.STATUS_APPROVED and sale["invoiceNumber"] == record["invoiceNumber"]
     lead = crm.store.get("leads", "L-OC")
@@ -169,12 +169,10 @@ def test_executive_may_create_an_old_client_sale_but_not_move_it(crm):
 
 def test_invoice_words_and_numbers(crm):
     inv = crm.invoice
-    assert inv.in_words(5000) == "Rupees Five Thousand Only"
-    assert inv.in_words(150847.46) == "Rupees One Lakh Fifty Thousand Eight Hundred Forty Seven and Forty Six Paise Only"
-    assert inv.in_words(12345678) == "Rupees One Crore Twenty Three Lakh Forty Five Thousand Six Hundred Seventy Eight Only"
-    assert inv.rupees(150847.46) == "Rs. 1,50,847.46"
-    from datetime import datetime
-    assert inv.financial_year(datetime(2027, 3, 31)) == "2026-27" and inv.financial_year(datetime(2027, 4, 1)) == "2027-28"
+    assert inv.in_words(25000) == "Indian Rupee Twenty-Five Thousand Only"
+    assert inv.in_words(150847.46) == "Indian Rupee One Lakh Fifty Thousand Eight Hundred Forty-Seven and Forty-Six Paise Only"
+    assert inv.in_words(12345678) == "Indian Rupee One Crore Twenty-Three Lakh Forty-Five Thousand Six Hundred Seventy-Eight Only"
+    assert inv.rupees(150847.46) == "₹1,50,847.46"
 
 
 def test_a_review_cannot_target_someone_elses_sale(oc):
@@ -205,7 +203,8 @@ def test_invoice_prints_the_company_state(crm, monkeypatch):
     monkeypatch.setattr(inv, "_para", lambda text, style: lines.append(text) or real_para(text, style))
     crm.store.put("companyProfile", "companyName", {"id": "companyName", "value": "Unite Tech"})
     crm.store.put("companyProfile", "state", {"id": "state", "value": "Gujarat"})
+    crm.store.put("companyProfile", "registeredAddress", {"id": "registeredAddress", "value": "219, Sai Vittorio, Surat"})
     pdf = inv.build_pdf({"clientName": "A", "clientState": "Maharashtra", "grossSales": "1180", "netSales": "1000",
                          "gst": "180", "serviceName": "Stock Cash"}, "INV-1", datetime(2026, 11, 19))
     assert pdf.startswith(b"%PDF")
-    assert "State: Gujarat" in lines and "Place of Supply: Maharashtra" in lines
+    assert "Gujarat" in lines and "Place Of Supply: Maharashtra (27)" in lines

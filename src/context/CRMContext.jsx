@@ -664,6 +664,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'invoice-block',
+    name: 'Invoice Block',
+    category: 'Sales & Approvals',
+    description: 'Tax invoices for every client who has e-signed: paid vs the Service Master Value (Invoice 1 / Invoice 2 with the balance), Generate Invoice (PDF, numbered per branch per month), and Invoice Controls for GST rates, Notes and Terms. Checked by the server too (backend/invoice_block.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',

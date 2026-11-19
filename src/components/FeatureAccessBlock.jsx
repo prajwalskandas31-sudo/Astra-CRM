@@ -36,7 +36,8 @@ import {
   Check,
   X,
   Copy,
-  Activity
+  Activity,
+  Receipt
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -58,6 +59,7 @@ const FEATURE_ICONS = {
   'sale-approvals': CheckCircle,
   'esign-block': FileSignature,
   'kra-block': ShieldCheck,
+  'invoice-block': Receipt,
   'register-sale': CheckCircle2,
   'lead-summary': PieChart,
   'system-settings': Settings,
