@@ -4,18 +4,10 @@ import { useToast } from './ToastNotification';
 import { Building2, Save, RotateCcw } from 'lucide-react';
 import { CompanyBankAccounts } from './CompanyBankAccounts';
 import { CompanyLogoUpload } from './CompanyLogoUpload';
+// Same list as the client's State on the Client Information Page (both are printed on invoices)
+import { INDIAN_STATES } from './ClientInformationModal';
 
 // Suggestions for Nature of Business; any other text can be typed in
-// Indian States and Union Territories offered for State; any other text can be typed in
-const STATES = [
-  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat', 'Haryana',
-  'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya',
-  'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
-  'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
-  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
-  'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
-];
-
 const BUSINESS_TYPES = [
   'Research Analyst (SEBI Registered)', 'Investment Adviser (SEBI Registered)', 'Stock Broking', 'Portfolio Management Services',
   'Mutual Fund Distribution', 'Wealth Management', 'Insurance Broking', 'Financial Services', 'Banking & NBFC',
@@ -33,7 +25,7 @@ const FIELDS = [
   { key: 'email', label: 'Email', type: 'email', placeholder: 'e.g. support@company.com', autoComplete: 'email' },
   { key: 'website', label: 'Website', type: 'text', placeholder: 'e.g. www.company.com', autoComplete: 'url' },
   { key: 'registeredAddress', label: 'Registered Address', type: 'textarea', placeholder: 'e.g. 4th Floor, 12 MG Road, Bengaluru 560001', autoComplete: 'street-address' },
-  { key: 'state', label: 'State', type: 'text', placeholder: 'Type or pick, e.g. Gujarat', list: 'company-states', maxLength: 60, autoComplete: 'address-level1' },
+  { key: 'state', label: 'State (printed on invoices)', type: 'select', options: INDIAN_STATES, placeholder: 'Select the State' },
   { key: 'investorCharterUrl', label: 'Investor Charter Link', type: 'url', placeholder: 'e.g. https://www.company.com/investor-charter' }
 ];
 
@@ -100,7 +92,21 @@ export const CompanyProfileBlock = () => {
               <label htmlFor={`company-${f.key}`}>
                 {f.label}{f.key === 'companyName' && canEdit ? ' *' : ''}
               </label>
-              {f.type === 'textarea' ? (
+              {f.type === 'select' ? (
+                <select
+                  id={`company-${f.key}`}
+                  value={draft[f.key]}
+                  onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                  disabled={!canEdit}
+                >
+                  <option value="">{canEdit ? f.placeholder : '—'}</option>
+                  {draft[f.key] && !f.options.includes(draft[f.key]) && (
+                    // Typed in before State became a dropdown: kept until another State is picked
+                    <option value={draft[f.key]}>{draft[f.key]} (not in list)</option>
+                  )}
+                  {f.options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : f.type === 'textarea' ? (
                 <textarea
                   id={`company-${f.key}`}
                   rows={2}
@@ -128,9 +134,6 @@ export const CompanyProfileBlock = () => {
             </div>
           ))}
         </div>
-        <datalist id="company-states">
-          {STATES.map(s => <option key={s} value={s} />)}
-        </datalist>
         <datalist id="company-business-types">
           {BUSINESS_TYPES.map(t => <option key={t} value={t} />)}
         </datalist>

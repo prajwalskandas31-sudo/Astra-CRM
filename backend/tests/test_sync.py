@@ -329,14 +329,14 @@ def test_company_logo_and_nature_of_business(crm, tok):
     svg = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
     for entry in ({"id": "companyLogo", "value": png}, {"id": "companyLogo", "value": svg},
                   {"id": "companyLogo", "value": ""}, {"id": "natureOfBusiness", "value": "Research Analyst"},
-                  {"id": "state", "value": "Gujarat"}):
+                  {"id": "state", "value": "Gujarat"}, {"id": "state", "value": "Delhi (NCT)"}, {"id": "state", "value": ""}):
         assert not push(crm, tok["sa"], "companyProfile", [entry])["rejected"]["companyProfile"], entry
     assert push(crm, tok["admin"], "companyProfile", [{"id": "companyLogo", "value": png}])["rejected"]["companyProfile"]
     for bad in ({"id": "companyLogo", "value": "https://evil.example/logo.png"},
                 {"id": "companyLogo", "value": "data:text/html;base64,PHNjcmlwdD4="},
                 {"id": "companyLogo", "value": "data:image/png;base64," + "A" * 1_400_000},
                 {"id": "natureOfBusiness", "value": "x" * 151},
-                {"id": "state", "value": "x" * 61}):
+                {"id": "state", "value": "x" * 61}, {"id": "state", "value": "Gujrat"}):
         assert push(crm, tok["sa"], "companyProfile", [bad])["rejected"]["companyProfile"], bad["value"][:40]
 
 

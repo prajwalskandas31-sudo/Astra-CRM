@@ -131,7 +131,14 @@ LOGO_TYPES = ("png", "jpeg", "jpg", "webp", "gif", "svg+xml", "bmp", "x-icon", "
 LOGO_DATA_URL = re.compile(r"^data:image/(" + "|".join(re.escape(t) for t in LOGO_TYPES) + r");base64,[A-Za-z0-9+/]+=*$")
 MAX_LOGO_CHARS = 1_400_000   # about 1 MB of image
 NATURE_OF_BUSINESS_MAX = 150
-STATE_MAX = 60
+# Must match INDIAN_STATES in src/components/ClientInformationModal.jsx (the company State is printed on invoices)
+INDIAN_STATES = {
+    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
+    "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+    "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+    "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu", "Delhi (NCT)", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+}
 
 
 def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
@@ -143,8 +150,8 @@ def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict])
             return "Company Logo is too large (1 MB at most)."
         return None
     if new is not None and new.get("id") == "state":
-        if not isinstance(new.get("value"), str) or len(new["value"]) > STATE_MAX:
-            return f"State must be text of at most {STATE_MAX} characters."
+        if new.get("value") not in INDIAN_STATES and new.get("value") != "":
+            return "State must be one of the Indian States or Union Territories in the list."
         return None
     if new is not None and new.get("id") == "natureOfBusiness":
         if not isinstance(new.get("value"), str) or len(new["value"]) > NATURE_OF_BUSINESS_MAX:
