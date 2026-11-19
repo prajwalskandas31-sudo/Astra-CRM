@@ -163,6 +163,8 @@ const SERVICES_VERSION = '2026-11-official-tiers';
 // Company Profile block: the firm's own details, edited by the Super Admin
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: '',
+  natureOfBusiness: '',
+  companyLogo: '', // image data URL, shrunk in the browser; checked in backend/sync.py
   sebiRegistrationNumber: '',
   contact: '',
   email: '',
