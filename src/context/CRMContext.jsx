@@ -694,6 +694,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'service-master',
+    name: 'Service Master',
+    category: 'Administration & Governance',
+    description: 'Every service offered with its Value (price). These are the only Service Names on the Client Information Page. Only a Super Admin can add, edit or delete them.',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'company-profile',
     name: 'Company Profile',
     category: 'Administration & Governance',
@@ -2686,8 +2693,9 @@ export const CRMProvider = ({ children }) => {
   // ─── Services Master CRUD ──────────────────────────────────────────────
   const addService = (serviceData) => {
     const newService = {
-      id: 'srv-' + Date.now(),
+      id: 'srv-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900),
       name: (serviceData.name || '').trim(),
+      value: serviceData.value === '' || serviceData.value === undefined ? '' : Number(serviceData.value),
       description: (serviceData.description || '').trim()
     };
     setServices(prev => [...prev, newService]);

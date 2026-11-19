@@ -69,8 +69,13 @@ export const normalizeTenure = (tenure) => {
   return SERVICE_TENURES.find(opt => opt.toLowerCase() === t) || tenure;
 };
 
-// Select value for "+ Custom Service Name"; the typed name is what gets saved
-const CUSTOM_SERVICE = '__custom_service__';
+// Service names come only from the Service Master block; its Value is filled in as the Service Value
+const serviceValueOf = (services, name) => {
+  const srv = (services || []).find(s => s.name === name);
+  return srv && srv.value !== undefined && srv.value !== null ? String(srv.value) : '';
+};
+const formatServiceValue = (v) => (v === '' || v === undefined || v === null || Number.isNaN(Number(v))
+  ? '—' : `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
 
 export const ClientInformationModal = ({ 
   isOpen, 
@@ -108,6 +113,7 @@ export const ClientInformationModal = ({
     phone2: '',
     paymentDate: new Date().toISOString().split('T')[0],
     serviceName: '',
+    serviceValue: '',
     serviceTenure: '3 Months',
     transactionNumbers: [''], // Up to 5 (min 1)
     grossSales: '',
@@ -124,7 +130,6 @@ export const ClientInformationModal = ({
   const [panError, setPanError] = useState('');
   const [panChecking, setPanChecking] = useState(false);
   const panCheckSeq = useRef(0);
-  const [isCustomService, setIsCustomService] = useState(false);
   
   // Admin Gross Limit Override Modal State
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -171,6 +176,9 @@ export const ClientInformationModal = ({
         phone2: existing.phone2 || '',
         paymentDate: existing.paymentDate || todayStr,
         serviceName: existing.serviceName || initialServices,
+        // A submitted sale keeps the value it was sold at; otherwise today's Service Master value
+        serviceValue: existing.serviceValue !== undefined && existing.serviceValue !== ''
+          ? String(existing.serviceValue) : serviceValueOf(services, existing.serviceName || initialServices),
         serviceTenure: normalizeTenure(existing.serviceTenure) || '3 Months',
         transactionNumbers: existingTxnNumbers,
         grossSales: gross,
@@ -178,9 +186,6 @@ export const ClientInformationModal = ({
         gst: calcGst,
         clientState: existing.clientState || 'Maharashtra'
       });
-
-      // A saved name that is not one of the official tiers was typed in as a custom service
-      setIsCustomService(!!existing.serviceName && !(services || []).some(s => s.name === existing.serviceName));
 
       if (existing.transactionAttachments && Array.isArray(existing.transactionAttachments)) {
         setTransactionAttachments(existing.transactionAttachments);
@@ -1126,30 +1131,30 @@ export const ClientInformationModal = ({
                     {fieldErrors.serviceName && <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Fill details</span>}
                   </label>
                   <select
-                    value={isCustomService ? CUSTOM_SERVICE : formData.serviceName}
+                    value={formData.serviceName}
                     onChange={(e) => {
-                      const custom = e.target.value === CUSTOM_SERVICE;
-                      setIsCustomService(custom);
-                      handleChange('serviceName', custom ? '' : e.target.value);
+                      const name = e.target.value;
+                      setFormData(prev => ({ ...prev, serviceName: name, serviceValue: serviceValueOf(services, name) }));
+                      setFieldErrors(prev => (prev.serviceName ? { ...prev, serviceName: undefined } : prev));
                     }}
                     style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem' }}
                   >
-                    {services && services.map(srv => (
+                    {!formData.serviceName && <option value="">Select a service</option>}
+                    {formData.serviceName && !(services || []).some(s => s.name === formData.serviceName) && (
+                      // Saved before custom names were removed: kept as it is, but cannot be picked for a new sale
+                      <option value={formData.serviceName}>{formData.serviceName} (not in Service Master)</option>
+                    )}
+                    {(services || []).map(srv => (
                       <option key={srv.id} value={srv.name}>{srv.name}</option>
                     ))}
-                    <option value={CUSTOM_SERVICE}>+ Custom Service Name</option>
                   </select>
-                  {isCustomService && (
-                    <input
-                      type="text"
-                      value={formData.serviceName}
-                      onChange={(e) => handleChange('serviceName', e.target.value)}
-                      placeholder="Type the custom service name"
-                      maxLength={60}
-                      autoFocus
-                      style={{ width: '100%', padding: '8px 12px', fontSize: '0.84rem', marginTop: '6px' }}
-                    />
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '6px', padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-default)', fontSize: '0.78rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Service Value</span>
+                    <strong style={{ fontVariantNumeric: 'tabular-nums' }}>{formatServiceValue(formData.serviceValue)}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    New service names are added in the Service Master block.
+                  </div>
                 </div>
 
                 {/* Service Tenure */}
