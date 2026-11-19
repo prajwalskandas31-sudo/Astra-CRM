@@ -170,6 +170,7 @@ export const DEFAULT_COMPANY_PROFILE = {
   email: '',
   website: '',
   registeredAddress: '',
+  state: '',
   investorCharterUrl: '',
   gstin: '', // printed on Old Client invoices (they become "Tax Invoice" once it is set)
   // [{id, bankName, accountNumber, ifscCode, accountType, bankBranch, upiId, paymentGatewayLink}]

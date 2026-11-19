@@ -131,6 +131,7 @@ LOGO_TYPES = ("png", "jpeg", "jpg", "webp", "gif", "svg+xml", "bmp", "x-icon", "
 LOGO_DATA_URL = re.compile(r"^data:image/(" + "|".join(re.escape(t) for t in LOGO_TYPES) + r");base64,[A-Za-z0-9+/]+=*$")
 MAX_LOGO_CHARS = 1_400_000   # about 1 MB of image
 NATURE_OF_BUSINESS_MAX = 150
+STATE_MAX = 60
 
 
 def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
@@ -140,6 +141,10 @@ def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict])
             return "Company Logo must be a JPG, PNG, WEBP, SVG, GIF, BMP, ICO or AVIF image."
         if len(value) > MAX_LOGO_CHARS:
             return "Company Logo is too large (1 MB at most)."
+        return None
+    if new is not None and new.get("id") == "state":
+        if not isinstance(new.get("value"), str) or len(new["value"]) > STATE_MAX:
+            return f"State must be text of at most {STATE_MAX} characters."
         return None
     if new is not None and new.get("id") == "natureOfBusiness":
         if not isinstance(new.get("value"), str) or len(new["value"]) > NATURE_OF_BUSINESS_MAX:
