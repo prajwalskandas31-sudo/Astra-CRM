@@ -1,12 +1,27 @@
 import React, { useMemo, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { GitBranch, Save, RotateCcw, Plus, Edit2, Trash2, MapPin, Phone, Users } from 'lucide-react';
+import { GitBranch, Save, RotateCcw, Plus, Edit2, Trash2, MapPin, Phone, Users, Wand2 } from 'lucide-react';
 
 // Roles that can be named as a branch manager
 const MANAGER_ROLES = ['Manager', 'Admin', 'Super Admin'];
 
-const EMPTY_FORM = { name: '', address: '', managerIds: [], phone: '' };
+const EMPTY_FORM = { name: '', branchCode: '', address: '', managerIds: [], phone: '' };
+
+// Branch ID: matches BRANCH_CODE in backend/sync.py
+const CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{0,19}$/;
+const cleanCode = (v) => (v || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
+
+// Next free code in the BR-001, BR-002 ... series
+const nextBranchCode = (branches) => {
+  const taken = new Set(branches.map(b => (b.branchCode || '').toUpperCase()));
+  let n = branches.reduce((max, b) => {
+    const m = /^BR-(\d+)$/.exec((b.branchCode || '').toUpperCase());
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0) + 1;
+  while (taken.has(`BR-${String(n).padStart(3, '0')}`)) n += 1;
+  return `BR-${String(n).padStart(3, '0')}`;
+};
 
 export const BranchProfilesBlock = () => {
   const { branches = [], addBranch, updateBranch, deleteBranch, users = [], currentUser } = useCRM();
@@ -16,6 +31,7 @@ export const BranchProfilesBlock = () => {
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
+  const suggestedCode = useMemo(() => nextBranchCode(branches), [branches]);
 
   const managerChoices = useMemo(
     () => users.filter(u => MANAGER_ROLES.includes(u.role) && u.status !== 'Inactive'),
@@ -48,11 +64,23 @@ export const BranchProfilesBlock = () => {
       showToast(`A branch named "${clash.name}" already exists.`, 'error');
       return;
     }
+    // Left blank: the next code in the series is assigned
+    const branchCode = cleanCode(form.branchCode) || suggestedCode;
+    if (!CODE_PATTERN.test(branchCode)) {
+      showToast('Branch ID must be letters, digits, - or _ (e.g. BR-001).', 'error');
+      return;
+    }
+    const codeClash = branches.find(b => b.id !== editingId && (b.branchCode || '').toUpperCase() === branchCode);
+    if (codeClash) {
+      showToast(`Branch ID "${branchCode}" is already used by "${codeClash.name}".`, 'error');
+      return;
+    }
+    const data = { ...form, branchCode };
     if (editingId) {
-      updateBranch(editingId, form);
+      updateBranch(editingId, data);
       showToast(`Branch "${name}" updated.`, 'success');
     } else {
-      addBranch(form);
+      addBranch(data);
       showToast(`Branch "${name}" saved. It is now available in Add User.`, 'success');
     }
     resetForm();
@@ -62,6 +90,7 @@ export const BranchProfilesBlock = () => {
     setEditingId(branch.id);
     setForm({
       name: branch.name || '',
+      branchCode: branch.branchCode || '',
       address: branch.address || '',
       managerIds: Array.isArray(branch.managerIds) ? branch.managerIds : [],
       phone: branch.phone || ''
@@ -112,6 +141,24 @@ export const BranchProfilesBlock = () => {
                   placeholder="e.g. Hyderabad - Ameerpet"
                   required
                 />
+              </div>
+              <div className="form-group">
+                <label htmlFor="branch-code">Branch ID</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    id="branch-code"
+                    type="text"
+                    value={form.branchCode}
+                    onChange={e => setForm(f => ({ ...f, branchCode: cleanCode(e.target.value) }))}
+                    placeholder={`Unique code, e.g. ${suggestedCode} (assigned if left blank)`}
+                    maxLength={20}
+                    style={{ flex: 1, textTransform: 'uppercase', fontFamily: 'monospace' }}
+                  />
+                  <button type="button" className="btn-secondary" onClick={() => setForm(f => ({ ...f, branchCode: suggestedCode }))}
+                    title="Fill in the next free Branch ID" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                    <Wand2 size={14} /> Auto-assign
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <label htmlFor="branch-phone">Branch Phone Number</label>
@@ -166,7 +213,7 @@ export const BranchProfilesBlock = () => {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-              {(editingId || form.name || form.address || form.phone || form.managerIds.length > 0) && (
+              {(editingId || form.name || form.branchCode || form.address || form.phone || form.managerIds.length > 0) && (
                 <button type="button" className="btn-secondary" onClick={resetForm}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   <RotateCcw size={14} /> {editingId ? 'Cancel Edit' : 'Clear'}
@@ -184,6 +231,7 @@ export const BranchProfilesBlock = () => {
             <thead>
               <tr>
                 <th>No.</th>
+                <th>Branch ID</th>
                 <th>Branch Name</th>
                 <th>Address</th>
                 <th>Managers</th>
@@ -195,7 +243,7 @@ export const BranchProfilesBlock = () => {
             <tbody>
               {branches.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={canEdit ? 8 : 7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     {canEdit ? 'No branches yet. Add the first one above.' : 'No branches have been set up yet.'}
                   </td>
                 </tr>
@@ -204,6 +252,7 @@ export const BranchProfilesBlock = () => {
                 return (
                   <tr key={b.id}>
                     <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                    <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{b.branchCode || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                     <td style={{ fontWeight: 600 }}>{b.name}</td>
                     <td style={{ color: b.address ? 'var(--text-secondary)' : 'var(--text-muted)', maxWidth: '280px' }}>
                       {b.address ? <span style={{ display: 'inline-flex', gap: '4px' }}><MapPin size={13} style={{ flexShrink: 0, marginTop: '2px' }} />{b.address}</span> : '—'}

@@ -158,6 +158,25 @@ def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict])
     return None
 
 
+# Branch ID (branchCode): letters, digits, "-" or "_", unique across branches (ignoring case)
+BRANCH_CODE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,19}$")
+
+
+def _branch_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    if new is None:
+        return None
+    code = str(new.get("branchCode") or "").strip().upper()
+    if not code:
+        return None   # branches saved before Branch ID existed
+    if not BRANCH_CODE.match(code):
+        return "Branch ID must be 1-20 letters, digits, - or _ (e.g. BR-001)."
+    for other in store.all("branches"):
+        if other.get("id") != new.get("id") and str(other.get("branchCode") or "").strip().upper() == code:
+            return f'Branch ID "{code}" is already used by {other.get("name") or "another branch"}.'
+    new["branchCode"] = code
+    return None
+
+
 MAX_COMPANY_ASSETS = 10
 
 
@@ -310,7 +329,7 @@ POLICIES: Dict[str, Policy] = {
     "companyProfile": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_profile_check),
     "loginDisclaimer": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_login_disclaimer_check),
     # Branch Profiles block; every user creator picks from these names
-    "branches": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    "branches": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_branch_check),
     # "Company Assets Provided" items offered in Add User (max 10)
     "companyAssets": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_asset_check),
 }

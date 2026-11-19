@@ -2713,6 +2713,7 @@ export const CRMProvider = ({ children }) => {
   // ─── Branch Profiles CRUD ────────────────────────────────────────────────
   const cleanBranch = (data) => ({
     name: (data.name || '').trim(),
+    branchCode: (data.branchCode || '').trim().toUpperCase(), // Branch ID: unique, checked in backend/sync.py
     address: (data.address || '').trim(),
     managerIds: Array.isArray(data.managerIds) ? data.managerIds : [],
     phone: (data.phone || '').trim()
