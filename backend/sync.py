@@ -125,7 +125,26 @@ def _sale_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optiona
     return None
 
 
+# Company Logo: an image stored as a data URL (the browser shrinks it first). It syncs to every user,
+# so it is capped; SVG is accepted because the logo is only ever shown through <img>, where scripts never run.
+LOGO_TYPES = ("png", "jpeg", "jpg", "webp", "gif", "svg+xml", "bmp", "x-icon", "vnd.microsoft.icon", "avif")
+LOGO_DATA_URL = re.compile(r"^data:image/(" + "|".join(re.escape(t) for t in LOGO_TYPES) + r");base64,[A-Za-z0-9+/]+=*$")
+MAX_LOGO_CHARS = 1_400_000   # about 1 MB of image
+NATURE_OF_BUSINESS_MAX = 150
+
+
 def _company_profile_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    if new is not None and new.get("id") == "companyLogo":
+        value = new.get("value") or ""
+        if not isinstance(value, str) or (value and not LOGO_DATA_URL.match(value)):
+            return "Company Logo must be a JPG, PNG, WEBP, SVG, GIF, BMP, ICO or AVIF image."
+        if len(value) > MAX_LOGO_CHARS:
+            return "Company Logo is too large (1 MB at most)."
+        return None
+    if new is not None and new.get("id") == "natureOfBusiness":
+        if not isinstance(new.get("value"), str) or len(new["value"]) > NATURE_OF_BUSINESS_MAX:
+            return f"Nature of Business must be text of at most {NATURE_OF_BUSINESS_MAX} characters."
+        return None
     # Bank account links are rendered as clickable links for every user, so only web links are accepted
     if new is None or new.get("id") != "bankAccounts":
         return None

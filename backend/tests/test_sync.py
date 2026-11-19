@@ -312,3 +312,17 @@ def test_company_assets_are_super_admin_only_and_capped_at_ten(crm, tok):
     assert push(crm, tok["sa"], "companyAssets", [{"id": "ast-11", "name": "One too many"}])["rejected"]["companyAssets"]
     # Renaming an existing item still works when the list is full
     assert not push(crm, tok["sa"], "companyAssets", [{"id": "ast-1", "name": "Laptop (Dell)"}])["rejected"]["companyAssets"]
+
+
+def test_company_logo_and_nature_of_business(crm, tok):
+    png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    svg = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
+    for entry in ({"id": "companyLogo", "value": png}, {"id": "companyLogo", "value": svg},
+                  {"id": "companyLogo", "value": ""}, {"id": "natureOfBusiness", "value": "Research Analyst"}):
+        assert not push(crm, tok["sa"], "companyProfile", [entry])["rejected"]["companyProfile"], entry
+    assert push(crm, tok["admin"], "companyProfile", [{"id": "companyLogo", "value": png}])["rejected"]["companyProfile"]
+    for bad in ({"id": "companyLogo", "value": "https://evil.example/logo.png"},
+                {"id": "companyLogo", "value": "data:text/html;base64,PHNjcmlwdD4="},
+                {"id": "companyLogo", "value": "data:image/png;base64," + "A" * 1_400_000},
+                {"id": "natureOfBusiness", "value": "x" * 151}):
+        assert push(crm, tok["sa"], "companyProfile", [bad])["rejected"]["companyProfile"], bad["value"][:40]

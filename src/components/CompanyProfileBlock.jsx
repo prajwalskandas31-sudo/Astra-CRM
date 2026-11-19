@@ -3,9 +3,20 @@ import { useCRM, DEFAULT_COMPANY_PROFILE } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { Building2, Save, RotateCcw } from 'lucide-react';
 import { CompanyBankAccounts } from './CompanyBankAccounts';
+import { CompanyLogoUpload } from './CompanyLogoUpload';
+
+// Suggestions for Nature of Business; any other text can be typed in
+const BUSINESS_TYPES = [
+  'Research Analyst (SEBI Registered)', 'Investment Adviser (SEBI Registered)', 'Stock Broking', 'Portfolio Management Services',
+  'Mutual Fund Distribution', 'Wealth Management', 'Insurance Broking', 'Financial Services', 'Banking & NBFC',
+  'Fintech', 'Accounting & Tax Advisory', 'Information Technology', 'Software & SaaS', 'Consulting',
+  'Education & Training', 'Real Estate', 'Manufacturing', 'Trading & Distribution', 'Retail & E-commerce',
+  'Healthcare', 'Media & Marketing', 'Other'
+];
 
 const FIELDS = [
   { key: 'companyName', label: 'Company Name', type: 'text', placeholder: 'e.g. Astra Research Pvt. Ltd.', autoComplete: 'organization' },
+  { key: 'natureOfBusiness', label: 'Nature of Business', type: 'text', placeholder: 'Type or pick, e.g. Research Analyst', list: 'company-business-types', maxLength: 150 },
   { key: 'sebiRegistrationNumber', label: 'SEBI Registration Number', type: 'text', placeholder: 'e.g. INH000000000' },
   { key: 'gstin', label: 'GSTIN (printed on invoices)', type: 'text', placeholder: 'e.g. 29ABCDE1234F1Z5' },
   { key: 'contact', label: 'Contact', type: 'tel', placeholder: 'e.g. +91 98765 43210', autoComplete: 'tel' },
@@ -64,6 +75,15 @@ export const CompanyProfileBlock = () => {
 
       <form onSubmit={handleSubmit} style={{ padding: '20px' }}>
         <div className="form-grid">
+          <CompanyLogoUpload
+            logo={companyProfile?.companyLogo || ''}
+            canEdit={canEdit}
+            onChange={(companyLogo) => {
+              updateCompanyProfile({ companyLogo });
+              showToast(companyLogo ? 'Company Logo saved.' : 'Company Logo removed.', 'success');
+            }}
+            onError={(message) => showToast(message, 'error')}
+          />
           {FIELDS.map(f => (
             <div className="form-group" key={f.key} style={f.type === 'textarea' ? { gridColumn: '1 / -1' } : undefined}>
               <label htmlFor={`company-${f.key}`}>
@@ -89,12 +109,17 @@ export const CompanyProfileBlock = () => {
                   autoComplete={f.autoComplete}
                   readOnly={!canEdit}
                   required={f.key === 'companyName'}
+                  list={canEdit ? f.list : undefined}
+                  maxLength={f.maxLength}
                   style={['sebiRegistrationNumber', 'gstin'].includes(f.key) ? { textTransform: 'uppercase', fontFamily: 'monospace' } : undefined}
                 />
               )}
             </div>
           ))}
         </div>
+        <datalist id="company-business-types">
+          {BUSINESS_TYPES.map(t => <option key={t} value={t} />)}
+        </datalist>
 
         {canEdit && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
