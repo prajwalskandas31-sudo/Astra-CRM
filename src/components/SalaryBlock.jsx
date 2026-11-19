@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { API_BASE_URL, isBackendEnabled, readErrorDetail } from '../services/backendConfig';
-import { Wallet, RefreshCw, ChevronDown, ChevronRight, Search, X } from 'lucide-react';
+import { Wallet, RefreshCw, ChevronDown, ChevronRight, Search, X, Settings2, FileSpreadsheet, Files } from 'lucide-react';
+import { SETTING_FIELDS, ENTRY_AMOUNTS, calculate, exportConsolidated, exportIndividual } from './salaryPayroll';
 
 // Must match PAY_TYPES in backend/salary.py
 const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
@@ -13,56 +14,136 @@ const HELP = {
 };
 
 const pad = (n) => String(n).padStart(2, '0');
-const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const monthStart = () => { const d = new Date(); return isoDay(new Date(d.getFullYear(), d.getMonth(), 1)); };
+const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+const monthLabel = (m) => {
+  const [y, mo] = (m || '').split('-').map(Number);
+  return y && mo ? new Date(y, mo - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' }) : m;
+};
 
 const money = (n) => (n === null || n === undefined ? '—' : `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
 const pct = (n) => (n === null || n === undefined ? '—' : `${n}%`);
+const asText = (v) => (v === null || v === undefined || Number(v) === 0 ? '' : String(v));
 
 const TONE = {
-  'Eligible for Salary': 'success', 'Target Reached': 'success',
-  'Not Eligible for Salary': 'danger', 'Target Not Reached': 'danger',
+  'Eligible for Salary': 'success', 'Target Reached': 'success', 'Applicable': 'warning',
+  'Not Eligible for Salary': 'danger', 'Target Not Reached': 'danger', 'Not Applicable': 'neutral',
   'Pay details missing': 'warning'
 };
 
 const StatusBadge = ({ status }) => {
   if (!status) return null;
   const tone = TONE[status] || 'warning';
+  const style = tone === 'neutral'
+    ? { color: 'var(--text-muted)', border: '1px solid var(--border-default)', background: 'transparent' }
+    : { background: `var(--status-${tone}-bg)`, color: `var(--status-${tone})`, border: `1px solid var(--status-${tone}-border)` };
+  return <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', ...style }}>{status}</span>;
+};
+
+const OnOff = ({ on, onChange, label }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={on}
+    aria-label={label}
+    onClick={onChange}
+    style={{
+      minWidth: '46px', height: '24px', borderRadius: '12px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700,
+      border: `1px solid ${on ? 'var(--accent)' : 'var(--border-default)'}`,
+      background: on ? 'var(--accent)' : 'transparent', color: on ? '#fff' : 'var(--text-muted)'
+    }}
+  >
+    {on ? 'On' : 'Off'}
+  </button>
+);
+
+const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
+const amountInput = { width: '92px', height: '30px', padding: '4px 8px', fontSize: '0.8rem', textAlign: 'right', boxSizing: 'border-box' };
+const cleanNumber = (v) => v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+
+const AttendanceCell = ({ a }) => (
+  <div style={{ fontSize: '0.74rem', lineHeight: 1.5, whiteSpace: 'nowrap' }}>
+    <div><strong>{a.worked}</strong> / {a.workingDays} worked</div>
+    <div style={{ color: 'var(--text-muted)' }}>
+      PL {a.paidLeave}{a.extraLeave ? <span style={{ color: 'var(--status-danger)' }}> (+{a.extraLeave})</span> : null}
+      {' · '}<span style={{ color: a.absent ? 'var(--status-danger)' : undefined }}>A {a.absent}</span>
+      {' · '}<span style={{ color: a.halfDay ? 'var(--status-warning)' : undefined }}>HD {a.halfDay}</span>
+    </div>
+  </div>
+);
+
+const Breakdown = ({ r, settings }) => {
+  const { attendance: a, calc: c } = r.view;
+  const lines = [
+    ['Total Salary (calculated)', c.base, ''],
+    ['+ Incentive', c.incentive, ''],
+    ['− Absent', -c.absentDeduction, `${a.absent} absent${a.extraLeave ? ` + ${a.extraLeave} leave(s) beyond the ${Math.floor(Number(settings.paidLeaves) || 0)} paid` : ''} × ${money(settings.absentDeduction || 0)}`],
+    ['− Half Day', -c.halfDayDeduction, `${a.halfDay} × ${money(settings.halfDayDeduction || 0)}`],
+    ['+ Expenses', c.expenses, ''],
+    ['− Deduction', -c.deduction, ''],
+    ['− Advance', -c.advance, ''],
+    ['= Before Professional Tax', c.beforeProfessionalTax, ''],
+    ['− Professional Tax', -c.professionalTax, `${c.professionalTaxStatus} (limit ${money(settings.professionalTaxLimit || 0)})`],
+    ['− Insurance', -c.insurance, r.entry.insurance ? 'On' : 'Off'],
+    ['− PF', -c.pf, r.entry.pf ? 'On' : 'Off']
+  ];
   return (
-    <span className="badge" style={{ fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', background: `var(--status-${tone}-bg)`, color: `var(--status-${tone})`, border: `1px solid var(--status-${tone}-border)` }}>
-      {status}
-    </span>
+    <table className="crm-table" style={{ fontSize: '0.78rem' }}>
+      <thead><tr><th>Calculation</th><th>Detail</th><th style={num}>Amount</th></tr></thead>
+      <tbody>
+        {lines.map(([label, value, detail]) => (
+          <tr key={label}><td>{label}</td><td style={{ color: 'var(--text-muted)' }}>{detail}</td><td style={num}>{money(value)}</td></tr>
+        ))}
+        <tr>
+          <td style={{ fontWeight: 700 }}>Final Total Salary</td>
+          <td style={{ color: 'var(--text-muted)' }}>{a.notMarked ? `${a.notMarked} day(s) not marked (no deduction)` : ''}</td>
+          <td style={{ ...num, fontWeight: 700 }}>{money(c.finalSalary)}</td>
+        </tr>
+      </tbody>
+    </table>
   );
 };
 
-const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-
 /**
- * Salary Block (Super Admin only): pick a Pay Type and a date range; every employee with that Pay Type
- * is listed with their Net Sales from closed clients (Paid block), split by Sharing Present, and what they earn.
- * All figures are computed on the server (backend/salary.py).
+ * Salary Block (Super Admin only): pick a Pay Type and a month; every employee with that Pay Type is listed
+ * with their Net Sales from closed clients (Paid block), split by Sharing Present, and what they earn.
+ * The month's global settings and each employee's Incentive / Expenses / Deduction / Advance / Insurance / PF
+ * are saved on the server as they are typed. The Final Total Salary follows payroll() in backend/salary.py.
  */
 export const SalaryBlock = () => {
   const { authToken } = useCRM();
   const [payType, setPayType] = useState(PAY_TYPES[0]);
-  const [from, setFrom] = useState(monthStart);
-  const [to, setTo] = useState(() => isoDay(new Date()));
+  const [month, setMonth] = useState(thisMonth);
   const [rows, setRows] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [settingsSaved, setSettingsSaved] = useState(true);
+  const [entries, setEntries] = useState({});
   const [error, setError] = useState('');
+  const [saveState, setSaveState] = useState('');
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(() => new Set());
+  const [showSettings, setShowSettings] = useState(true);
   const [search, setSearch] = useState('');
+  const timers = useRef({});
+  const inFlight = useRef(0);
+
+  const headers = useMemo(() => ({ Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' }), [authToken]);
 
   const load = useCallback(async () => {
     if (!authToken || !isBackendEnabled()) { setError('The Salary Block needs the CRM server.'); return; }
-    if (!from || !to) return;
-    if (from > to) { setError('The From date is after the To date.'); setRows([]); return; }
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
     setLoading(true);
     try {
-      const q = new URLSearchParams({ payType, from, to });
-      const res = await fetch(`${API_BASE_URL}/salary-block?${q}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const q = new URLSearchParams({ payType, month });
+      const res = await fetch(`${API_BASE_URL}/salary-block?${q}`, { headers });
       if (!res.ok) throw new Error(await readErrorDetail(res, `Server returned ${res.status}`));
-      setRows((await res.json()).rows || []);
+      const body = await res.json();
+      setRows(body.rows || []);
+      setSettings(Object.fromEntries(SETTING_FIELDS.map(f => [f.key, asText(body.settings?.[f.key])])));
+      setSettingsSaved(Boolean(body.settings?.saved));
+      setEntries(Object.fromEntries((body.rows || []).map(r => [r.userId, {
+        ...Object.fromEntries(ENTRY_AMOUNTS.map(f => [f.key, asText(r.entry?.[f.key])])),
+        insurance: Boolean(r.entry?.insurance), pf: Boolean(r.entry?.pf)
+      }])));
       setError('');
     } catch (err) {
       setRows([]);
@@ -70,26 +151,74 @@ export const SalaryBlock = () => {
     } finally {
       setLoading(false);
     }
-  }, [authToken, payType, from, to]);
+  }, [authToken, payType, month, headers]);
 
   useEffect(() => { load(); }, [load]);
 
+  // Save after a short pause in typing; the settings and each employee have their own timer
+  const scheduleSave = useCallback((key, path, body) => {
+    clearTimeout(timers.current[key]);
+    setSaveState('Saving...');
+    timers.current[key] = setTimeout(async () => {
+      inFlight.current += 1;
+      try {
+        const res = await fetch(`${API_BASE_URL}/salary-block/${path}?${new URLSearchParams({ month })}`, { method: 'PUT', headers, body: JSON.stringify(body) });
+        if (!res.ok) throw new Error(await readErrorDetail(res, `Server returned ${res.status}`));
+        if (path === 'settings') setSettingsSaved(true);
+        setSaveState(inFlight.current > 1 ? 'Saving...' : 'All changes saved');
+      } catch (err) {
+        setSaveState(`Not saved: ${err.message || 'server error'}`);
+      } finally {
+        inFlight.current -= 1;
+      }
+    }, 700);
+  }, [headers, month]);
+
+  useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), []);
+  useEffect(() => { setSaveState(''); }, [month, payType]);
+
+  const setSetting = (key, value) => {
+    const next = { ...settings, [key]: cleanNumber(value) };
+    setSettings(next);
+    scheduleSave('settings', 'settings', Object.fromEntries(SETTING_FIELDS.map(f => [f.key, Number(next[f.key]) || 0])));
+  };
+
+  const setEntry = (userId, key, value) => {
+    const next = { ...entries[userId], [key]: typeof value === 'string' ? cleanNumber(value) : value };
+    setEntries(prev => ({ ...prev, [userId]: next }));
+    scheduleSave(`entry:${userId}`, 'entry', {
+      userId, ...Object.fromEntries(ENTRY_AMOUNTS.map(f => [f.key, Number(next[f.key]) || 0])),
+      insurance: Boolean(next.insurance), pf: Boolean(next.pf)
+    });
+  };
+
   const toggle = (id) => setOpen(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
+  // Each row with its live calculation from the current settings and entries
+  const computed = useMemo(() => rows.map(r => {
+    const entry = entries[r.userId] || {};
+    return { ...r, entry, view: calculate(r.totalSalary, r.attendance, settings, entry) };
+  }), [rows, entries, settings]);
+
   const q = search.trim().toLowerCase();
-  const shown = useMemo(() => rows.filter(r => !q
-    || r.name.toLowerCase().includes(q) || (r.employeeId || '').toLowerCase().includes(q) || (r.branch || '').toLowerCase().includes(q)), [rows, q]);
+  const shown = useMemo(() => computed.filter(r => !q
+    || r.name.toLowerCase().includes(q) || (r.employeeId || '').toLowerCase().includes(q) || (r.branch || '').toLowerCase().includes(q)), [computed, q]);
 
   const totals = useMemo(() => shown.reduce((acc, r) => {
     acc.net += r.netSales || 0;
     acc.pay += r.totalSalary || 0;
+    acc.final += r.view.calc.finalSalary || 0;
     return acc;
-  }, { net: 0, pay: 0 }), [shown]);
+  }, { net: 0, pay: 0, final: 0 }), [shown]);
 
   const isCommission = payType === 'Commission';
   const isPlus = payType === 'Salary plus Incentives';
-  // Chevron, Employee, Branch, Net Sales, Total Salary + the Pay Type's own columns
-  const columns = 5 + (isCommission ? 1 : isPlus ? 6 : 4);
+  const typeColumns = isCommission ? 1 : isPlus ? 6 : 4;
+  // Chevron, Employee, Branch, Net Sales, Total Salary, Incentive, Attendance, Expenses, Deduction, Advance,
+  // Prof. Tax, Insurance, PF, Final + the Pay Type's own columns
+  const columns = 14 + typeColumns;
+
+  const groups = [...new Set(SETTING_FIELDS.map(f => f.group))];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -103,10 +232,49 @@ export const SalaryBlock = () => {
               Net Sales from closed clients (Paid block) by Payment Date, split by Sharing Present. {HELP[payType]}
             </p>
           </div>
-          <button className="btn-secondary" onClick={load} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <RefreshCw size={14} /> {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="btn-secondary" onClick={() => setShowSettings(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }} aria-expanded={showSettings}>
+              <Settings2 size={14} /> {showSettings ? 'Hide settings' : 'Settings'}
+            </button>
+            <button className="btn-secondary" onClick={load} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RefreshCw size={14} /> {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
+
+        {showSettings && (
+          <div style={{ margin: '0 20px 16px', padding: '14px 16px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <strong style={{ fontSize: '0.86rem' }}>Settings for {monthLabel(month)}: all employees, all three pay types</strong>
+              <span style={{ fontSize: '0.74rem', color: settingsSaved ? 'var(--text-muted)' : 'var(--status-warning)' }}>
+                {settingsSaved ? 'Saved for this month' : 'Carried over from an earlier month: change any value to save it for this month'}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+              {groups.map(g => (
+                <fieldset key={g} style={{ border: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <legend style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>{g}</legend>
+                  {SETTING_FIELDS.filter(f => f.group === g).map(f => (
+                    <div className="form-group" key={f.key}>
+                      <label htmlFor={`sal-set-${f.key}`}>{f.label}</label>
+                      <input
+                        id={`sal-set-${f.key}`}
+                        inputMode={f.whole ? 'numeric' : 'decimal'}
+                        value={settings[f.key] ?? ''}
+                        placeholder="0"
+                        onChange={e => setSetting(f.key, f.whole ? e.target.value.replace(/\D/g, '') : e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </fieldset>
+              ))}
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+              Leaves beyond the paid allowance are deducted at the Absent rate; unmarked days are not deducted.
+              Professional Tax is deducted only when the salary after all other additions and deductions is above the limit.
+            </p>
+          </div>
+        )}
 
         <div className="paid-service-tabs" role="tablist" aria-label="Pay Type" style={{ margin: '0 20px 12px' }}>
           {PAY_TYPES.map(t => (
@@ -125,10 +293,7 @@ export const SalaryBlock = () => {
 
         <div className="paid-filters" style={{ flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-            From <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} style={{ height: '36px' }} />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-            To <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} style={{ height: '36px' }} />
+            Month <input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} style={{ height: '36px' }} />
           </label>
           <div style={{ position: 'relative', flex: '1 1 220px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -145,8 +310,19 @@ export const SalaryBlock = () => {
               </button>
             )}
           </div>
+          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportConsolidated(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }} title="One sheet with every employee of this pay type">
+            <FileSpreadsheet size={14} /> Export all
+          </button>
+          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportIndividual(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }} title="One workbook with a sheet per employee">
+            <Files size={14} /> Export per employee
+          </button>
         </div>
 
+        {saveState && (
+          <div role="status" style={{ margin: '0 20px 8px', fontSize: '0.76rem', color: saveState.startsWith('Not saved') ? 'var(--status-danger)' : 'var(--text-muted)' }}>
+            {saveState}
+          </div>
+        )}
         {error && <div style={{ margin: '0 20px 12px', fontSize: '0.82rem', color: 'var(--status-danger)' }}>{error}</div>}
 
         {!error && shown.length === 0 ? (
@@ -168,21 +344,47 @@ export const SalaryBlock = () => {
                   {!isCommission && <th style={num}>Target</th>}
                   {!isCommission && <th style={num}>Fixed Salary</th>}
                   {isPlus && <th style={num}>Incentive %</th>}
-                  {isPlus && <th style={num}>Incentive</th>}
+                  {isPlus && <th style={num}>Target Incentive</th>}
                   {!isCommission && <th>Status</th>}
                   {!isCommission && <th style={num}>Difference</th>}
                   <th style={num}>Total Salary</th>
+                  <th style={num}>Incentive</th>
+                  <th>Attendance</th>
+                  <th style={num}>Expenses</th>
+                  <th style={num}>Deduction</th>
+                  <th style={num}>Advance</th>
+                  <th>Prof. Tax</th>
+                  <th>Insurance</th>
+                  <th>PF</th>
+                  <th style={num}>Final Total Salary</th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map(r => {
                   const expanded = open.has(r.userId);
                   const short = r.status === 'Not Eligible for Salary' || r.status === 'Target Not Reached';
+                  const { attendance: a, calc: c } = r.view;
+                  const amount = (key) => (
+                    <td style={num}>
+                      <input
+                        aria-label={`${key} for ${r.name}`}
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={r.entry[key] ?? ''}
+                        onChange={e => setEntry(r.userId, key, e.target.value)}
+                        style={amountInput}
+                      />
+                    </td>
+                  );
                   return (
                     <React.Fragment key={r.userId}>
-                      <tr onClick={() => toggle(r.userId)} style={{ cursor: 'pointer' }}>
-                        <td>{expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</td>
-                        <td style={{ fontWeight: 600 }}>
+                      <tr>
+                        <td>
+                          <button type="button" onClick={() => toggle(r.userId)} aria-expanded={expanded} aria-label={`Details for ${r.name}`} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}>
+                            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
+                        </td>
+                        <td style={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => toggle(r.userId)}>
                           {r.name}
                           <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                             {[r.employeeId, r.role, r.userStatus !== 'Active' ? r.userStatus : ''].filter(Boolean).join(' · ')}
@@ -201,34 +403,46 @@ export const SalaryBlock = () => {
                             {short ? `${money(r.difference)} short` : '—'}
                           </td>
                         )}
-                        <td style={{ ...num, fontWeight: 700 }}>
+                        <td style={num}>
                           {r.status === 'Pay details missing' && isCommission ? <StatusBadge status={r.status} /> : money(r.totalSalary)}
                         </td>
+                        {amount('incentive')}
+                        <td><AttendanceCell a={a} /></td>
+                        {amount('expenses')}
+                        {amount('deduction')}
+                        {amount('advance')}
+                        <td><StatusBadge status={c.professionalTaxStatus} /></td>
+                        <td><OnOff on={Boolean(r.entry.insurance)} label={`Insurance for ${r.name}`} onChange={() => setEntry(r.userId, 'insurance', !r.entry.insurance)} /></td>
+                        <td><OnOff on={Boolean(r.entry.pf)} label={`PF for ${r.name}`} onChange={() => setEntry(r.userId, 'pf', !r.entry.pf)} /></td>
+                        <td style={{ ...num, fontWeight: 700 }}>{money(c.finalSalary)}</td>
                       </tr>
                       {expanded && (
                         <tr>
                           <td />
                           <td colSpan={columns - 1} style={{ background: 'var(--bg-subtle, transparent)' }}>
-                            {r.transactions.length === 0 ? (
-                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No closed client transactions in this date range.</span>
-                            ) : (
-                              <table className="crm-table" style={{ fontSize: '0.78rem' }}>
-                                <thead>
-                                  <tr><th>Payment Date</th><th>Client</th><th>Sale</th><th>Credited as</th><th style={num}>Net Sales credited</th></tr>
-                                </thead>
-                                <tbody>
-                                  {r.transactions.map((t, i) => (
-                                    <tr key={`${t.saleId}-${i}`}>
-                                      <td>{t.paymentDate}</td>
-                                      <td>{t.clientName || '—'}</td>
-                                      <td style={{ fontFamily: 'monospace' }}>{t.saleId}</td>
-                                      <td>{t.role}</td>
-                                      <td style={num}>{money(t.credited)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px', alignItems: 'start' }}>
+                              <Breakdown r={r} settings={settings} />
+                              {r.transactions.length === 0 ? (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No closed client transactions in this month.</span>
+                              ) : (
+                                <table className="crm-table" style={{ fontSize: '0.78rem' }}>
+                                  <thead>
+                                    <tr><th>Payment Date</th><th>Client</th><th>Sale</th><th>Credited as</th><th style={num}>Net Sales credited</th></tr>
+                                  </thead>
+                                  <tbody>
+                                    {r.transactions.map((t, i) => (
+                                      <tr key={`${t.saleId}-${i}`}>
+                                        <td>{t.paymentDate}</td>
+                                        <td>{t.clientName || '—'}</td>
+                                        <td style={{ fontFamily: 'monospace' }}>{t.saleId}</td>
+                                        <td>{t.role}</td>
+                                        <td style={num}>{money(t.credited)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -241,8 +455,10 @@ export const SalaryBlock = () => {
                   <td />
                   <td colSpan={2} style={{ fontWeight: 700 }}>Total ({shown.length} employee{shown.length === 1 ? '' : 's'})</td>
                   <td style={{ ...num, fontWeight: 700 }}>{money(totals.net)}</td>
-                  <td colSpan={columns - 5} />
+                  <td colSpan={typeColumns} />
                   <td style={{ ...num, fontWeight: 700 }}>{money(totals.pay)}</td>
+                  <td colSpan={8} />
+                  <td style={{ ...num, fontWeight: 700 }}>{money(totals.final)}</td>
                 </tr>
               </tfoot>
             </table>

@@ -47,8 +47,8 @@ def data(crm):
     return crm
 
 
-def get(crm, pay_type, who=SA, frm="2026-11-01", to="2026-11-30"):
-    return crm.client.get("/api/salary-block", params={"payType": pay_type, "from": frm, "to": to},
+def get(crm, pay_type, who=SA, month="2026-11"):
+    return crm.client.get("/api/salary-block", params={"payType": pay_type, "month": month},
                           headers=bearer(crm.token(who)))
 
 
@@ -60,7 +60,8 @@ def by_id(res):
 def test_super_admin_only(data):
     assert get(data, "Commission", who=ADMIN).status_code == 403
     assert get(data, "Bonus").status_code == 400
-    assert get(data, "Salary", frm="2026-12-01", to="2026-11-01").status_code == 400
+    assert get(data, "Salary", month="2026-13").status_code == 400
+    assert get(data, "Salary", month="2026-11-01").status_code == 400
 
 
 def test_commission_uses_closed_sales_and_sharing(data):
@@ -114,3 +115,86 @@ def test_bad_sharing_values_never_credit_more_than_net_sales(crm):
     negative = {"present": True, "mode": "fixed", "shares": [{"userId": "a", "value": -5000}]}
     got = dict(sal.credits(sale("Y", "p", 1000, "2026-11-01", sharing=negative)))
     assert got == {"a": 0, "p": 1000}
+
+
+# ---------------------------------------------------------------- monthly payroll
+
+SETTINGS = {"workingDays": 26, "paidLeaves": 1, "absentDeduction": 500, "halfDayDeduction": 250,
+            "professionalTax": 200, "professionalTaxLimit": 15000, "insuranceDeduction": 300, "pf": 1800}
+
+
+@pytest.fixture
+def payroll(data):
+    s = data.store
+    for name in ("salarySettings", "salaryEntries", "attendance"):
+        s.delete_many(name, [d["id"] for d in s.all(name)])
+    return data
+
+
+def mark(crm, uid, day, status):
+    crm.store.put("attendance", f"{uid}:{day}", {"id": f"{uid}:{day}", "userId": uid, "date": day, "status": status})
+
+
+def put(crm, path, body, month="2026-11", who=SA):
+    return crm.client.put(f"/api/salary-block/{path}", params={"month": month}, json=body, headers=bearer(crm.token(who)))
+
+
+def test_full_chain_in_order(payroll):
+    assert put(payroll, "settings", SETTINGS).status_code == 200
+    for day, status in (("01", "Present"), ("02", "Present"), ("03", "Half Day"),
+                        ("04", "Leave"), ("05", "Leave"), ("06", "Leave"), ("07", "Absent")):
+        mark(payroll, "sal-s1", f"2026-11-{day}", status)
+    mark(payroll, "sal-s1", "2026-10-30", "Absent")           # another month: ignored
+    res = put(payroll, "entry", {"userId": "sal-s1", "incentive": 1000, "expenses": 500, "deduction": 200,
+                                 "advance": 1000, "insurance": True, "pf": False})
+    assert res.status_code == 200, res.text
+    row = by_id(get(payroll, "Salary"))["sal-s1"]
+    a, c = row["attendance"], row["calc"]
+    assert (a["worked"], a["workingDays"], a["leave"], a["extraLeave"], a["absentCharged"], a["notMarked"]) == (3, 26, 3, 2, 3, 19)
+    assert c["absentDeduction"] == 1500 and c["halfDayDeduction"] == 250
+    # 20000 + 1000 - 1500 - 250 + 500 - 200 - 1000 = 18550 > 15000 -> PT 200, then Insurance 300
+    assert c["beforeProfessionalTax"] == 18550 and c["professionalTaxStatus"] == "Applicable"
+    assert c["professionalTax"] == 200 and c["insurance"] == 300 and c["pf"] == 0
+    assert c["finalSalary"] == 18050
+
+
+def test_below_target_starts_at_zero_and_never_goes_negative(payroll):
+    put(payroll, "settings", SETTINGS)
+    put(payroll, "entry", {"userId": "sal-s2", "incentive": 2000, "advance": 5000, "pf": True})
+    c = by_id(get(payroll, "Salary"))["sal-s2"]["calc"]
+    assert c["base"] == 0 and c["professionalTaxStatus"] == "Not Applicable" and c["finalSalary"] == 0
+
+
+def test_professional_tax_not_applicable_at_the_limit(payroll):
+    put(payroll, "settings", {**SETTINGS, "professionalTaxLimit": 20000})
+    c = by_id(get(payroll, "Salary"))["sal-s1"]["calc"]
+    assert c["beforeProfessionalTax"] == 20000 and c["professionalTaxStatus"] == "Not Applicable"
+    assert c["finalSalary"] == 20000
+
+
+def test_commission_gets_the_same_adjustments(payroll):
+    put(payroll, "settings", SETTINGS)
+    mark(payroll, "sal-c1", "2026-11-02", "Absent")
+    put(payroll, "entry", {"userId": "sal-c1", "incentive": 100, "pf": True})
+    c = by_id(get(payroll, "Commission"))["sal-c1"]["calc"]
+    # 12400 + 100 - 500 = 12000 (under the PT limit) - PF 1800
+    assert c["base"] == 12400 and c["finalSalary"] == 10200
+
+
+def test_settings_carry_forward_and_entries_are_per_month(payroll):
+    put(payroll, "settings", SETTINGS, month="2026-10")
+    put(payroll, "entry", {"userId": "sal-s1", "advance": 700}, month="2026-10")
+    body = get(payroll, "Salary").json()
+    assert body["settings"]["workingDays"] == 26 and body["settings"]["saved"] is False
+    assert by_id(get(payroll, "Salary"))["sal-s1"]["entry"]["advance"] == 0
+    assert by_id(get(payroll, "Salary", month="2026-10"))["sal-s1"]["entry"]["advance"] == 700
+
+
+def test_payroll_writes_are_super_admin_only_and_clamped(payroll):
+    assert put(payroll, "settings", SETTINGS, who=ADMIN).status_code == 403
+    assert put(payroll, "entry", {"userId": "sal-s1"}, who=ADMIN).status_code == 403
+    assert put(payroll, "entry", {"userId": "nobody"}).status_code == 404
+    assert put(payroll, "settings", SETTINGS, month="2026-1").status_code == 400
+    saved = put(payroll, "settings", {"workingDays": 99, "absentDeduction": -5}).json()
+    assert saved["workingDays"] == 31 and saved["absentDeduction"] == 0
+    assert put(payroll, "entry", {"userId": "sal-s1", "advance": "-10"}).json()["advance"] == 0
