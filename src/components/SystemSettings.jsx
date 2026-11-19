@@ -5,7 +5,7 @@ import {
   Palette, Sun, Moon, Shield, Plus, Check, FileText, Trash2, Sparkles, 
   AlertCircle, ShieldCheck, ShieldOff, RefreshCw, Globe, Sliders, Edit2, 
   Tag, Lock, Unlock, KeyRound, Eye, EyeOff, X, ExternalLink, FileSignature,
-  FileSpreadsheet, CreditCard, Bot, Copy, CheckCheck, HelpCircle, ChevronDown, 
+  CreditCard, Bot, Copy, CheckCheck, HelpCircle, ChevronDown, 
   ChevronRight, ArrowLeft, Power, Zap, Send, Settings as SettingsIcon,
   Building2, CheckCircle2
 } from 'lucide-react';
@@ -36,9 +36,6 @@ export const SystemSettings = () => {
     resetUserIPs,
     addIPToUser,
     services = [],
-    addService,
-    updateService,
-    deleteService,
     voiceAgentSettings = {},
     updateVoiceAgentSettings,
     financialSettings = {},
@@ -84,9 +81,6 @@ export const SystemSettings = () => {
   const [manualIPInput, setManualIPInput] = useState('');
   const [ipForceRefresh, setIPForceRefresh] = useState(0); // trigger re-render after mutations
 
-  // Services Master form state
-  const [newServiceName, setNewServiceName] = useState('');
-  const [newServiceDesc, setNewServiceDesc] = useState('');
 
   // Financial Settings form state
   const [maxGrossInput, setMaxGrossInput] = useState(financialSettings?.maxGrossSales || 200000);
@@ -661,93 +655,10 @@ export const SystemSettings = () => {
         </div>
       </div>
 
-      {/* ── Services Master (Super Admin Managed) ────────────────────────── */}
-      <div className="directory-card" style={{ padding: '20px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-          <div>
-            <h3 style={{ fontSize: '1.05rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileSpreadsheet size={18} color="var(--accent-primary)" /> Services Master (Client Information Page)
-            </h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Super Admin manages the official list of advisory and research services available in the Client Information dropdown.
-            </p>
-          </div>
-          <span className="badge" style={{ backgroundColor: 'var(--accent-soft)', color: 'var(--accent)' }}>
-            {services.length} Active Services
-          </span>
-        </div>
-
-        {canManageSettings && (
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newServiceName.trim()) return;
-              addService({ name: newServiceName, description: newServiceDesc });
-              showToast(`Service '${newServiceName}' added to catalog.`, 'success');
-              setNewServiceName('');
-              setNewServiceDesc('');
-            }}
-            style={{ margin: '14px 0 18px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}
-          >
-            <input
-              type="text"
-              value={newServiceName}
-              onChange={(e) => setNewServiceName(e.target.value)}
-              placeholder="New Service Name (e.g. Commodity Energy Alpha)"
-              style={{ flex: 2, minWidth: '220px', padding: '8px 12px', fontSize: '0.84rem' }}
-              required
-            />
-            <input
-              type="text"
-              value={newServiceDesc}
-              onChange={(e) => setNewServiceDesc(e.target.value)}
-              placeholder="Short Description..."
-              style={{ flex: 3, minWidth: '240px', padding: '8px 12px', fontSize: '0.84rem' }}
-            />
-            <button type="submit" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Plus size={14} /> Add Service
-            </button>
-          </form>
-        )}
-
-        <div className="table-responsive">
-          <table className="crm-table">
-            <thead>
-              <tr>
-                <th>Service Name</th>
-                <th>Description</th>
-                {canManageSettings && <th>Action</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {services.map(srv => (
-                <tr key={srv.id}>
-                  <td style={{ fontWeight: 600 }}>{srv.name}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{srv.description || '—'}</td>
-                  {canManageSettings && (
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-danger"
-                        style={{ padding: '3px 8px', fontSize: '0.72rem' }}
-                        onClick={() => {
-                          if (services.length <= 1) {
-                            showToast('At least one service must remain in the catalog.', 'warning');
-                            return;
-                          }
-                          deleteService(srv.id);
-                          showToast(`Service '${srv.name}' removed.`, 'info');
-                        }}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Services and their Values are managed in the Service Master block (ServiceMasterBlock.jsx) */}
+      <div className="directory-card" style={{ padding: '16px 24px', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+        <strong style={{ color: 'var(--text-primary)' }}>Services ({services.length})</strong> are now managed in the <strong>Service Master</strong> block in the sidebar,
+        with a Value for each. They are the Service Name choices on the Client Information Page.
       </div>
 
       {/* ── Financial Limits & Formula Settings (Password Protected) ───────── */}

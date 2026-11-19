@@ -55,6 +55,7 @@ import { ESignManagementBlock } from './components/ESignManagementBlock';
 import { PaidBlock } from './components/PaidBlock';
 import { KraBlock } from './components/KraBlock';
 import { ClientMasterBlock } from './components/ClientMasterBlock';
+import { ServiceMasterBlock } from './components/ServiceMasterBlock';
 import { SalaryBlock } from './components/SalaryBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
@@ -103,6 +104,7 @@ const AppContent = () => {
       'telegram-control',
       'research-reports',
       'lead-reassignment',
+      'service-master',
       'company-profile',
       'branch-profiles',
       'email-block',
@@ -186,6 +188,7 @@ const AppContent = () => {
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
+    'service-master': 'Service Master - Service Names & Values for the Client Information Page',
     'company-profile': 'Company Profile - Company Name, SEBI Registration & Contact Details',
     'branch-profiles': 'Branch Profiles - Branch Details, Managers & Contact Numbers',
     'email-block': 'Email Block - Sender Email ID & Welcome Kit',
@@ -242,6 +245,8 @@ const AppContent = () => {
         return <LeadReassignmentView />;
       case 'research-reports':
         return <ResearchReportsBlock />;
+      case 'service-master':
+        return <ServiceMasterBlock />;
       case 'company-profile':
         return <CompanyProfileBlock />;
       case 'branch-profiles':

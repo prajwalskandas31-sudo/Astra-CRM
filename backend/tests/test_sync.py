@@ -338,3 +338,20 @@ def test_company_logo_and_nature_of_business(crm, tok):
                 {"id": "natureOfBusiness", "value": "x" * 151},
                 {"id": "state", "value": "x" * 61}):
         assert push(crm, tok["sa"], "companyProfile", [bad])["rejected"]["companyProfile"], bad["value"][:40]
+
+
+def test_service_master_names_are_unique_and_values_numeric(crm, tok):
+    for d in crm.store.all("services"):
+        crm.store.delete("services", d["id"])
+    ok = {"id": "srv-a", "name": "  Stock Cash Premium ", "value": 15000}
+    assert not push(crm, tok["sa"], "services", [ok])["rejected"]["services"]
+    assert crm.store.get("services", "srv-a")["name"] == "Stock Cash Premium"
+    assert not push(crm, tok["sa"], "services", [{"id": "srv-b", "name": "Bullions", "value": ""}])["rejected"]["services"]
+    assert push(crm, tok["admin"], "services", [{"id": "srv-c", "name": "Energy", "value": 1}])["rejected"]["services"]
+    for bad in ({"id": "srv-d", "name": "stock cash premium", "value": 1},   # same name, other case
+                {"id": "srv-e", "name": "", "value": 1},
+                {"id": "srv-f", "name": "Energy", "value": "lots"},
+                {"id": "srv-g", "name": "Energy", "value": -5},
+                {"id": "srv-h", "name": "x" * 61}):
+        assert push(crm, tok["sa"], "services", [bad])["rejected"]["services"], bad
+    assert not push(crm, tok["sa"], "services", [{**ok, "value": 18000}])["rejected"]["services"]   # edit itself

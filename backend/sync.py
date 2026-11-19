@@ -182,6 +182,34 @@ def _branch_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optio
     return None
 
 
+SERVICE_NAME_MAX = 60
+SERVICE_VALUE_MAX = 100_000_000
+
+
+def _service_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    """Service Master: the only Service Names on the Client Information Page, each with a Value (price)."""
+    if new is None:
+        return None
+    name = str(new.get("name") or "").strip()
+    if not name or len(name) > SERVICE_NAME_MAX:
+        return f"Service Name is required (at most {SERVICE_NAME_MAX} characters)."
+    for other in store.all("services"):
+        if other.get("id") != new.get("id") and str(other.get("name") or "").strip().lower() == name.lower():
+            return f'A service named "{name}" already exists.'
+    value = new.get("value")
+    if value not in (None, ""):
+        if isinstance(value, bool):
+            return "Value must be a number."
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return "Value must be a number."
+        if not (0 <= number <= SERVICE_VALUE_MAX):
+            return "Value must be between 0 and 10,00,00,000."
+    new["name"] = name
+    return None
+
+
 MAX_COMPANY_ASSETS = 10
 
 
@@ -325,7 +353,7 @@ POLICIES: Dict[str, Policy] = {
     # Team Performance Tracking block
     "callStats": Policy(read=SCOPED, write=SCOPED, owner=lambda c: c.get("userId"), check=_call_stats_check),
     "attendance": Policy(read=SCOPED, write=SCOPED, owner=lambda a: a.get("userId"), check=_attendance_check),
-    "services": Policy(read=EVERYONE, write=SUPER_ADMIN),
+    "services": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_service_check),
     "userCustomFields": Policy(read=EVERYONE, write=SUPER_ADMIN),
     # Key/value collections: one record {"id": key, "value": ...} per top-level key
     "userPermissions": Policy(read=EVERYONE, write=SUPER_ADMIN, visible=_own_entry),
