@@ -280,7 +280,9 @@ def _claim(record_id: str) -> Optional[dict]:
         record["status"] = "sending"
         record["sendingSince"] = _now().isoformat()
         # Kept across retries, so a failed email never uses up a second number
-        record["invoiceNumber"] = record.get("invoiceNumber") or invoice.next_number()
+        # The submitter's branch series for this month, shared with the Invoice Block (e.g. BLR1126254)
+        record["invoiceNumber"] = record.get("invoiceNumber") or invoice.next_number(
+            invoice.branch_code_for(record.get("submittedById"))[0], source=f"old-client:{record.get('saleId') or ''}")
         store.put(REVIEWS, record_id, record)
         return record
 

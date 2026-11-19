@@ -22,9 +22,10 @@ BUSINESS_COLLECTIONS = (
     "leads", "sales", "assignmentInstances", "leadRequests", "notifications",
     "masterRecords", "eSignRecords", "paidClients", "broadcasts", "login_failures",
     "callStats", "attendance", "kraRecords", "kraFiles", "salarySettings", "salaryEntries",
+    "clientInvoices", "clientInvoiceFiles", "invoiceNumbers",
 )
 # Single values (collection "kv") that hold business data, and their empty value
-BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": []}
+BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": [], "invoiceCounters": {}}
 EPOCH = "dataEpoch"
 
 

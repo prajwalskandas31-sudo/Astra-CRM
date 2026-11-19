@@ -24,6 +24,7 @@ try:
     from backend import broadcast_group
     from backend import kra
     from backend import client_master
+    from backend import invoice_block
     from backend import salary
     from backend.db_init import init_database
 except ImportError:
@@ -44,6 +45,7 @@ except ImportError:
     import broadcast_group
     import kra
     import client_master
+    import invoice_block
     import salary
     from db_init import init_database
 
@@ -76,6 +78,7 @@ app.include_router(service_expiry.router)
 app.include_router(broadcast_group.router)
 app.include_router(kra.router)
 app.include_router(client_master.router)
+app.include_router(invoice_block.router)
 app.include_router(salary.router)
 
 
