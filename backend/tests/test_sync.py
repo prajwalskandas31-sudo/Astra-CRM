@@ -149,6 +149,16 @@ def test_branches_are_read_by_all_and_changed_only_by_super_admin(crm, tok):
     assert "br-1" in ids(pull(crm, tok["exec"], "branches"), "branches")
 
 
+def test_branch_id_is_unique_and_well_formed(crm, tok):
+    a = {"id": "br-a", "name": "Surat", "branchCode": "br-001"}
+    assert not push(crm, tok["sa"], "branches", [a])["rejected"]["branches"]
+    assert crm.store.get("branches", "br-a")["branchCode"] == "BR-001"
+    assert not push(crm, tok["sa"], "branches", [{**a, "address": "Althan"}])["rejected"]["branches"]   # same branch again
+    assert push(crm, tok["sa"], "branches", [{"id": "br-b", "name": "Pune", "branchCode": "BR-001"}])["rejected"]["branches"]
+    assert push(crm, tok["sa"], "branches", [{"id": "br-c", "name": "Goa", "branchCode": "BR 1!"}])["rejected"]["branches"]
+    assert not push(crm, tok["sa"], "branches", [{"id": "br-d", "name": "Delhi", "branchCode": "BR-002"}])["rejected"]["branches"]
+
+
 def test_override_passwords_only_reach_admins(crm, tok):
     push(crm, tok["sa"], "financialSettings", [{"id": "adminOverridePassword", "value": "s3cret-override"},
                                                {"id": "maxGrossSales", "value": 200000}])
