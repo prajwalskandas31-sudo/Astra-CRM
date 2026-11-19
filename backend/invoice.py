@@ -98,7 +98,7 @@ def in_words(value: float) -> str:
 # PDF
 # ==========================================
 def _company() -> dict:
-    keys = ("companyName", "registeredAddress", "contact", "email", "website", "sebiRegistrationNumber", "gstin")
+    keys = ("companyName", "registeredAddress", "state", "contact", "email", "website", "sebiRegistrationNumber", "gstin")
     return {k: str((store.get("companyProfile", k) or {}).get("value") or "").strip() for k in keys}
 
 
@@ -127,6 +127,8 @@ def build_pdf(details: dict, number: str, issued: datetime) -> bytes:
     seller = [_para(company["companyName"] or "Company", title)]
     if company["registeredAddress"]:
         seller.append(_para(company["registeredAddress"], base))
+    if company["state"]:
+        seller.append(_para(f"State: {company['state']}", base))
     contact = "  |  ".join(x for x in (company["contact"], company["email"], company["website"]) if x)
     if contact:
         seller.append(_para(contact, base))

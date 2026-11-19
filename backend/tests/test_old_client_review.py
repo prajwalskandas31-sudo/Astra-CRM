@@ -196,3 +196,16 @@ def test_approval_leaves_the_crm_alone_when_the_sale_is_not_the_submitters(oc):
     assert len(mails) == 1  # the reviewer approved what they saw
     assert crm.store.get("sales", "SL-OC")["status"] == "E-Signed & Converted"
     assert crm.store.get("leads", "L-OC")["disposition"] == "Under Review (Old Client)"
+
+
+def test_invoice_prints_the_company_state(crm, monkeypatch):
+    from datetime import datetime
+    inv, lines = crm.invoice, []
+    real_para = inv._para
+    monkeypatch.setattr(inv, "_para", lambda text, style: lines.append(text) or real_para(text, style))
+    crm.store.put("companyProfile", "companyName", {"id": "companyName", "value": "Unite Tech"})
+    crm.store.put("companyProfile", "state", {"id": "state", "value": "Gujarat"})
+    pdf = inv.build_pdf({"clientName": "A", "clientState": "Maharashtra", "grossSales": "1180", "netSales": "1000",
+                         "gst": "180", "serviceName": "Stock Cash"}, "INV-1", datetime(2026, 11, 19))
+    assert pdf.startswith(b"%PDF")
+    assert "State: Gujarat" in lines and "Place of Supply: Maharashtra" in lines
