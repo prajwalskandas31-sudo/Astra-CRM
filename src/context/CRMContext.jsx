@@ -715,6 +715,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
+    id: 'research-recommendations',
+    name: 'Records for Research Recommendations',
+    category: 'Administration & Governance',
+    description: 'The register of research recommendations made during the year (Sr. No, Date, Nature, Products/ Securities, Strike/Trigger Price, Period, Call/Put/Hold, Buy Rate, Sell Rate, Rationale maintained). Add, edit, delete and export to Excel. Checked by the server too (backend/sync.py).',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
     id: 'service-master',
     name: 'Service Master',
     category: 'Administration & Governance',
@@ -1230,6 +1237,19 @@ export const CRMProvider = ({ children }) => {
     cacheSet('crm_branches', JSON.stringify(branches));
   }, [branches]);
 
+  // ─── Records for Research Recommendations (Admins and the Super Admin) ───────
+  const [researchRecommendations, setResearchRecommendations] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('crm_research_recommendations') || 'null');
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  });
+
+  useEffect(() => {
+    cacheSet('crm_research_recommendations', JSON.stringify(researchRecommendations));
+  }, [researchRecommendations]);
+
   // ─── Company Assets Provided (Super Admin managed list, max 10; users keep asset ids) ─
   const [companyAssets, setCompanyAssets] = useState(() => {
     try {
@@ -1377,6 +1397,8 @@ export const CRMProvider = ({ children }) => {
     callStats: { value: callStats, setValue: setCallStats, kind: 'list', canWrite: true, importLocal: false },
     attendance: { value: attendance, setValue: setAttendance, kind: 'list', canWrite: true, importLocal: false },
     companyAssets: { value: companyAssets, setValue: setCompanyAssets, kind: 'list', canWrite: isSyncSuperAdmin, importLocal: hadLocal('crm_company_assets') },
+    researchRecommendations: { value: researchRecommendations, setValue: setResearchRecommendations, kind: 'list', canWrite: isSyncAdmin,
+      importLocal: hadLocal('crm_research_recommendations') },
   }, {
     enabled: serverSyncActive && !!authUser,
     token: authToken,
@@ -2793,6 +2815,45 @@ export const CRMProvider = ({ children }) => {
     setCompanyAssets(prev => prev.filter(a => a.id !== id));
   };
 
+  // ─── Records for Research Recommendations CRUD ──────────────────────────
+  // The columns of the "Records for Research Recommendations" sheet; checked in backend/sync.py
+  const cleanResearchRecommendation = (data) => {
+    const num = (v) => (String(v ?? '').trim() === '' ? '' : Number(v));
+    return {
+      srNo: num(data.srNo),
+      date: (data.date || '').trim(),
+      nature: (data.nature || '').trim(),
+      product: (data.product || '').trim(),
+      strikePrice: String(data.strikePrice ?? '').trim(),
+      period: (data.period || '').trim(),
+      callPutHold: data.callPutHold || '',
+      buyRate: num(data.buyRate),
+      sellRate: num(data.sellRate),
+      rationaleMaintained: data.rationaleMaintained || ''
+    };
+  };
+
+  const addResearchRecommendation = (data) => {
+    const record = {
+      id: 'rr-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900),
+      ...cleanResearchRecommendation(data),
+      createdBy: currentUser?.name || '',
+      createdAt: new Date().toISOString()
+    };
+    setResearchRecommendations(prev => [...prev, record]);
+    return record;
+  };
+
+  const updateResearchRecommendation = (id, data) => {
+    setResearchRecommendations(prev => prev.map(r => r.id === id
+      ? { ...r, ...cleanResearchRecommendation({ ...r, ...data }), updatedBy: currentUser?.name || '', updatedAt: new Date().toISOString() }
+      : r));
+  };
+
+  const deleteResearchRecommendation = (id) => {
+    setResearchRecommendations(prev => prev.filter(r => r.id !== id));
+  };
+
   const updateFinancialSettings = (updated) => {
     setFinancialSettings(prev => ({ ...prev, ...updated }));
   };
@@ -3677,6 +3738,11 @@ export const CRMProvider = ({ children }) => {
       addBranch,
       updateBranch,
       deleteBranch,
+      // ─── Records for Research Recommendations ───────────────
+      researchRecommendations,
+      addResearchRecommendation,
+      updateResearchRecommendation,
+      deleteResearchRecommendation,
       // ─── Company Assets Provided ────────────────────────────
       companyAssets,
       addCompanyAsset,

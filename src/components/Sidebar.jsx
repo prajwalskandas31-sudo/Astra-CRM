@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet, Tags, Receipt, BookOpen, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet, Tags, Receipt, BookOpen, ClipboardList, NotebookPen } from 'lucide-react';
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
   const { simulatedRole, sales, leadRequests, eSignRecords = [], paidClients = [], hasPermission } = useCRM();
@@ -111,6 +111,11 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       id: 'research-reports',
       label: 'Research Reports',
       icon: FileText
+    },
+    {
+      id: 'research-recommendations',
+      label: 'Records for Research Recommendations',
+      icon: NotebookPen
     },
     {
       id: 'service-master',
