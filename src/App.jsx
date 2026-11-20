@@ -58,6 +58,7 @@ import { ClientMasterBlock } from './components/ClientMasterBlock';
 import { InvoiceBlock } from './components/InvoiceBlock';
 import { RunningAccountBlock } from './components/RunningAccountBlock';
 import { AuditReportBlock } from './components/AuditReportBlock';
+import { RaPeriodicReportBlock } from './components/RaPeriodicReportBlock';
 import { ServiceMasterBlock } from './components/ServiceMasterBlock';
 import { SalaryBlock } from './components/SalaryBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
@@ -107,6 +108,7 @@ const AppContent = () => {
       'invoice-block',
       'running-account',
       'audit-reports',
+      'ra-periodic-report',
       'telegram-control',
       'research-reports',
       'lead-reassignment',
@@ -194,6 +196,7 @@ const AppContent = () => {
     'invoice-block': 'Invoice Block - Tax Invoices for E-Signed Clients',
     'running-account': 'Running Account Statement - Monthly Credits, Debits & Net Balance',
     'audit-reports': 'Audit Report Blocks - Client and Fee Details (Half-Yearly)',
+    'ra-periodic-report': 'RA Periodic Report Block - SEBI Half-Yearly Report (11 Sub-Blocks, Excel)',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
@@ -254,6 +257,8 @@ const AppContent = () => {
         return <RunningAccountBlock />;
       case 'audit-reports':
         return <AuditReportBlock />;
+      case 'ra-periodic-report':
+        return <RaPeriodicReportBlock />;
       case 'telegram-control':
         return <TelegramControlBlock />;
       case 'lead-reassignment':
