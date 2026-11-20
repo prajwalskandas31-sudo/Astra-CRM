@@ -671,6 +671,20 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin']
   },
   {
+    id: 'running-account',
+    name: 'Running Account Statement',
+    category: 'Sales & Approvals',
+    description: 'Monthly Credits (client payments, absent / half-day deductions), Debits (advances, expenses, salary paid) and manual entries with a running Net Balance from ₹0; Excel and PDF export. Checked by the server too (backend/running_account.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'audit-reports',
+    name: 'Audit Report Blocks',
+    category: 'Sales & Approvals',
+    description: 'Half-yearly Client and Fee Details report (clients at start, acquired, expired, at end, maximum active, RAASB deposit, fees collected), editable and downloadable in Excel / PDF. Checked by the server too (backend/audit_report.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',
