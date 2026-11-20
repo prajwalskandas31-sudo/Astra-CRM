@@ -37,7 +37,9 @@ import {
   X,
   Copy,
   Activity,
-  Receipt
+  Receipt,
+  BookOpen,
+  ClipboardList
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -60,6 +62,8 @@ const FEATURE_ICONS = {
   'esign-block': FileSignature,
   'kra-block': ShieldCheck,
   'invoice-block': Receipt,
+  'running-account': BookOpen,
+  'audit-reports': ClipboardList,
   'register-sale': CheckCircle2,
   'lead-summary': PieChart,
   'system-settings': Settings,

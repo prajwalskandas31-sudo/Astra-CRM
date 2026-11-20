@@ -56,6 +56,8 @@ import { PaidBlock } from './components/PaidBlock';
 import { KraBlock } from './components/KraBlock';
 import { ClientMasterBlock } from './components/ClientMasterBlock';
 import { InvoiceBlock } from './components/InvoiceBlock';
+import { RunningAccountBlock } from './components/RunningAccountBlock';
+import { AuditReportBlock } from './components/AuditReportBlock';
 import { ServiceMasterBlock } from './components/ServiceMasterBlock';
 import { SalaryBlock } from './components/SalaryBlock';
 import { TelegramControlBlock } from './components/TelegramControlBlock';
@@ -103,6 +105,8 @@ const AppContent = () => {
       'kra-block',
       'client-master',
       'invoice-block',
+      'running-account',
+      'audit-reports',
       'telegram-control',
       'research-reports',
       'lead-reassignment',
@@ -188,6 +192,8 @@ const AppContent = () => {
     'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
     'client-master': 'Client MASTER - Client Details, Leegality Signing, Invoices & Grievances',
     'invoice-block': 'Invoice Block - Tax Invoices for E-Signed Clients',
+    'running-account': 'Running Account Statement - Monthly Credits, Debits & Net Balance',
+    'audit-reports': 'Audit Report Blocks - Client and Fee Details (Half-Yearly)',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
     'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
@@ -244,6 +250,10 @@ const AppContent = () => {
         return <ClientMasterBlock />;
       case 'invoice-block':
         return <InvoiceBlock />;
+      case 'running-account':
+        return <RunningAccountBlock />;
+      case 'audit-reports':
+        return <AuditReportBlock />;
       case 'telegram-control':
         return <TelegramControlBlock />;
       case 'lead-reassignment':

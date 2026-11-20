@@ -26,6 +26,8 @@ try:
     from backend import client_master
     from backend import invoice_block
     from backend import salary
+    from backend import running_account
+    from backend import audit_report
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -47,6 +49,8 @@ except ImportError:
     import client_master
     import invoice_block
     import salary
+    import running_account
+    import audit_report
     from db_init import init_database
 
 
@@ -80,6 +84,8 @@ app.include_router(kra.router)
 app.include_router(client_master.router)
 app.include_router(invoice_block.router)
 app.include_router(salary.router)
+app.include_router(running_account.router)
+app.include_router(audit_report.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
