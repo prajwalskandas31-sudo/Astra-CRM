@@ -355,3 +355,21 @@ def test_service_master_names_are_unique_and_values_numeric(crm, tok):
                 {"id": "srv-h", "name": "x" * 61}):
         assert push(crm, tok["sa"], "services", [bad])["rejected"]["services"], bad
     assert not push(crm, tok["sa"], "services", [{**ok, "value": 18000}])["rejected"]["services"]   # edit itself
+
+
+def test_research_recommendations_are_admin_only_and_checked(crm, tok):
+    good = {"id": "rr-1", "srNo": "1", "date": "2026-11-20", "nature": " Intraday ", "product": "RELIANCE",
+            "strikePrice": "2450", "period": "Intraday", "callPutHold": "Call", "buyRate": 2450.5, "sellRate": "",
+            "rationaleMaintained": "Yes"}
+    assert not push(crm, tok["sa"], "researchRecommendations", [good])["rejected"]["researchRecommendations"]
+    saved = crm.store.get("researchRecommendations", "rr-1")
+    assert saved["srNo"] == 1 and saved["nature"] == "Intraday"
+    assert not push(crm, tok["admin"], "researchRecommendations", [{**good, "id": "rr-2", "srNo": 2}])["rejected"]["researchRecommendations"]
+    assert push(crm, tok["tl"], "researchRecommendations", [{**good, "id": "rr-3"}])["rejected"]["researchRecommendations"]
+    assert ids(pull(crm, tok["admin"], "researchRecommendations"), "researchRecommendations") >= {"rr-1", "rr-2"}
+    assert not ids(pull(crm, tok["exec"], "researchRecommendations"), "researchRecommendations")
+    for bad in ({"date": ""}, {"date": "20-11-2026"}, {"product": "  "}, {"srNo": 0}, {"srNo": "x"},
+                {"callPutHold": "Buy"}, {"rationaleMaintained": "Maybe"}, {"buyRate": "lots"}, {"sellRate": -1},
+                {"buyRate": True}, {"nature": "x" * 201}, {"strikePrice": "x" * 61}):
+        assert push(crm, tok["sa"], "researchRecommendations", [{**good, "id": "rr-bad", **bad}])["rejected"]["researchRecommendations"], bad
+    assert not push(crm, tok["sa"], "researchRecommendations", [{**good, "sellRate": 2470}])["rejected"]["researchRecommendations"]

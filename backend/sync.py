@@ -217,6 +217,54 @@ def _service_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Opti
     return None
 
 
+# Records for Research Recommendations: one row per recommendation, the columns of the regulator's sheet
+RR_TEXT_FIELDS = {"nature": 200, "product": 200, "strikePrice": 60, "period": 100}
+RR_CALL_PUT_HOLD = {"Call", "Put", "Hold"}
+RR_YES_NO = {"Yes", "No"}
+RR_RATE_MAX = 100_000_000
+
+
+def _research_recommendation_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
+    """Records for Research Recommendations: checks every column before it is stored."""
+    if new is None:
+        return None
+    sr_no = new.get("srNo")
+    if sr_no in (None, ""):
+        new["srNo"] = ""
+    else:
+        text = str(sr_no).strip()
+        if isinstance(sr_no, bool) or not text.isdigit() or not (1 <= int(text) <= 999_999):
+            return "Sr. No must be a whole number from 1."
+        new["srNo"] = int(text)
+    if not _is_date_key(new.get("date")):
+        return "Date is required (YYYY-MM-DD)."
+    for field, limit in RR_TEXT_FIELDS.items():
+        value = str(new.get(field) or "").strip()
+        if len(value) > limit:
+            return f"{field} can be at most {limit} characters."
+        new[field] = value
+    if not new["product"]:
+        return "Products/ Securities is required."
+    if str(new.get("callPutHold") or "") not in RR_CALL_PUT_HOLD | {""}:
+        return "Call/Put/ Hold must be Call, Put or Hold."
+    if str(new.get("rationaleMaintained") or "") not in RR_YES_NO | {""}:
+        return "Rationale maintained must be Yes or No."
+    for field, label in (("buyRate", "Buy Rate"), ("sellRate", "Sell Rate")):
+        value = new.get(field)
+        if value in (None, ""):
+            new[field] = ""
+            continue
+        if isinstance(value, bool):
+            return f"{label} must be a number."
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return f"{label} must be a number."
+        if not (0 <= number <= RR_RATE_MAX):
+            return f"{label} must be between 0 and 10,00,00,000."
+    return None
+
+
 MAX_COMPANY_ASSETS = 10
 
 
@@ -372,6 +420,8 @@ POLICIES: Dict[str, Policy] = {
     "branches": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_branch_check),
     # "Company Assets Provided" items offered in Add User (max 10)
     "companyAssets": Policy(read=EVERYONE, write=SUPER_ADMIN, check=_company_asset_check),
+    # Records for Research Recommendations block (Admins and the Super Admin keep it)
+    "researchRecommendations": Policy(read=ADMIN, write=ADMIN, check=_research_recommendation_check),
 }
 
 for _collection, _rules in POLICIES.items():
