@@ -321,10 +321,19 @@ def _para(text: str, style) -> Paragraph:
     return Paragraph(escape(str(text or "")).replace("\n", "<br/>"), style)
 
 
+def is_non_individual(d: dict) -> bool:
+    """Client Category 'Non-Individual' (Corporate / Firm), tolerant of case, spacing and the dropdown label."""
+    cat = re.sub(r"[\s_-]+", "", str((d or {}).get("clientCategory") or "")).lower()
+    return cat.startswith("nonindividual")
+
+
 def bill_to(d: dict) -> tuple:
-    """(name, GSTIN or ''): the firm and its GSTIN for a Non-Individual client, else the client's name."""
-    if d.get("clientCategory") == "Non-Individual":
-        return (d.get("firmName") or d.get("clientName") or "").strip(), str(d.get("gstin") or "").strip().upper()
+    """(name, GSTIN or ''): a Non-Individual client is invoiced in the Firm / Company Name from the Client
+    Information Page, with its GSTIN; anyone else in the client's own name."""
+    d = d or {}
+    if is_non_individual(d):
+        name = str(d.get("firmName") or "").strip() or str(d.get("clientName") or "").strip()
+        return name, str(d.get("gstin") or "").strip().upper()
     return str(d.get("clientName") or "").strip(), ""
 
 

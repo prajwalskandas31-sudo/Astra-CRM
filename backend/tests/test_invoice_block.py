@@ -63,6 +63,33 @@ def test_lists_only_esigned_clients_with_the_recommended_invoice(ib):
     assert firm["branch"]["code"] == "HO"  # usr-1 has no branch
 
 
+@pytest.mark.parametrize("category", ["Non-Individual", "non-individual", " Non Individual ",
+                                      "Non-Individual (Corporate / Firm)", "NON_INDIVIDUAL"])
+def test_non_individual_is_billed_to_the_firm_name(category):
+    from backend import invoice
+    d = {**FIRM, "clientCategory": category}
+    assert invoice.bill_to(d) == ("MMR ART CREATIONS", "36CNGPM7476M3Z4")
+
+
+def test_bill_to_falls_back_and_ignores_firm_for_individuals():
+    from backend import invoice
+    assert invoice.bill_to({**FIRM, "firmName": "  "}) == ("M Rao", "36CNGPM7476M3Z4")
+    assert invoice.bill_to({**FIRM, "clientCategory": "Individual"}) == ("M Rao", "")
+    assert invoice.bill_to({}) == ("", "")
+
+
+def test_firm_invoice_pdf_bills_the_firm(ib):
+    from io import BytesIO
+    from backend import invoice
+    pdf = invoice.build_pdf(FIRM, "BLR1126999", datetime(2026, 11, 20, tzinfo=timezone.utc), 1, 90000)
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        pytest.skip("pypdf not installed")
+    text = "".join(p.extract_text() for p in PdfReader(BytesIO(pdf)).pages)
+    assert "MMR ART CREATIONS" in text and "GSTIN 36CNGPM7476M3Z4" in text and "M Rao" not in text
+
+
 def test_paying_the_full_value_recommends_invoice_1(ib):
     ib.store.put("services", "srv-1", {"id": "srv-1", "name": "Equity & Derivative Research & Advisory Services", "value": 25000})
     row = next(r for r in get(ib).json()["rows"] if r["saleId"] == "SL-1")
