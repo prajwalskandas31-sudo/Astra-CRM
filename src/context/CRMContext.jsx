@@ -699,6 +699,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin']
   },
   {
+    id: 'ra-compliance',
+    name: 'RA Monthly Compliance Tracker',
+    category: 'Administration & Governance',
+    description: 'SEBI Research Analyst monthly compliance checklist: Dashboard plus 17 input sheets (social media, recommendations, research reports, client register, MITC, KYC, SCORES, ODR, website, UPI, communications, advertisements, policies, complaint data, invoices, client documents), kept per month with Excel download. Checked by the server too (backend/ra_compliance.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',

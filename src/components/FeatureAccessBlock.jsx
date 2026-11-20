@@ -41,7 +41,8 @@ import {
   BookOpen,
   ClipboardList,
   ScrollText,
-  Cloud
+  Cloud,
+  ShieldAlert
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -68,6 +69,7 @@ const FEATURE_ICONS = {
   'audit-reports': ClipboardList,
   'ra-periodic-report': ScrollText,
   'annexure-a-saas': Cloud,
+  'ra-compliance': ShieldAlert,
   'register-sale': CheckCircle2,
   'lead-summary': PieChart,
   'system-settings': Settings,
