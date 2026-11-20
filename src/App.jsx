@@ -59,6 +59,7 @@ import { InvoiceBlock } from './components/InvoiceBlock';
 import { RunningAccountBlock } from './components/RunningAccountBlock';
 import { AuditReportBlock } from './components/AuditReportBlock';
 import { RaPeriodicReportBlock } from './components/RaPeriodicReportBlock';
+import { AnnexureASaasBlock } from './components/AnnexureASaasBlock';
 import { RaComplianceBlock } from './components/RaComplianceBlock';
 import { ServiceMasterBlock } from './components/ServiceMasterBlock';
 import { SalaryBlock } from './components/SalaryBlock';
@@ -110,6 +111,7 @@ const AppContent = () => {
       'running-account',
       'audit-reports',
       'ra-periodic-report',
+      'annexure-a-saas',
       'ra-compliance',
       'telegram-control',
       'research-reports',
@@ -199,6 +201,7 @@ const AppContent = () => {
     'running-account': 'Running Account Statement - Monthly Credits, Debits & Net Balance',
     'audit-reports': 'Audit Report Blocks - Client and Fee Details (Half-Yearly)',
     'ra-periodic-report': 'RA Periodic Report Block - SEBI Half-Yearly Report (11 Sub-Blocks, Excel)',
+    'annexure-a-saas': 'Annexure A for SaaS Reporting - SaaS / Hosted Services (Manual Input)',
     'ra-compliance': 'RA Monthly Compliance Tracker - SEBI Research Analyst Monthly Checklist',
     'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
     'lead-reassignment': 'Lead Reassignment & Audit Protocol',
@@ -262,6 +265,8 @@ const AppContent = () => {
         return <AuditReportBlock />;
       case 'ra-periodic-report':
         return <RaPeriodicReportBlock />;
+      case 'annexure-a-saas':
+        return <AnnexureASaasBlock />;
       case 'ra-compliance':
         return <RaComplianceBlock />;
       case 'telegram-control':
