@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useCRM, NEW_CLIENT, OLD_CLIENT, OPEN_SALE_STATUSES } from '../context/CRMContext';
-import { buildSubscriptionHistory, activeSubscriptions, formatDay } from '../services/subscriptionHistory';
+import { buildSubscriptionHistory, activeSubscriptions, formatDay, totalPaidAmount } from '../services/subscriptionHistory';
 import { computeServiceEndDate } from '../services/serviceTenure';
 import { SubscriptionHistoryPanel } from './SubscriptionHistoryPanel';
 import { useToast } from './ToastNotification';
@@ -257,6 +257,8 @@ export const ClientInformationModal = ({
     openSaleStatuses: OPEN_SALE_STATUSES
   }), [isOpen, lead, formData.panNumber, formData.phone2, paidClients, sales]);
   const activeSubs = useMemo(() => activeSubscriptions(subscriptionHistory), [subscriptionHistory]);
+  // Old Client: Max Limit minus what the client has already paid and this payment's Gross Sales
+  const alreadyPaid = useMemo(() => totalPaidAmount(subscriptionHistory), [subscriptionHistory]);
   // A new payment joins the active subscription and keeps its exact expiry date (the latest one by default)
   const [joinedExpiry, setJoinedExpiry] = useState('');
   const joinedSub = activeSubs.find(s => s.endDate === joinedExpiry) || activeSubs[0] || null;
@@ -1235,6 +1237,37 @@ export const ClientInformationModal = ({
                     Auto from Mode of Payment (2% off Credit Card / Payment Gateway) · Max limit: ₹{financialSettings?.maxGrossSales?.toLocaleString('en-IN') || '2,00,000'} {isLimitOverridden && '(Override Active)'}
                   </span>
                 </div>
+
+                {/* Old Client: Permissible Amount Left = Max Limit − already paid − this Gross Sales */}
+                {formData.clientType === OLD_CLIENT && (() => {
+                  const maxLimit = financialSettings?.maxGrossSales || 200000;
+                  const gross = parseFloat(formData.grossSales) || 0;
+                  const left = Math.round((maxLimit - alreadyPaid - gross) * 100) / 100;
+                  const over = left < 0;
+                  const inr = (n) => n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                  return (
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, marginBottom: '5px', display: 'block' }}>
+                        Permissible Amount Left for Client
+                      </label>
+                      <div style={{
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: over ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                        border: `1px solid ${over ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.25)'}`,
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: over ? '#ef4444' : '#10b981'
+                      }}>
+                        {over ? '− ' : ''}₹ {inr(Math.abs(left))}
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: over ? '#ef4444' : 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                        Max ₹{inr(maxLimit)} − already paid ₹{inr(alreadyPaid)} − Gross ₹{inr(gross)}
+                        {over ? ' · over the limit' : ''}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Net Sales (B) - Automatically Calculated A ÷ C */}
                 <div className="form-group" style={{ margin: 0 }}>
