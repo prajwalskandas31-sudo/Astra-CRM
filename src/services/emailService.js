@@ -75,3 +75,15 @@ export const sendServiceExpiryTest = (to) =>
 
 export const resendServiceExpiryEmail = (paidId) =>
   json(`/email/service-expiry/send/${encodeURIComponent(paidId)}`, { method: 'POST' });
+
+// ─── Failed Email Deliveries report (backend/email_failures.py) ───
+export const getEmailFailures = () => json('/email/failures');
+
+/** Reads the sender mailbox for bounce messages, then returns the refreshed report. */
+export const scanEmailBounces = () => json('/email/failures/scan', { method: 'POST' });
+
+export const markEmailFailureReviewed = (id, note) =>
+  json(`/email/failures/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify({ note: note || '' }) });
+
+export const unmarkEmailFailureReviewed = (id) =>
+  json(`/email/failures/${encodeURIComponent(id)}/review`, { method: 'DELETE' });

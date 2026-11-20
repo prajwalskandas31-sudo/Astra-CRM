@@ -26,7 +26,7 @@ BUSINESS_COLLECTIONS = (
     "ledgerManualEntries", "ledgerAdjustments", "auditClientFee", "raPeriodicReport", "annexureASaas", "raCompliance",
 )
 # Single values (collection "kv") that hold business data, and their empty value
-BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": [], "invoiceCounters": {}}
+BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": [], "emailFailureLog": [], "emailBounces": {}, "emailFailureReviews": {}, "invoiceCounters": {}}
 EPOCH = "dataEpoch"
 
 

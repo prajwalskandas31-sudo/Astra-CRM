@@ -11,6 +11,7 @@ import {
   previewWelcomeKit, sendWelcomeKit, getWelcomeKitLog, describeSend
 } from '../services/emailService';
 import { ServiceExpiryEmail } from './ServiceExpiryEmail';
+import { EmailFailuresReport } from './EmailFailuresReport';
 
 const SECURITY = [
   { value: 'ssl', label: 'SSL/TLS (port 465)', port: 465 },
@@ -356,6 +357,9 @@ export const EmailBlock = () => {
 
       {/* ─── Service Expiry Email ─── */}
       <ServiceExpiryEmail canEdit={canEdit} />
+
+      {/* ─── Failed Email Deliveries ─── */}
+      <EmailFailuresReport />
 
       {/* ─── Recent sends ─── */}
       {log.length > 0 && (

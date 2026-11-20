@@ -21,6 +21,7 @@ try:
     from backend import client_info_telegram
     from backend import old_client_review
     from backend import service_expiry
+    from backend import email_failures
     from backend import broadcast_group
     from backend import kra
     from backend import client_master
@@ -47,6 +48,7 @@ except ImportError:
     import client_info_telegram
     import old_client_review
     import service_expiry
+    import email_failures
     import broadcast_group
     import kra
     import client_master
@@ -85,6 +87,7 @@ app.include_router(sale_review.router)
 app.include_router(client_info_telegram.router)
 app.include_router(old_client_review.router)
 app.include_router(service_expiry.router)
+app.include_router(email_failures.router)
 app.include_router(broadcast_group.router)
 app.include_router(kra.router)
 app.include_router(client_master.router)

@@ -40,12 +40,14 @@ SETTINGS = "emailSettings"
 SLOTS = "welcomeKitSlots"          # {slot number: file metadata}
 FILE_PREFIX = "welcomeKitFile:"    # one value per slot holding the file itself
 LOG = "welcomeKitLog"
+FAILURES = "emailFailureLog"       # client emails that were attempted but not sent (Email Block failure report)
 SLOT_COUNT = 19
 MAX_FILE_BYTES = 10 * 1024 * 1024
 # Mail servers cap a whole message at about 25 MB *after* base64 (+33%), and the signed agreement
 # still has to fit, so the uploaded files together stay under 15 MB.
 MAX_TOTAL_BYTES = 15 * 1024 * 1024
 LOG_LIMIT = 500
+FAILURE_LIMIT = 500
 
 EMAIL_RE = re.compile(r"^[^@\s<>\"',;]+@[^@\s<>\"',;]+\.[^@\s<>\"',;]+$")
 SECURITY_MODES = {"ssl", "starttls", "none"}
@@ -434,6 +436,26 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
     if sale.get("clientType") == "Old Client":
         raise HTTPException(status_code=400, detail="Old Clients get no Welcome Kit: only the invoice, emailed when the Telegram group approves.")
     client = _client(sale)
+    try:
+        return _deliver_welcome_kit(req.saleId, sale, client, settings, current_user)
+    except HTTPException as err:
+        # "Nothing to send" is about the kit, not the client; everything else is a failed delivery to them
+        if err.status_code != 400 or not client["emailValid"]:
+            record_failure("Welcome Kit", client["name"], client["email"], err.detail,
+                           by=current_user.get("name"), saleId=req.saleId)
+        raise
+
+
+def record_failure(source: str, client_name: str, to: str, error, by: Optional[str] = None, **ref) -> dict:
+    """Remember an email to a client that was attempted but not sent, for the Email Block's failure report."""
+    entry = {"id": uuid.uuid4().hex, "source": source, "clientName": client_name or "", "to": to or "",
+             "error": str(error), "at": _now(), "attemptedBy": by or "", **ref}
+    with store.update_value(FAILURES, []) as box:
+        box[0] = (box[0] or [])[-(FAILURE_LIMIT - 1):] + [entry]
+    return entry
+
+
+def _deliver_welcome_kit(sale_id: str, sale: dict, client: dict, settings: dict, current_user: dict) -> dict:
     if not client["email"]:
         raise HTTPException(status_code=400, detail="This client has no Email ID on the Client Information Page.")
     if not client["emailValid"]:
@@ -484,7 +506,7 @@ def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_role
 
     entry = {
         "id": uuid.uuid4().hex,
-        "saleId": req.saleId,
+        "saleId": sale_id,
         "clientName": client["name"],
         "to": client["email"],
         "from": settings["senderEmail"],

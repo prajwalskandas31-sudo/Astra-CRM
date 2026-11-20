@@ -361,6 +361,10 @@ def approve(token: str, reviewer: str = Form("")):
     except Exception as err:  # noqa: BLE001 - any failure must release the claim so it can be retried
         detail = err.detail if isinstance(err, HTTPException) else f"{type(err).__name__}: {err}"
         log.warning("Old client invoice for sale %s not sent: %s", claimed.get("saleId"), detail)
+        d = claimed.get("details") or {}
+        email_kit.record_failure("Old Client Invoice", cit.client_name(d), d.get("email") or "", detail, by=name,
+                                 saleId=claimed.get("saleId") or "", reviewId=claimed["id"],
+                                 invoiceNumber=claimed.get("invoiceNumber") or "")
         with store.transaction():
             current = store.get(REVIEWS, claimed["id"])
             current.update(status="pending", sendingSince=None, lastError=str(detail))
