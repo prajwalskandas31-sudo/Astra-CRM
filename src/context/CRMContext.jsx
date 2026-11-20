@@ -685,6 +685,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin']
   },
   {
+    id: 'ra-periodic-report',
+    name: 'RA Periodic Report Block',
+    category: 'Sales & Approvals',
+    description: 'SEBI RA half-yearly periodic report in 11 sub-blocks (General Details, Complaints, Clients And Fees, Branch Address, Website, Social Media, Bank Details, Directors & Partners, Shareholding, NISM Certification, UPI Handle): CRM values filled in, the rest typed, saved per half and exported to Excel. Checked by the server too (backend/ra_periodic_report.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'annexure-a-saas',
     name: 'Annexure A for SaaS Reporting',
     category: 'Sales & Approvals',
