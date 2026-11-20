@@ -3,6 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { isBackendAuthoritative } from '../services/backendConfig';
 import { CompanyAssetsField } from './CompanyAssetsField';
+import { ReportingHierarchy, ReportingChain } from './ReportingHierarchy';
 import { 
   X, 
   UserPlus, 
@@ -920,9 +921,17 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     >
                       <option value="">-- Select Reporting Team Leader or Manager --</option>
                       {managementUsers.map(m => (
-                        <option key={m.id} value={m.name}>{m.name} ({m.role})</option>
+                        <option key={m.id} value={m.name}>{m.name} ({m.role}){m.reportingTo ? ` → reports to ${m.reportingTo}` : ''}</option>
                       ))}
                     </select>
+                    <ReportingChain users={users} supervisorName={formData.reportingTo} newUserLabel={formData.name || 'This executive'} />
+                    <ReportingHierarchy
+                      users={users}
+                      selectedName={formData.reportingTo}
+                      onSelect={name => setFormData(prev => ({ ...prev, reportingTo: name }))}
+                      selectableRoles={['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Team Lead']}
+                      excludeId={userToEdit?.id}
+                    />
                   </div>
                 )}
 
@@ -961,8 +970,46 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                         </optgroup>
                       )}
                     </select>
+                    <ReportingChain users={users} supervisorName={formData.reportingTo} newUserLabel={formData.name || 'This Team Leader'} />
+                    <ReportingHierarchy
+                      users={users}
+                      selectedName={formData.reportingTo}
+                      onSelect={name => setFormData(prev => ({ ...prev, reportingTo: name }))}
+                      selectableRoles={['Super Admin', 'Admin', 'Manager']}
+                      excludeId={userToEdit?.id}
+                    />
                   </div>
                 )}
+
+                {['Manager', 'Admin'].includes(formData.role) && (() => {
+                  // Managers report to an Admin / Super Admin; Admins to the Super Admin (optional)
+                  const bossRoles = formData.role === 'Manager' ? ['Super Admin', 'Admin'] : ['Super Admin'];
+                  const bosses = seniorLeadership.filter(u => bossRoles.includes(u.role));
+                  return (
+                    <div className="form-group" style={{ gridColumn: '1 / -1', background: 'var(--accent-soft)', padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--accent-border)' }}>
+                      <label style={{ color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                        <AlertCircle size={15} /> {formData.role} Reports To (optional):
+                      </label>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        {formData.role === 'Manager' ? 'Pick the Admin or Super Admin this Manager reports to.' : 'Pick the Super Admin this Admin reports to.'}
+                      </div>
+                      <select name="reportingTo" value={formData.reportingTo} onChange={handleChange} style={{ background: 'var(--bg-card)' }}>
+                        <option value="">-- Not set --</option>
+                        {bosses.map(m => (
+                          <option key={m.id} value={m.name}>{m.name} ({m.role}{m.employeeId ? ` - ${m.employeeId}` : ''})</option>
+                        ))}
+                      </select>
+                      <ReportingChain users={users} supervisorName={formData.reportingTo} newUserLabel={formData.name || `This ${formData.role}`} />
+                      <ReportingHierarchy
+                        users={users}
+                        selectedName={formData.reportingTo}
+                        onSelect={name => setFormData(prev => ({ ...prev, reportingTo: name }))}
+                        selectableRoles={bossRoles}
+                        excludeId={userToEdit?.id}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* ── Provision: User & Bank Profile Details ── */}
                 <div style={{
