@@ -692,6 +692,13 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin']
   },
   {
+    id: 'annexure-a-saas',
+    name: 'Annexure A for SaaS Reporting',
+    category: 'Sales & Approvals',
+    description: 'Manual input sheet in the Annexure A format (IA/RA enlistment number and name, SaaS / hosted services used, type, criticality, hosting location, comments, sign-off and c.c.); nothing is fetched automatically. Download as Word, PDF or Excel. Checked by the server too (backend/annexure_a_saas.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',

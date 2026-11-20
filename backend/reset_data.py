@@ -23,7 +23,7 @@ BUSINESS_COLLECTIONS = (
     "masterRecords", "eSignRecords", "paidClients", "broadcasts", "login_failures",
     "callStats", "attendance", "kraRecords", "kraFiles", "salarySettings", "salaryEntries",
     "clientInvoices", "clientInvoiceFiles", "invoiceNumbers",
-    "ledgerManualEntries", "ledgerAdjustments", "auditClientFee", "raPeriodicReport",
+    "ledgerManualEntries", "ledgerAdjustments", "auditClientFee", "raPeriodicReport", "annexureASaas",
 )
 # Single values (collection "kv") that hold business data, and their empty value
 BUSINESS_VALUES = {"leegalityDocuments": {}, "paidClientsDeleted": [], "welcomeKitLog": [], "invoiceCounters": {}}
