@@ -116,6 +116,13 @@ export const buildSubscriptionHistory = ({
     || (b.startDate || '').localeCompare(a.startDate || ''));
 };
 
+/**
+ * Gross amount the client has already paid: every service in the history (Active, Expired and Pending).
+ * Rejected/declined sales and this lead's open sale are not in the history, so they never count.
+ */
+export const totalPaidAmount = (history) =>
+  Math.round((history || []).reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0) * 100) / 100;
+
 /** Active subscriptions a new payment can join: one per expiry date, the latest first. */
 export const activeSubscriptions = (history) => {
   const active = history.filter(e => e.status === SUB_ACTIVE && e.endDate);
