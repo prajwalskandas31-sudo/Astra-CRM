@@ -685,6 +685,27 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin']
   },
   {
+    id: 'ra-periodic-report',
+    name: 'RA Periodic Report Block',
+    category: 'Sales & Approvals',
+    description: 'SEBI RA half-yearly periodic report in 11 sub-blocks (General Details, Complaints, Clients And Fees, Branch Address, Website, Social Media, Bank Details, Directors & Partners, Shareholding, NISM Certification, UPI Handle): CRM values filled in, the rest typed, saved per half and exported to Excel. Checked by the server too (backend/ra_periodic_report.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'annexure-a-saas',
+    name: 'Annexure A for SaaS Reporting',
+    category: 'Sales & Approvals',
+    description: 'Manual input sheet in the Annexure A format (IA/RA enlistment number and name, SaaS / hosted services used, type, criticality, hosting location, comments, sign-off and c.c.); nothing is fetched automatically. Download as Word, PDF or Excel. Checked by the server too (backend/annexure_a_saas.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'ra-compliance',
+    name: 'RA Monthly Compliance Tracker',
+    category: 'Administration & Governance',
+    description: 'SEBI Research Analyst monthly compliance checklist: Dashboard plus 17 input sheets (social media, recommendations, research reports, client register, MITC, KYC, SCORES, ODR, website, UPI, communications, advertisements, policies, complaint data, invoices, client documents), kept per month with Excel download. Checked by the server too (backend/ra_compliance.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'telegram-control',
     name: 'Telegram Control Block',
     category: 'Sales & Approvals',
