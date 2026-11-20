@@ -39,7 +39,8 @@ import {
   Activity,
   Receipt,
   BookOpen,
-  ClipboardList
+  ClipboardList,
+  Cloud
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -64,6 +65,7 @@ const FEATURE_ICONS = {
   'invoice-block': Receipt,
   'running-account': BookOpen,
   'audit-reports': ClipboardList,
+  'annexure-a-saas': Cloud,
   'register-sale': CheckCircle2,
   'lead-summary': PieChart,
   'system-settings': Settings,
