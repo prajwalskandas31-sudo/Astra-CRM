@@ -286,8 +286,18 @@ def _company_name() -> str:
     return (doc.get("value") or "").strip() or "our company"
 
 
-def _sale_or_404(sale_id: str) -> dict:
+def _sale_or_404(sale_id: str, user: dict) -> dict:
+    """The sale, if this user may send its Welcome Kit: Super Admin / Admin any client; anyone else given
+    Send Welcome Kit in Feature Access only their own team's clients (as everywhere else in the CRM)."""
     sale = store.get("sales", sale_id)
+    if sale and user.get("role") not in ("Super Admin", "Admin"):
+        try:
+            from backend.sync import team_ids
+        except ImportError:
+            from sync import team_ids
+        owner = sale.get("submittedByUserId") or sale.get("employeeId")
+        if not owner or owner not in team_ids(user):
+            sale = None
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found.")
     return sale
@@ -435,7 +445,7 @@ class WelcomeKitSend(BaseModel):
 @router.get("/welcome-kit/preview/{sale_id}")
 def preview(sale_id: str, current_user: dict = Depends(kit_senders)):
     """What a send would do, from the CRM's own records (Leegality itself is asked only when sending)."""
-    sale = _sale_or_404(sale_id)
+    sale = _sale_or_404(sale_id, current_user)
     slots = _slots()
     record = _agreement_record(sale) or {}
     doc_id = record.get("documentId")
@@ -454,7 +464,7 @@ def preview(sale_id: str, current_user: dict = Depends(kit_senders)):
 def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(kit_senders)):
     settings = _settings()
     _require_sender(settings)
-    sale = _sale_or_404(req.saleId)
+    sale = _sale_or_404(req.saleId, current_user)
     if sale.get("clientType") == "Old Client":
         raise HTTPException(status_code=400, detail="Old Clients get no Welcome Kit: only the invoice, emailed when the Telegram group approves.")
     client = _client(sale)

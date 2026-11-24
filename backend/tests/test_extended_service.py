@@ -189,3 +189,20 @@ def test_delete_esign_link(crm, monkeypatch):
 
     state["status"] = "COMPLETED"
     assert crm.client.delete("/api/leegality/esign/DOC123", headers=bearer(crm.token(SA))).status_code == 409
+
+
+def test_send_welcome_kit_granted_to_a_non_admin_is_scoped_to_their_team(ext):
+    crm, _ = ext
+    s = crm.store
+    exec_id = next(u["id"] for u in s.all("users") if u.get("email") == EXEC)
+    tok = bearer(crm.token(EXEC))
+    s.put("sales", "SL-MINE", _sale("SL-MINE", 1000, _ago(3), submittedByUserId=exec_id))
+    # Not granted: Super Admin / Admin only, as before
+    assert crm.client.get("/api/email/welcome-kit/preview/SL-MINE", headers=tok).status_code == 403
+    s.put("userPermissions", exec_id, {"id": exec_id, "value": {"send-welcome-kit": True}})
+    assert crm.client.get("/api/email/welcome-kit/preview/SL-MINE", headers=tok).status_code == 200
+    # Someone else's client stays out of reach
+    assert crm.client.get("/api/email/welcome-kit/preview/SL-2", headers=tok).status_code == 404
+    res = crm.client.post("/api/email/welcome-kit/send", headers=tok, json={"saleId": "SL-2"})
+    assert res.status_code == 404
+    s.delete("userPermissions", exec_id)
