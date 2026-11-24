@@ -208,7 +208,8 @@ def services() -> list:
             continue
         info = salary._info(s)
         tenure = s.get("serviceTenure") or info.get("serviceTenure")
-        start = _day(info.get("paymentDate")) or _day(s.get("eSignedAt")) or _day(s.get("date"))
+        # Service tenure runs from the e-Sign date; only an Old Client (never e-signs) starts on its Payment Date
+        start = _day(s.get("eSignedAt")) or _day(info.get("paymentDate")) or _day(s.get("date"))
         if not start:
             continue
         end = _day(s.get("serviceEndDate") or info.get("serviceEndDate")) or end_date(start, tenure)

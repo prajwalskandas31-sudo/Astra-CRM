@@ -55,6 +55,7 @@ def crm(tmp_path_factory):
     import backend.client_master as client_master
     import backend.invoice_block as invoice_block
     import backend.salary as salary
+    import backend.extended_service as extended_service
     import backend.pdf_tables as pdf_tables
     import backend.running_account as running_account
     import backend.audit_report as audit_report
@@ -62,7 +63,7 @@ def crm(tmp_path_factory):
     import backend.annexure_a_saas as annexure_a_saas
     import backend.ra_compliance as ra_compliance
     import backend.db_init as db_init
-    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, email_failures, broadcast_group, kra, client_master, invoice_block, salary, pdf_tables, running_account, audit_report, ra_periodic_report, annexure_a_saas, ra_compliance, db_init):
+    for module in (store, auth, signatures, leegality, broadcasts, reports, sync, email_kit, client_info_telegram, invoice, old_client_review, service_expiry, email_failures, broadcast_group, kra, client_master, invoice_block, salary, extended_service, pdf_tables, running_account, audit_report, ra_periodic_report, annexure_a_saas, ra_compliance, db_init):
         importlib.reload(module)
     data_dir = tmp_path_factory.mktemp("data")
     # Never import the real backend/data files into the test database
@@ -92,7 +93,7 @@ def crm(tmp_path_factory):
     return SimpleNamespace(client=client, creds=creds, main=main, signatures=signatures, broadcasts=broadcasts, reports=reports,
                            store=store, email_kit=email_kit, service_expiry=service_expiry, email_failures=email_failures, leegality=leegality,
                            client_info_telegram=client_info_telegram, old_client_review=old_client_review, invoice=invoice,
-                           broadcast_group=broadcast_group, kra=kra, client_master=client_master, invoice_block=invoice_block, login=login, token=token)
+                           broadcast_group=broadcast_group, kra=kra, client_master=client_master, invoice_block=invoice_block, extended_service=extended_service, login=login, token=token)
 
 
 def bearer(tok):

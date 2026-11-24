@@ -4,7 +4,7 @@ import { ToastProvider, useToast } from './components/ToastNotification';
 import { LoginPage } from './components/LoginPage';
 import { LoginDisclaimerModal } from './components/LoginDisclaimerModal';
 import { Navbar } from './components/Navbar';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, ALL_TAB_IDS } from './components/Sidebar';
 import { CRMDashboard } from './components/CRMDashboard';
 import { UserDirectory } from './components/UserDirectory';
 import { DispositionsManager } from './components/DispositionsManager';
@@ -68,6 +68,8 @@ import { TelegramControlBlock } from './components/TelegramControlBlock';
 import { CompanyProfileBlock } from './components/CompanyProfileBlock';
 import { BranchProfilesBlock } from './components/BranchProfilesBlock';
 import { EmailBlock } from './components/EmailBlock';
+import { SendWelcomeKitBlock } from './components/SendWelcomeKitBlock';
+import { ExtendedServiceBlock } from './components/ExtendedServiceBlock';
 import { ResearchReportsBlock } from './components/ResearchReportsBlock';
 import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
@@ -93,39 +95,7 @@ const AppContent = () => {
       return;
     }
 
-    const allTabs = [
-      'dashboard',
-      'lead-history',
-      'directory',
-      'dispositions',
-      'lead-upload',
-      'lead-summary',
-      'team-monitoring',
-      'team-performance',
-      'sale-approvals',
-      'esign-block',
-      'paid-block',
-      'salary-block',
-      'kra-block',
-      'client-master',
-      'invoice-block',
-      'running-account',
-      'audit-reports',
-      'ra-periodic-report',
-      'annexure-a-saas',
-      'ra-compliance',
-      'telegram-control',
-      'research-reports',
-      'research-recommendations',
-      'lead-reassignment',
-      'service-master',
-      'company-profile',
-      'branch-profiles',
-      'email-block',
-      'system-settings',
-      'custom-roles',
-      'feature-access'
-    ];
+    const allTabs = ALL_TAB_IDS;
 
     if (!hasPermission(activeTab)) {
       const fallbackTab = allTabs.find(t => hasPermission(t)) || 'dashboard';
@@ -196,6 +166,8 @@ const AppContent = () => {
     'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
     'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
     'paid-block': 'Paid - Clients by Service Name & Service Tenure',
+    'send-welcome-kit': 'Send Welcome Kit - Welcome Kit Files and the Signed Agreement to the Client',
+    'extended-service': 'Extended Service Block - Clients Above a Net Value Limit in the Last 12 Months',
     'salary-block': 'Salary Block - Commission, Salary and Salary plus Incentives',
     'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
     'client-master': 'Client MASTER - Client Details, Leegality Signing, Invoices & Grievances',
@@ -212,7 +184,7 @@ const AppContent = () => {
     'service-master': 'Service Master - Service Names & Values for the Client Information Page',
     'company-profile': 'Company Profile - Company Name, SEBI Registration & Contact Details',
     'branch-profiles': 'Branch Profiles - Branch Details, Managers & Contact Numbers',
-    'email-block': 'Email Block - Sender Email ID & Welcome Kit',
+    'email-block': 'Email Block - Sender Email ID, Welcome Kit Files & Email Reports',
     'system-settings': 'System Settings & UI Customization',
     'custom-roles': 'Custom Roles Builder (Annexure-I)',
     'feature-access': 'Feature Access & Permissions Master Block'
@@ -254,6 +226,10 @@ const AppContent = () => {
         );
       case 'paid-block':
         return <PaidBlock />;
+      case 'send-welcome-kit':
+        return <SendWelcomeKitBlock />;
+      case 'extended-service':
+        return <ExtendedServiceBlock />;
       case 'salary-block':
         return <SalaryBlock />;
       case 'kra-block':

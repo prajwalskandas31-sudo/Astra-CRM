@@ -77,6 +77,10 @@ const serviceValueOf = (services, name) => {
 const formatServiceValue = (v) => (v === '' || v === undefined || v === null || Number.isNaN(Number(v))
   ? '—' : `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`);
 
+// The Max Limit on Gross / Net Sales (System Settings) applies to Individual clients only:
+// a Non-Individual (Corporate / Firm) client has no cap of any kind.
+export const limitAppliesTo = (clientCategory) => clientCategory !== 'Non-Individual';
+
 export const ClientInformationModal = ({ 
   isOpen, 
   onClose, 
@@ -284,10 +288,10 @@ export const ClientInformationModal = ({
         updated.netSales = net;
         updated.gst = gst;
 
-        // Check Limit Rule: Super Admin sets a maximum allowed value
+        // Check Limit Rule: Super Admin sets a maximum allowed value (never for Non-Individual clients)
         const maxLimit = financialSettings?.maxGrossSales || 200000;
         const enteredVal = parseFloat(value) || 0;
-        if (enteredVal > maxLimit && !isLimitOverridden) {
+        if (limitAppliesTo(updated.clientCategory) && enteredVal > maxLimit && !isLimitOverridden) {
           setPendingGrossAmount(value);
           setShowOverrideModal(true);
         }
@@ -295,6 +299,11 @@ export const ClientInformationModal = ({
 
       return updated;
     });
+
+    // Non-Individual clients have no limit, so a pending "exceeds the limit" prompt no longer applies
+    if (field === 'clientCategory' && !limitAppliesTo(value)) {
+      setShowOverrideModal(false);
+    }
 
     if (fieldErrors[field]) {
       setFieldErrors(prev => {
@@ -485,9 +494,9 @@ export const ClientInformationModal = ({
       }
     }
 
-    // 5. Gross Limit Rule check
+    // 5. Gross Limit Rule check (no cap of any kind for Non-Individual clients)
     const maxLimit = financialSettings?.maxGrossSales || 200000;
-    if (parseFloat(formData.grossSales) > maxLimit && !isLimitOverridden) {
+    if (limitAppliesTo(formData.clientCategory) && parseFloat(formData.grossSales) > maxLimit && !isLimitOverridden) {
       errors.grossSales = 'Kindly contact administrator';
       setShowOverrideModal(true);
       showToast('Kindly contact administrator: Amount exceeds maximum threshold.', 'error');
@@ -1234,12 +1243,14 @@ export const ClientInformationModal = ({
                     />
                   </div>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
-                    Auto from Mode of Payment (2% off Credit Card / Payment Gateway) · Max limit: ₹{financialSettings?.maxGrossSales?.toLocaleString('en-IN') || '2,00,000'} {isLimitOverridden && '(Override Active)'}
+                    Auto from Mode of Payment (2% off Credit Card / Payment Gateway) · {limitAppliesTo(formData.clientCategory)
+                      ? <>Max limit: ₹{financialSettings?.maxGrossSales?.toLocaleString('en-IN') || '2,00,000'} {isLimitOverridden && '(Override Active)'}</>
+                      : 'No limit (Non-Individual)'}
                   </span>
                 </div>
 
                 {/* Old Client: Permissible Amount Left = Max Limit − already paid − this Gross Sales */}
-                {formData.clientType === OLD_CLIENT && (() => {
+                {formData.clientType === OLD_CLIENT && limitAppliesTo(formData.clientCategory) && (() => {
                   const maxLimit = financialSettings?.maxGrossSales || 200000;
                   const gross = parseFloat(formData.grossSales) || 0;
                   const left = Math.round((maxLimit - alreadyPaid - gross) * 100) / 100;

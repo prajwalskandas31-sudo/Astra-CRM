@@ -42,7 +42,9 @@ import {
   ClipboardList,
   ScrollText,
   Cloud,
-  ShieldAlert
+  ShieldAlert,
+  MailCheck,
+  PackagePlus
 } from 'lucide-react';
 
 const FEATURE_ICONS = {
@@ -64,6 +66,8 @@ const FEATURE_ICONS = {
   'sale-approvals': CheckCircle,
   'esign-block': FileSignature,
   'kra-block': ShieldCheck,
+  'send-welcome-kit': MailCheck,
+  'extended-service': PackagePlus,
   'invoice-block': Receipt,
   'running-account': BookOpen,
   'audit-reports': ClipboardList,

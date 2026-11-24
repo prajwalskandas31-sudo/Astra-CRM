@@ -4,6 +4,7 @@ import {
   saveLeegalityConfig, 
   dispatchLeegalitySignRequest,
   getLeegalityDocumentStatus,
+  deleteLeegalityESign,
   isRealLeegalityDispatch,
   getEKycLight
 } from '../services/leegalityService';
@@ -650,6 +651,20 @@ export const CRM_FEATURES = [
     defaultForRoles: ['Super Admin', 'Admin', 'Manager', 'Team Leader', 'Executive']
   },
   {
+    id: 'send-welcome-kit',
+    name: 'Send Welcome Kit',
+    category: 'Sales & Approvals',
+    description: 'Pick a client and email them every Welcome Kit file plus, once they have e-signed, the signed Leegality agreement and e-KYC documents. The files and sender are set in Settings > Email Block. Checked by the server too (backend/email_kit.py).',
+    defaultForRoles: ['Super Admin', 'Admin']
+  },
+  {
+    id: 'extended-service',
+    name: 'Extended Service Block',
+    category: 'Sales & Approvals',
+    description: 'Enter a Net Value Limit to list every client whose paid Net Value over the last 12 months crossed it (with their e-Sign date), then assign a service from the Service Master: the service goes live in Paid / Telegram and its invoice is generated and emailed automatically. Checked by the server too (backend/extended_service.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
     id: 'kra-block',
     name: 'KRA Block (CVL KRA)',
     category: 'Sales & Approvals',
@@ -765,9 +780,9 @@ export const CRM_FEATURES = [
   },
   {
     id: 'email-block',
-    name: 'Email Block (Sender Email ID & Welcome Kit)',
+    name: 'Email Block (Sender Email ID & Welcome Kit Files)',
     category: 'Administration & Governance',
-    description: 'The Sender Email ID and up to 19 Welcome Kit files; send a client their Welcome Kit with the signed Leegality agreement. Only a Super Admin can change the sender or the files.',
+    description: 'The Sender Email ID, up to 19 Welcome Kit files, the Service Expiry email, failed deliveries and the consolidated Email Delivery Report (Excel). Only a Super Admin can change the sender or the files. Sending a kit is the separate "Send Welcome Kit" block.',
     defaultForRoles: ['Super Admin', 'Admin']
   },
   {
@@ -3188,6 +3203,44 @@ export const CRMProvider = ({ children }) => {
     return { sale, apiResult };
   };
 
+  // ─── Sale Approvals > Delete: withdraw a sent e-sign link; the sale goes back to the pending queue ───
+  const deleteESignLink = async (saleId) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) throw new Error(`Sale with ID '${saleId}' not found`);
+    if (currentUser?.role !== 'Super Admin') throw new Error('Only a Super Admin can delete an e-sign link.');
+    const docId = sale.eSignDocumentId || sale.eSignDetails?.documentId;
+    if (!docId) throw new Error('No e-sign link has been sent for this sale.');
+    if (sale.eSignStatus === 'Completed') throw new Error('The client has already signed; the e-sign link cannot be deleted.');
+
+    const res = await deleteLeegalityESign(docId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    setSales(prev => prev.map(s => s.id === saleId ? {
+      ...s,
+      status: 'Pending Super Admin Review',
+      stage: 'Under Review by Super Admin',
+      eSignStatus: 'Link Deleted',
+      eSignDocumentId: null,
+      eSignUrl: '',
+      eSignDetails: null,
+      deletedESignLinks: [...(s.deletedESignLinks || []), { documentId: docId, deletedAt: res.deletedAt, deletedBy: res.deletedBy || currentUser?.name }]
+    } : s));
+    if (sale.leadId) {
+      setLeads(prev => prev.map(l => l.id === sale.leadId ? {
+        ...l,
+        disposition: 'Under Review by Super Admin',
+        history: [...(l.history || []), { date: todayStr, text: `E-sign link (Leegality Doc ID: ${docId}) deleted by ${currentUser?.name || 'Super Admin'}. e-KYC & E-Sign can be sent again from Sale Approvals.` }]
+      } : l));
+    }
+    addNotification({
+      title: 'E-Sign Link Deleted',
+      message: `The e-sign link for '${sale.clientName}' (Doc ID: ${docId}) was deleted on Leegality.`,
+      type: 'info',
+      targetUserId: sale.submittedByUserId,
+      actionPayload: { saleId }
+    });
+    return res;
+  };
+
   // ─── Live Leegality status; a deal is finalized only when Leegality reports COMPLETED ───
   const refreshESignStatus = async (saleId, documentIdOverride = null) => {
     const sale = sales.find(s => s.id === saleId);
@@ -3784,6 +3837,7 @@ export const CRMProvider = ({ children }) => {
       telegramSaleReview,
       superAdminApproveSale,
       triggerEKycAndESign,
+      deleteESignLink,
       refreshESignStatus,
       completeVoiceCallVerification,
       completeESignProcess,

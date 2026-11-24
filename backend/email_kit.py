@@ -26,11 +26,11 @@ from pydantic import BaseModel
 
 try:
     from backend import store
-    from backend.auth import require_roles
+    from backend.auth import require_roles, get_current_user
     from backend import leegality
 except ImportError:
     import store
-    from auth import require_roles
+    from auth import require_roles, get_current_user
     import leegality
 
 
@@ -74,6 +74,28 @@ DEFAULTS = {
 }
 
 read_roles = require_roles(["Super Admin", "Admin"])
+SEND_FEATURE = "send-welcome-kit"  # the Send Welcome Kit block; kept in step with CRM_FEATURES in CRMContext.jsx
+
+
+def _can_send_kits(user: dict) -> bool:
+    """Send Welcome Kit access: a Feature Access override first, else Super Admin / Admin (as before)."""
+    perms = (store.get("userPermissions", user["id"]) or {}).get("value")
+    if isinstance(perms, dict) and isinstance(perms.get(SEND_FEATURE), bool):
+        return perms[SEND_FEATURE]
+    return user.get("role") in ("Super Admin", "Admin")
+
+
+def kit_senders(current_user: dict = Depends(get_current_user)) -> dict:
+    if not _can_send_kits(current_user):
+        raise HTTPException(status_code=403, detail="You do not have access to Send Welcome Kit.")
+    return current_user
+
+
+def settings_readers(current_user: dict = Depends(get_current_user)) -> dict:
+    """The sender details (never the password): the Email Block (Super Admin / Admin) and Send Welcome Kit."""
+    if current_user.get("role") not in ("Super Admin", "Admin") and not _can_send_kits(current_user):
+        raise HTTPException(status_code=403, detail="You do not have access to the email settings.")
+    return current_user
 write_roles = require_roles(["Super Admin"])
 
 
@@ -109,7 +131,7 @@ class EmailSettingsUpdate(BaseModel):
 
 
 @router.get("/settings")
-def get_settings(current_user: dict = Depends(read_roles)):
+def get_settings(current_user: dict = Depends(settings_readers)):
     return {**_public(_settings()), "slotCount": SLOT_COUNT, "maxFileBytes": MAX_FILE_BYTES, "maxTotalBytes": MAX_TOTAL_BYTES}
 
 
@@ -411,7 +433,7 @@ class WelcomeKitSend(BaseModel):
 
 
 @router.get("/welcome-kit/preview/{sale_id}")
-def preview(sale_id: str, current_user: dict = Depends(read_roles)):
+def preview(sale_id: str, current_user: dict = Depends(kit_senders)):
     """What a send would do, from the CRM's own records (Leegality itself is asked only when sending)."""
     sale = _sale_or_404(sale_id)
     slots = _slots()
@@ -429,7 +451,7 @@ def preview(sale_id: str, current_user: dict = Depends(read_roles)):
 
 
 @router.post("/welcome-kit/send")
-def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(read_roles)):
+def send_welcome_kit(req: WelcomeKitSend, current_user: dict = Depends(kit_senders)):
     settings = _settings()
     _require_sender(settings)
     sale = _sale_or_404(req.saleId)

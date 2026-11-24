@@ -128,6 +128,10 @@ export const dispatchLeegalitySignRequest = async ({ saleId, clientName, email, 
 export const getLeegalityDocumentStatus = async (documentId) =>
   (await backendFetch(`/leegality/esign/${encodeURIComponent(documentId)}`)).json();
 
+/** Delete an e-sign link already sent (Super Admin); refused by the server once the client has signed. */
+export const deleteLeegalityESign = async (documentId) =>
+  (await backendFetch(`/leegality/esign/${encodeURIComponent(documentId)}`, { method: 'DELETE' })).json();
+
 /**
  * Download the signed agreement ('signed-pdf') or audit trail ('audit-trail') once COMPLETED.
  */

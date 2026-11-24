@@ -5,6 +5,7 @@ import { HarshalParmarESign } from './HarshalParmarESign';
 import { DigitalSignatureVault } from './DigitalSignatureVault';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 import { SignatureTypesCard } from './SignatureTypesCard';
+import { ExpiredClientData } from './ExpiredClientData';
 import { getPrimarySignatory } from '../services/digitalSignatureService';
 import { downloadLeegalityFile } from '../services/leegalityService';
 import { sendWelcomeKit, describeSend } from '../services/emailService';
@@ -35,7 +36,8 @@ import {
   Lock,
   Unlock,
   KeyRound,
-  Mail
+  Mail,
+  CalendarClock
 } from 'lucide-react';
 
 export const ESignManagementBlock = () => {
@@ -51,7 +53,7 @@ export const ESignManagementBlock = () => {
 
   const { showToast } = useToast();
 
-  const [activeBlockTab, setActiveBlockTab] = useState('registry'); // 'registry' | 'vault'
+  const [activeBlockTab, setActiveBlockTab] = useState('registry'); // 'registry' | 'vault' | 'expired'
   const [searchTerm, setSearchTerm] = useState('');
   const [primarySignatory, setPrimarySignatory] = useState(() => getPrimarySignatory());
   const [liveDispatchData, setLiveDispatchData] = useState(null);
@@ -375,10 +377,34 @@ export const ESignManagementBlock = () => {
             Password Protected
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveBlockTab('expired')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: activeBlockTab === 'expired' ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: activeBlockTab === 'expired' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+            color: activeBlockTab === 'expired' ? '#fbbf24' : 'var(--text-muted, #94a3b8)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <CalendarClock size={15} />
+          <span>Expired Client Data</span>
+        </button>
       </div>
 
       {activeBlockTab === 'vault' ? (
         <DigitalSignatureVault initialSignerKey="master_officer" />
+      ) : activeBlockTab === 'expired' ? (
+        <ExpiredClientData />
       ) : (
         <>
           {/* ─── AUTHORIZED SIGNER PROFILE & SEAL CARD ─── */}

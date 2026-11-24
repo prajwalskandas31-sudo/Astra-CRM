@@ -32,6 +32,7 @@ try:
     from backend import ra_periodic_report
     from backend import annexure_a_saas
     from backend import ra_compliance
+    from backend import extended_service
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -59,6 +60,7 @@ except ImportError:
     import ra_periodic_report
     import annexure_a_saas
     import ra_compliance
+    import extended_service
     from db_init import init_database
 
 
@@ -98,6 +100,7 @@ app.include_router(audit_report.router)
 app.include_router(ra_periodic_report.router)
 app.include_router(annexure_a_saas.router)
 app.include_router(ra_compliance.router)
+app.include_router(extended_service.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env

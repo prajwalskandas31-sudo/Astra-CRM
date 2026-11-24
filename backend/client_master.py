@@ -201,6 +201,68 @@ def _with_sales(collection: str, found: list, sale_ids: set) -> list:
     return found
 
 
+KRA_RECORDS = "kraRecords"        # backend/kra.py
+WELCOME_KIT_LOG = "welcomeKitLog"  # backend/email_kit.py
+OLD_CLIENT = "Old Client"
+DEAD_SALE = ("Rejected", "Declined")
+
+
+def _iso_day(value) -> str:
+    text = str(value or "").strip()
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", text)
+    if m:
+        return m.group(0)
+    m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})", text)
+    return f"{m[3]}-{int(m[2]):02d}-{int(m[1]):02d}" if m else ""
+
+
+def client_status(sales: list, paid: list, pan: str, today: Optional[str] = None) -> dict:
+    """The five-step overview at the top of the Client MASTER: KRA, eKYC/MITC, Welcome Kit, Service, Expired."""
+    today = today or datetime.now(timezone(timedelta(hours=5, minutes=30))).date().isoformat()
+    sale_ids = {s.get("id") for s in sales if s.get("id")}
+
+    kra = [r for r in store.all(KRA_RECORDS) if (pan and r.get("pan") == pan) or r.get("saleId") in sale_ids]
+    kra.sort(key=lambda r: r.get("fetchedAt") or "")
+    kra_last = kra[-1] if kra else None
+
+    # e-KYC / MITC runs on the client's latest new-client sale (an Old Client renewal never e-signs)
+    live = [s for s in sales if s.get("clientType") != OLD_CLIENT and not any(w in str(s.get("status") or "") for w in DEAD_SALE)]
+    live.sort(key=lambda s: (_sale_day(s), str(s.get("id") or "")))
+    sale = live[-1] if live else None
+    # The latest sale's own e-sign decides; with no open sale, any completed e-sign of the client counts
+    signed = (sale.get("eSignStatus") == "Completed") if sale else         (any(s.get("eSignStatus") == "Completed" for s in sales) or any(p.get("eSignedAt") for p in paid))
+    details = (sale or {}).get("eSignDetails") or {}
+    link_sent = bool(sale and (sale.get("eSignDocumentId") or details.get("dispatchedAt")))
+    signed_at = next((p.get("eSignedAt") for p in sorted(paid, key=lambda p: p.get("serviceStartDate") or "", reverse=True)
+                      if p.get("eSignedAt")), "") or next((s.get("eSignedAt") for s in sales if s.get("eSignedAt")), "")
+
+    kits = [e for e in (store.get_value(WELCOME_KIT_LOG, []) or []) if e.get("saleId") in sale_ids]
+    kits.sort(key=lambda e: e.get("sentAt") or "")
+    kit_sale = next((s for s in reversed(live) if s.get("eSignStatus") == "Completed"), None) or sale
+
+    current = list(paid)
+    running = [p for p in current if p.get("status") != "Service Expired"
+               and (not p.get("serviceEndDate") or str(p["serviceEndDate"]) > today)]
+    enabled = [p for p in running if isinstance(p.get("segments"), list) and p["segments"]]
+    latest = max(current, key=lambda p: str(p.get("serviceEndDate") or ""), default=None)
+    expired = bool(current) and not running
+
+    return {
+        "kra": {"completed": bool(kra_last), "kycStatus": (kra_last or {}).get("kycStatus") or "",
+                "fetchedAt": (kra_last or {}).get("fetchedAt") or "", "saleId": (sale or {}).get("id")},
+        "ekyc": {"completed": signed, "linkSent": link_sent or signed, "saleId": (sale or {}).get("id"),
+                 "eSignStatus": (sale or {}).get("eSignStatus") or "", "documentId": (sale or {}).get("eSignDocumentId") or "",
+                 "signedAt": _iso_day(signed_at), "oldClientOnly": bool(sales) and not live},
+        "welcomeKit": {"sent": bool(kits), "sentAt": (kits[-1] if kits else {}).get("sentAt") or "",
+                       "to": (kits[-1] if kits else {}).get("to") or "", "saleId": (kit_sale or {}).get("id")},
+        "service": {"enabled": bool(enabled), "hasService": bool(current),
+                    "services": [{"serviceName": p.get("serviceName") or "", "segments": p.get("segments") or [],
+                                  "endDate": p.get("serviceEndDate") or ""} for p in running]},
+        "expired": {"expired": expired, "hasService": bool(current),
+                    "endDate": (latest or {}).get("serviceEndDate") or "", "expiredAt": (latest or {}).get("expiredAt") or ""},
+    }
+
+
 def find_client(kind: str, value: str) -> Optional[dict]:
     leads = [d for d in _records("leads", kind, value) if isinstance(d.get("clientInfo"), dict) and d["clientInfo"]]
     sales = _records("sales", kind, value)
@@ -221,6 +283,7 @@ def find_client(kind: str, value: str) -> Optional[dict]:
         "submissions": submissions,
         "leegality": _signings(sales, esigns, paid),
         "invoices": _invoices(reviews),
+        "status": client_status(sales, paid, pan),
     }
 
 

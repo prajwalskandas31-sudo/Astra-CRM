@@ -25,13 +25,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 try:
-    from backend import store, email_kit, service_expiry, old_client_review
+    from backend import store, email_kit, service_expiry, old_client_review, extended_service
     from backend.auth import require_roles
 except ImportError:
     import store
     import email_kit
     import service_expiry
     import old_client_review
+    import extended_service
     from auth import require_roles
 
 router = APIRouter(prefix="/api/email/failures", tags=["email"])
@@ -225,6 +226,10 @@ def _rows() -> list:
             later = next((e for e in kit_log if e.get("saleId") == f.get("saleId") and e.get("sentAt", "") > f["at"]), None)
             if later:
                 resolved = f"Welcome Kit sent to {later['to']} on {later['sentAt'][:10]}"
+        elif f.get("assignmentId"):
+            assignment = store.get(extended_service.ASSIGNMENTS, f["assignmentId"]) or {}
+            if assignment.get("emailStatus") == "sent":
+                resolved = f"Invoice emailed to {assignment.get('emailedTo') or 'the client'}"
         elif f.get("reviewId"):
             review = store.get(old_client_review.REVIEWS, f["reviewId"]) or {}
             if review.get("status") == "approved":
@@ -262,6 +267,63 @@ def _rows() -> list:
         r["review"] = reviews.get(r["id"])
     rows.sort(key=lambda r: r.get("at") or "", reverse=True)
     return rows
+
+
+def delivery_rows() -> list:
+    """One row per client email the CRM triggered, sent or not: the Recently Sent Welcome Kits, every other
+    email that went out (Service Expiry, Old Client and Extended Service invoices) and every failure above."""
+    rows = []
+    for e in store.get_value(email_kit.LOG, []) or []:
+        agreement = ("Signed agreement attached" + (f" + {len(e.get('kycFiles') or [])} e-KYC" if e.get("kycFiles") else "")
+                     if e.get("agreementAttached") else "No signed agreement")
+        rows.append({"id": e["id"], "at": e.get("sentAt") or "", "emailType": "Welcome Kit", "clientName": e.get("clientName") or "",
+                     "to": e.get("to") or "", "from": e.get("from") or "", "status": "Sent", "kind": "Delivered to mail server",
+                     "detail": f"{len(e.get('attachments') or [])} attachment(s); {agreement}", "by": e.get("sentBy") or "",
+                     "saleId": e.get("saleId") or "", "resolved": ""})
+    for e in store.get_value(service_expiry.LOG, []) or []:
+        if e.get("status") == "sent":
+            rows.append({"id": e["id"], "at": e.get("sentAt") or "", "emailType": "Service Expiry Email",
+                         "clientName": e.get("clientName") or "", "to": e.get("to") or "", "from": e.get("from") or "",
+                         "status": "Sent", "kind": "Delivered to mail server",
+                         "detail": " ".join(x for x in (e.get("serviceName"), f"(ended {e['endDate']})" if e.get("endDate") else "") if x),
+                         "by": e.get("sentBy") or "", "paidId": e.get("paidId") or "", "resolved": ""})
+    for r in store.all(old_client_review.REVIEWS):
+        if r.get("status") == "approved" and r.get("emailedTo"):
+            d = r.get("details") or {}
+            rows.append({"id": r["id"], "at": r.get("decidedAt") or "", "emailType": "Old Client Invoice",
+                         "clientName": " ".join(x for x in (d.get("clientPrefix"), d.get("clientName")) if x),
+                         "to": r["emailedTo"], "from": r.get("sentFrom") or "", "status": "Sent", "kind": "Delivered to mail server",
+                         "detail": f"Invoice {r.get('invoiceNumber') or ''}".strip(), "by": r.get("decidedBy") or "",
+                         "saleId": r.get("saleId") or "", "resolved": ""})
+    for a in extended_service.sent_log():
+        rows.append({"id": a["id"], "at": a.get("emailedAt") or "", "emailType": "Extended Service Invoice",
+                     "clientName": a.get("clientName") or "", "to": a.get("emailedTo") or "", "from": a.get("emailedFrom") or "",
+                     "status": "Sent", "kind": "Delivered to mail server",
+                     "detail": f"Invoice {a.get('invoiceNumber') or ''} for {a.get('serviceName') or ''}".strip(),
+                     "by": a.get("assignedBy") or "", "resolved": ""})
+    for f in _rows():
+        rows.append({"id": f["id"], "at": f.get("at") or "", "emailType": f.get("source") or "",
+                     "clientName": f.get("clientName") or "", "to": f.get("to") or "", "from": "",
+                     "status": "Failed", "kind": f.get("kind") or "", "detail": f.get("error") or "",
+                     "by": f.get("attemptedBy") or "", "saleId": f.get("saleId") or "", "paidId": f.get("paidId") or "",
+                     "resolved": f.get("resolved") or "",
+                     "reviewed": f"Reviewed by {f['review'].get('by')}" if f.get("review") else ""})
+    rows.sort(key=lambda r: ((r["clientName"] or r["to"]).strip().lower(), r["at"]))
+    return rows
+
+
+@router.get("/delivery-report")
+def delivery_report(current_user: dict = Depends(read_roles)):
+    rows = delivery_rows()
+    return {
+        "rows": rows,
+        "summary": {
+            "total": len(rows),
+            "sent": sum(1 for r in rows if r["status"] == "Sent"),
+            "failed": sum(1 for r in rows if r["status"] == "Failed"),
+            "clients": len({(r["clientName"] or r["to"]).strip().lower() for r in rows}),
+        },
+    }
 
 
 @router.get("")

@@ -262,6 +262,7 @@ SIGN_TYPES = "leegalitySignatureTypes"
 SIGN_TYPE_LABELS = {"aadhaar": "Aadhaar", "virtualSign": "Virtual Sign"}
 COMBO_LABELS = {"aadhaar": "Aadhaar only", "virtualSign": "Virtual Sign only", "both": "Aadhaar + Virtual Sign"}
 _PROFILE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_DOC_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _default_sign_types():
@@ -587,6 +588,28 @@ def esign_details(document_id: str, current_user: dict = Depends(require_roles([
             "lastCheckedAt": datetime.now(timezone.utc).isoformat(),
         })
     return {**details, "crmRecord": record}
+
+
+@router.delete("/esign/{document_id}")
+def delete_esign(document_id: str, current_user: dict = Depends(require_roles(["Super Admin"]))):
+    """Sale Approvals > Delete: withdraw an e-sign link already sent, so it can no longer be signed.
+    Leegality deletes the sign request; a document the client has already signed is never deleted."""
+    if not _DOC_ID.fullmatch(document_id or ""):
+        raise HTTPException(status_code=404, detail="Unknown Leegality document.")
+    settings = _settings()
+    _, details = _leegality("GET", "/v3.3/document/details", settings, params={"documentId": document_id})
+    status = ((details.get("data") or {}).get("document") or {}).get("status") if details.get("status") == 1 else None
+    if status == "COMPLETED":
+        raise HTTPException(status_code=409, detail="The client has already signed this document, so the e-sign link cannot be deleted.")
+    _, body = _leegality("DELETE", "/v3.0/sign/request", settings, params={"documentId": document_id})
+    if body.get("status") != 1:
+        raise HTTPException(status_code=422, detail=f"Leegality did not delete the e-sign link: {_messages(body)}")
+    deleted_at = datetime.now(timezone.utc).isoformat()
+    if document_id in _read_records():
+        _update_record(document_id, {"documentStatus": "DELETED", "deletedAt": deleted_at,
+                                     "deletedBy": current_user.get("name")})
+    return {"documentId": document_id, "deleted": True, "deletedAt": deleted_at, "deletedBy": current_user.get("name"),
+            "message": _messages(body)}
 
 
 def fetch_completed_pdf(document_id, kind="file"):

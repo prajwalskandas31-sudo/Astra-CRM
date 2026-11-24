@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from './ToastNotification';
+import { useCRM } from '../context/CRMContext';
+import { sendWelcomeKit, describeSend } from '../services/emailService';
 import {
   searchClient, listGrievances, uploadGrievance, renameGrievance, downloadGrievance, downloadInvoice
 } from '../services/clientMasterService';
 import {
-  Contact, Search, X, FileSignature, Receipt, Download, MessageSquareWarning, Upload, Pencil, Check, CalendarRange, Loader2
+  Contact, Search, X, FileSignature, Receipt, Download, MessageSquareWarning, Upload, Pencil, Check, CalendarRange, Loader2,
+  CheckCircle2, XCircle, Send
 } from 'lucide-react';
 
 // Client Master: look a client up by PAN or mobile number (backend/client_master.py).
@@ -235,6 +238,120 @@ const Grievances = ({ clientKey }) => {
   );
 };
 
+// ─── Five-step client status (KRA → eKYC/MITC → Welcome Kit → Service → Expired) ───
+const OK = '#10b981';
+const BAD = '#ef4444';
+const NEUTRAL = 'var(--text-muted)';
+
+const StatusPill = ({ ok, children, tone }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 600, padding: '2px 8px', borderRadius: '999px',
+    color: tone || (ok ? OK : BAD), background: tone ? 'rgba(148,163,184,0.12)' : ok ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'
+  }}>
+    {!tone && (ok ? <CheckCircle2 size={11} /> : <XCircle size={11} />)} {children}
+  </span>
+);
+
+const Step = ({ n, title, children, action }) => (
+  <div style={{ flex: '1 1 180px', minWidth: '170px', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.04em', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Step {n} · {title}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>{children}</div>
+    {action}
+  </div>
+);
+
+const StepButton = ({ onClick, busy, children }) => (
+  <button type="button" className="btn-secondary" onClick={onClick} disabled={busy}
+    style={{ alignSelf: 'flex-start', padding: '3px 9px', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+    {busy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} {children}
+  </button>
+);
+
+const ClientStatusOverview = ({ status, onChanged }) => {
+  const { currentUser, sales = [], triggerEKycAndESign } = useCRM();
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState('');
+  if (!status) return null;
+  const { kra, ekyc, welcomeKit, service, expired } = status;
+  const isSuperAdmin = currentUser?.role === 'Super Admin';
+  const ekycSale = sales.find(s => s.id === ekyc.saleId);
+
+  const run = async (key, fn) => {
+    setBusy(key);
+    try {
+      await fn();
+      // The browser's sales reach the server within a few seconds; re-read the client after that
+      setTimeout(() => onChanged?.(), 2500);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const triggerEKyc = () => run('ekyc', async () => {
+    const res = await triggerEKycAndESign(ekyc.saleId);
+    showToast(`e-KYC & E-Sign link sent (Leegality Doc ID ${res.apiResult.documentId}).`, 'success');
+  });
+  const triggerKit = () => run('kit', async () => {
+    const res = await sendWelcomeKit(welcomeKit.saleId);
+    showToast(describeSend(res), 'success');
+  });
+
+  // e-KYC can be (re)sent while the latest sale is not signed and its link is not live
+  const ekycPending = !ekyc.completed && !!ekyc.saleId && !ekyc.oldClientOnly &&
+    (!ekyc.linkSent || ['Rejected by Client', 'Invitation Expired', 'Link Deleted'].includes(ekyc.eSignStatus));
+
+  return (
+    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '0 20px 18px' }} aria-label="Client status overview">
+      <Step n={1} title="KRA">
+        <StatusPill ok={kra.completed}>{kra.completed ? 'KRA Completed' : 'KRA Not Completed'}</StatusPill>
+        {kra.completed && kra.kycStatus && <span style={{ fontSize: '0.72rem', color: NEUTRAL }}>{kra.kycStatus}</span>}
+      </Step>
+
+      <Step n={2} title="eKYC / MITC" action={ekycPending && isSuperAdmin && ekycSale && (
+        <StepButton onClick={triggerEKyc} busy={busy === 'ekyc'}>{ekyc.linkSent ? 'Re-send eKYC/MITC Link' : 'Trigger eKYC/MITC'}</StepButton>
+      )}>
+        {ekyc.oldClientOnly ? (
+          <StatusPill tone={NEUTRAL}>Not required (Old Client)</StatusPill>
+        ) : (
+          <>
+            <StatusPill ok={ekyc.completed}>{ekyc.completed ? 'eKYC/MITC Completed' : 'eKYC/MITC Not Completed'}</StatusPill>
+            <StatusPill ok={ekyc.linkSent}>{ekyc.linkSent ? 'eKYC/MITC Link Sent' : 'eKYC/MITC Link Not Sent'}</StatusPill>
+            {ekyc.completed && ekyc.signedAt && <span style={{ fontSize: '0.72rem', color: NEUTRAL }}>e-Signed {formatDay(ekyc.signedAt)}</span>}
+            {ekycPending && !isSuperAdmin && <span style={{ fontSize: '0.72rem', color: NEUTRAL }}>A Super Admin can trigger it.</span>}
+          </>
+        )}
+      </Step>
+
+      <Step n={3} title="Welcome Kit" action={!welcomeKit.sent && welcomeKit.saleId && (
+        <StepButton onClick={triggerKit} busy={busy === 'kit'}>Send Welcome Kit</StepButton>
+      )}>
+        <StatusPill ok={welcomeKit.sent}>{welcomeKit.sent ? 'Welcome Kit Sent' : 'Welcome Kit Not Sent'}</StatusPill>
+        {welcomeKit.sent && <span style={{ fontSize: '0.72rem', color: NEUTRAL }}>{formatMoment(welcomeKit.sentAt)}{welcomeKit.to ? ` · ${welcomeKit.to}` : ''}</span>}
+      </Step>
+
+      <Step n={4} title="Service">
+        <StatusPill ok={service.enabled}>{service.enabled ? 'Service Enabled' : 'Service Disabled'}</StatusPill>
+        {service.services.map((x, i) => (
+          <span key={i} style={{ fontSize: '0.72rem', color: NEUTRAL }}>
+            {x.serviceName}{x.segments.length ? ` · ${x.segments.join(', ')}` : ' · no segment'}{x.endDate ? ` · until ${formatDay(x.endDate)}` : ''}
+          </span>
+        ))}
+      </Step>
+
+      <Step n={5} title="Expired">
+        {!expired.hasService
+          ? <StatusPill tone={NEUTRAL}>No service yet</StatusPill>
+          : <StatusPill ok={!expired.expired}>{expired.expired ? 'Service Expired' : 'Not Expired'}</StatusPill>}
+        {expired.hasService && expired.endDate && (
+          <span style={{ fontSize: '0.72rem', color: NEUTRAL }}>{expired.expired ? 'Ended' : 'Ends'} {formatDay(expired.endDate)}</span>
+        )}
+      </Step>
+    </div>
+  );
+};
+
 export const ClientMasterBlock = () => {
   const { showToast } = useToast();
   const [query, setQuery] = useState('');
@@ -259,6 +376,13 @@ export const ClientMasterBlock = () => {
   };
 
   const reset = () => { setQuery(''); setResult(null); setError(''); };
+  // Re-read the client after a trigger in the status overview (keeps the current result on failure)
+  const refresh = async () => {
+    if (!result?.query) return;
+    try {
+      setResult(await searchClient(result.query.value));
+    } catch { /* keep what is shown */ }
+  };
   const getInvoice = (inv) => downloadInvoice(inv).catch(err => showToast(err.message, 'error'));
   const name = result && ([result.client.clientPrefix, result.client.clientName].filter(Boolean).join(' ') || result.client.firmName || 'Client');
 
@@ -288,6 +412,7 @@ export const ClientMasterBlock = () => {
           </button>
         </form>
         {error && <div role="alert" style={{ margin: '0 20px 18px', color: 'var(--status-danger)', fontSize: '0.85rem' }}>{error}</div>}
+        {result && <ClientStatusOverview status={result.status} onChanged={refresh} />}
       </Section>
 
       {result && (
