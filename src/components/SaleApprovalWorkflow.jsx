@@ -14,7 +14,8 @@ import {
   Paperclip,
   FastForward,
   Bot,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
@@ -86,7 +87,9 @@ export const SaleApprovalWorkflow = () => {
     rejectSale,
     hasPermission,
     voiceAgentSettings,
-    triggerEKycAndESign
+    triggerEKycAndESign,
+    deleteESignLink,
+    currentUser
   } = useCRM();
   const { showToast } = useToast();
 
@@ -99,6 +102,37 @@ export const SaleApprovalWorkflow = () => {
     rejectSale(id, 'Super Admin declined sale details.');
     showToast(`Sale for '${name}' rejected.`, 'info');
   };
+
+  // Delete: only a Super Admin, only for a link that was sent and not yet signed
+  const [deletingId, setDeletingId] = useState(null);
+  const canDeleteLink = (s) => currentUser?.role === 'Super Admin' && isRealLeegalityDispatch(s) && s.eSignStatus !== 'Completed';
+  const handleDeleteLink = async (s) => {
+    const docId = s.eSignDocumentId || s.eSignDetails?.documentId;
+    if (!window.confirm(`Delete the e-sign link sent to '${s.clientName}' (Leegality Doc ID: ${docId})?
+
+The client will no longer be able to sign it. The sale goes back to the pending queue so e-KYC & E-Sign can be sent again.`)) return;
+    setDeletingId(s.id);
+    try {
+      await deleteESignLink(s.id);
+      showToast(`E-sign link for '${s.clientName}' deleted on Leegality.`, 'success');
+    } catch (err) {
+      showToast(`E-sign link not deleted: ${err.message}`, 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const DeleteLinkButton = ({ sale }) => (
+    <button
+      className="btn-danger"
+      style={{ padding: '3px 8px', fontSize: '0.74rem', gap: '4px', display: 'inline-flex', alignItems: 'center' }}
+      onClick={() => handleDeleteLink(sale)}
+      disabled={deletingId === sale.id}
+      title="Delete the e-sign link already sent on Leegality (Super Admin)"
+    >
+      <Trash2 size={12} /> {deletingId === sale.id ? 'Deleting…' : 'Delete'}
+    </button>
+  );
 
   const handleDirectTriggerEKycAndESign = async (targetSale) => {
     setIsDispatchingDirect(true);
@@ -291,6 +325,8 @@ export const SaleApprovalWorkflow = () => {
                             >
                               <XCircle size={12} /> Reject
                             </button>
+
+                            {canDeleteLink(s) && <DeleteLinkButton sale={s} />}
                           </div>
                         ) : (
                           <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
@@ -362,13 +398,16 @@ export const SaleApprovalWorkflow = () => {
                               : 'Awaiting Telegram approval'}
                           </span>
                         ) : (
-                        <EKycTrafficLight
-                          sale={s}
-                          canTrigger={hasPermission('sale-approvals')}
-                          isDispatching={isDispatchingDirect}
-                          onTrigger={() => handleDirectTriggerEKycAndESign(s)}
-                          onViewStatus={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <EKycTrafficLight
+                            sale={s}
+                            canTrigger={hasPermission('sale-approvals')}
+                            isDispatching={isDispatchingDirect}
+                            onTrigger={() => handleDirectTriggerEKycAndESign(s)}
+                            onViewStatus={() => setLiveDispatchData({ sale: s, result: s.eSignDetails?.documentId ? s.eSignDetails : { documentId: s.eSignDocumentId } })}
+                          />
+                          {canDeleteLink(s) && <DeleteLinkButton sale={s} />}
+                        </div>
                         )}
                       </td>
                     </tr>

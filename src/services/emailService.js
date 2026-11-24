@@ -79,6 +79,9 @@ export const resendServiceExpiryEmail = (paidId) =>
 // ─── Failed Email Deliveries report (backend/email_failures.py) ───
 export const getEmailFailures = () => json('/email/failures');
 
+/** Every client email triggered, sent or failed, for the consolidated Email Delivery Report. */
+export const getEmailDeliveryReport = () => json('/email/failures/delivery-report');
+
 /** Reads the sender mailbox for bounce messages, then returns the refreshed report. */
 export const scanEmailBounces = () => json('/email/failures/scan', { method: 'POST' });
 

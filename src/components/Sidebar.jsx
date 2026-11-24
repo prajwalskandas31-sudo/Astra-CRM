@@ -1,176 +1,130 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History, FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet, Tags, Receipt, BookOpen, ClipboardList, ScrollText, Cloud, ShieldAlert, NotebookPen } from 'lucide-react';
+import {
+  LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History,
+  FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet,
+  Tags, Receipt, BookOpen, ClipboardList, ScrollText, Cloud, ShieldAlert, NotebookPen, Settings, BarChart3, Scale,
+  ChevronDown, ChevronRight, Shuffle, PackagePlus, MailCheck
+} from 'lucide-react';
+
+/**
+ * The sidebar: stand-alone blocks plus four parent blocks (Leads, Reports, Compliance, Settings).
+ * Each child keeps its own Feature Access id, so a parent shows only the children the user may open
+ * and disappears when there are none.
+ */
+export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, eSignCount = 0 } = {}) => [
+  { id: 'dashboard', label: 'CRM Dashboard', icon: LayoutDashboard },
+  { id: 'lead-history', label: 'Lead History (Block 5)', icon: History },
+  {
+    group: 'leads', label: 'Leads', icon: Upload,
+    children: [
+      { id: 'lead-upload', label: 'Lead Upload & Reports', icon: Upload },
+      { id: 'lead-summary', label: 'Lead Summary (Block 4)', icon: PieChart, badge: pendingRequestsCount || null },
+      { id: 'lead-reassignment', label: 'Lead Re-assignment', icon: Shuffle }
+    ]
+  },
+  { id: 'team-monitoring', label: 'Team Monitoring', icon: TrendingUp },
+  { id: 'team-performance', label: 'Team Performance Tracking', icon: Activity },
+  { id: 'sale-approvals', label: 'Sale Approvals', icon: CheckCircle, badge: pendingSalesCount || null },
+  { id: 'esign-block', label: 'E-Sign Block', icon: FileSignature, badge: eSignCount || null },
+  { id: 'paid-block', label: 'Paid', icon: BadgeIndianRupee },
+  { id: 'send-welcome-kit', label: 'Send Welcome Kit', icon: MailCheck },
+  { id: 'extended-service', label: 'Extended Service Block', icon: PackagePlus },
+  { id: 'kra-block', label: 'KRA Block', icon: ShieldCheck },
+  { id: 'telegram-control', label: 'Telegram Control Block', icon: Send },
+  { id: 'research-reports', label: 'Research Reports', icon: FileText },
+  {
+    group: 'reports', label: 'Reports', icon: BarChart3,
+    children: [
+      { id: 'salary-block', label: 'Salary Block', icon: Wallet },
+      { id: 'client-master', label: 'Client MASTER', icon: Contact },
+      { id: 'research-recommendations', label: 'Records for Research Recommendations', icon: NotebookPen },
+      { id: 'running-account', label: 'Running Account Statement', icon: BookOpen }
+    ]
+  },
+  {
+    group: 'compliance', label: 'Compliance', icon: Scale,
+    children: [
+      { id: 'audit-reports', label: 'Audit Report Blocks', icon: ClipboardList },
+      { id: 'ra-periodic-report', label: 'RA Periodic Report Block', icon: ScrollText },
+      { id: 'ra-compliance', label: 'RA Monthly Compliance Tracker', icon: ShieldAlert },
+      { id: 'annexure-a-saas', label: 'Annexure A for SaaS Reporting', icon: Cloud }
+    ]
+  },
+  {
+    group: 'settings', label: 'Settings', icon: Settings,
+    children: [
+      { id: 'company-profile', label: 'Company Profile', icon: Building2 },
+      { id: 'branch-profiles', label: 'Branch Profiles', icon: GitBranch },
+      { id: 'directory', label: 'User Directory', icon: Users },
+      { id: 'email-block', label: 'Email Block', icon: Mail },
+      { id: 'system-settings', label: 'System & UI Settings', icon: Sliders },
+      { id: 'custom-roles', label: 'Custom Roles (Annexure-I)', icon: Shield },
+      { id: 'feature-access', label: 'Feature Access Block', icon: Key },
+      { id: 'dispositions', label: 'Dispositions (Block 2)', icon: Layers },
+      { id: 'service-master', label: 'Service Master', icon: Tags },
+      { id: 'invoice-block', label: 'Invoice Block', icon: Receipt }
+    ]
+  }
+];
+
+/** Every tab id in sidebar order (App.jsx falls back to the first one the user may open). */
+export const ALL_TAB_IDS = buildNavTree().flatMap(n => (n.children ? n.children.map(c => c.id) : [n.id]));
+
+const OPEN_GROUPS_KEY = 'astra_sidebar_open_groups';
+
+const readOpenGroups = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPEN_GROUPS_KEY) || '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
 
 export const Sidebar = ({ activeTab, setActiveTab }) => {
-  const { simulatedRole, sales, leadRequests, eSignRecords = [], paidClients = [], hasPermission } = useCRM();
+  const { simulatedRole, sales, leadRequests, eSignRecords = [], hasPermission } = useCRM();
 
-  const pendingSalesCount = sales.filter(s => s.status.includes('Pending')).length;
-  const pendingRequestsCount = leadRequests?.filter(r => r.status === 'Pending').length || 0;
-
-  const navItems = [
-    {
-      id: 'dashboard',
-      label: 'CRM Dashboard',
-      icon: LayoutDashboard
-    },
-    {
-      id: 'lead-history',
-      label: 'Lead History (Block 5)',
-      icon: History
-    },
-    {
-      id: 'directory',
-      label: 'User Directory',
-      icon: Users
-    },
-    {
-      id: 'dispositions',
-      label: 'Dispositions (Block 2)',
-      icon: Layers
-    },
-    {
-      id: 'lead-upload',
-      label: 'Lead Upload & Reports',
-      icon: Upload
-    },
-    {
-      id: 'lead-summary',
-      label: 'Lead Summary (Block 4)',
-      icon: PieChart,
-      badge: pendingRequestsCount > 0 ? pendingRequestsCount : null
-    },
-    {
-      id: 'team-monitoring',
-      label: 'Team Monitoring',
-      icon: TrendingUp
-    },
-    {
-      id: 'team-performance',
-      label: 'Team Performance Tracking',
-      icon: Activity
-    },
-    {
-      id: 'sale-approvals',
-      label: 'Sale Approvals',
-      icon: CheckCircle,
-      badge: pendingSalesCount > 0 ? pendingSalesCount : null
-    },
-    {
-      id: 'esign-block',
-      label: 'E-Sign Block',
-      icon: FileSignature,
-      badge: eSignRecords.length > 0 ? eSignRecords.length : null
-    },
-    {
-      id: 'paid-block',
-      label: 'Paid',
-      icon: BadgeIndianRupee
-    },
-    {
-      id: 'salary-block',
-      label: 'Salary Block',
-      icon: Wallet
-    },
-    {
-      id: 'kra-block',
-      label: 'KRA Block',
-      icon: ShieldCheck
-    },
-    {
-      id: 'client-master',
-      label: 'Client MASTER',
-      icon: Contact
-    },
-    {
-      id: 'invoice-block',
-      label: 'Invoice Block',
-      icon: Receipt
-    },
-    {
-      id: 'running-account',
-      label: 'Running Account Statement',
-      icon: BookOpen
-    },
-    {
-      id: 'audit-reports',
-      label: 'Audit Report Blocks',
-      icon: ClipboardList
-    },
-    {
-      id: 'ra-periodic-report',
-      label: 'RA Periodic Report Block',
-      icon: ScrollText
-    },
-    {
-      id: 'annexure-a-saas',
-      label: 'Annexure A for SaaS Reporting',
-      icon: Cloud
-    },
-    {
-      id: 'ra-compliance',
-      label: 'RA Monthly Compliance Tracker',
-      icon: ShieldAlert
-    },
-    {
-      id: 'telegram-control',
-      label: 'Telegram Control Block',
-      icon: Send
-    },
-    {
-      id: 'lead-reassignment',
-      label: 'Lead Reassignment',
-      icon: Layers
-    },
-    {
-      id: 'research-reports',
-      label: 'Research Reports',
-      icon: FileText
-    },
-    {
-      id: 'research-recommendations',
-      label: 'Records for Research Recommendations',
-      icon: NotebookPen
-    },
-    {
-      id: 'service-master',
-      label: 'Service Master',
-      icon: Tags
-    },
-    {
-      id: 'company-profile',
-      label: 'Company Profile',
-      icon: Building2
-    },
-    {
-      id: 'branch-profiles',
-      label: 'Branch Profiles',
-      icon: GitBranch
-    },
-    {
-      id: 'email-block',
-      label: 'Email Block',
-      icon: Mail
-    },
-    {
-      id: 'system-settings',
-      label: 'System & UI Settings',
-      icon: Sliders
-    },
-    {
-      id: 'custom-roles',
-      label: 'Custom Roles (Annexure-I)',
-      icon: Shield
-    },
-    {
-      id: 'feature-access',
-      label: 'Feature Access Block',
-      icon: Key
-    }
-  ];
+  const tree = buildNavTree({
+    pendingSalesCount: sales.filter(s => s.status.includes('Pending')).length,
+    pendingRequestsCount: leadRequests?.filter(r => r.status === 'Pending').length || 0,
+    eSignCount: eSignRecords.length
+  });
 
   // Role does not inherently restrict features; visibility is driven strictly by permissions
-  const visibleNavItems = navItems.filter(item => hasPermission(item.id));
+  const visibleTree = tree
+    .map(n => (n.children ? { ...n, children: n.children.filter(c => hasPermission(c.id)) } : n))
+    .filter(n => (n.children ? n.children.length > 0 : hasPermission(n.id)));
+
+  const [openGroups, setOpenGroups] = useState(readOpenGroups);
+
+  // The parent block holding the open page is always expanded
+  const activeGroup = tree.find(n => n.children?.some(c => c.id === activeTab))?.group;
+  useEffect(() => {
+    if (activeGroup) setOpenGroups(g => (g.includes(activeGroup) ? g : [...g, activeGroup]));
+  }, [activeGroup]);
+
+  useEffect(() => {
+    try { localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups)); } catch { /* storage blocked */ }
+  }, [openGroups]);
+
+  const toggleGroup = (group) =>
+    setOpenGroups(g => (g.includes(group) ? g.filter(x => x !== group) : [...g, group]));
+
+  const renderItem = (item, nested = false) => {
+    const Icon = item.icon;
+    return (
+      <button
+        key={item.id}
+        className={`nav-item ${nested ? 'nav-item-nested' : ''} ${activeTab === item.id ? 'active' : ''}`}
+        onClick={() => setActiveTab(item.id)}
+      >
+        <Icon size={nested ? 14 : 16} />
+        <span>{item.label}</span>
+        {item.badge && <span className="nav-badge">{item.badge}</span>}
+      </button>
+    );
+  };
 
   return (
     <aside className="sidebar">
@@ -185,27 +139,33 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
       </div>
 
       <nav className="sidebar-nav">
-        {visibleNavItems.map(item => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
+        {visibleTree.map(node => {
+          if (!node.children) return renderItem(node);
+          const Icon = node.icon;
+          const open = openGroups.includes(node.group);
+          const badgeTotal = node.children.reduce((sum, c) => sum + (c.badge || 0), 0);
           return (
-            <button
-              key={item.id}
-              className={`nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => setActiveTab(item.id)}
-            >
-              <Icon size={16} />
-              <span>{item.label}</span>
-              {item.badge && <span className="nav-badge">{item.badge}</span>}
-            </button>
+            <div key={node.group} className="nav-group">
+              <button
+                className={`nav-item nav-group-header ${node.group === activeGroup ? 'holds-active' : ''}`}
+                onClick={() => toggleGroup(node.group)}
+                aria-expanded={open}
+              >
+                <Icon size={16} />
+                <span>{node.label}</span>
+                {!open && badgeTotal > 0 && <span className="nav-badge">{badgeTotal}</span>}
+                <span className="nav-group-chevron">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+              </button>
+              {open && <div className="nav-group-children">{node.children.map(c => renderItem(c, true))}</div>}
+            </div>
           );
         })}
       </nav>
 
       <div className="sidebar-footer">
-        <div style={{ 
-          fontSize: '0.73rem', 
-          color: '#9A9A96', 
+        <div style={{
+          fontSize: '0.73rem',
+          color: '#9A9A96',
           textAlign: 'center',
           padding: '6px 12px',
           background: 'rgba(255, 255, 255, 0.03)',

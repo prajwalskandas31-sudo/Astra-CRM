@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useCRM } from '../context/CRMContext';
+import { useToast } from './ToastNotification';
 import {
   History,
   Search,
@@ -12,11 +14,27 @@ import {
   Phone,
   Globe,
   Clock,
-  Filter
+  Download
 } from 'lucide-react';
+
+// History entries carry YYYY-MM-DD dates (older ones may hold an ISO timestamp)
+const dayOf = (value) => String(value || '').slice(0, 10);
+const inRange = (day, from, to) => !!day && (!from || day >= from) && (!to || day <= to);
+
+/** The lead's assignment / interaction entries that fall in the date range (all of them when no range is set). */
+export const entriesInRange = (lead, from, to) =>
+  (lead.history || []).filter(h => (!from && !to) || inRange(dayOf(h.date), from, to));
+
+/** A lead is in the range when it was first assigned, or has any timeline entry, between the dates. */
+export const leadInRange = (lead, from, to) => {
+  if (!from && !to) return true;
+  const first = dayOf(lead.history?.[0]?.date || lead.createdAt);
+  return inRange(first, from, to) || entriesInRange(lead, from, to).length > 0;
+};
 
 export const LeadHistoryBlock = () => {
   const { leads, users, currentUser, simulatedRole } = useCRM();
+  const { showToast } = useToast();
   const isSuperAdmin = simulatedRole === 'Super Admin' || currentUser?.role === 'Super Admin';
 
   const [search, setSearch] = useState('');
@@ -27,7 +45,6 @@ export const LeadHistoryBlock = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [showFilters, setShowFilters] = useState(false);
 
   const effectiveUserId =
     isSuperAdmin && historyUserFilter !== 'SELF' && historyUserFilter !== 'ALL'
@@ -82,9 +99,7 @@ export const LeadHistoryBlock = () => {
     const q = search.trim().toLowerCase();
     return historyLeads.filter(l => {
       if (dispFilter !== 'All' && (l.disposition || 'New Lead') !== dispFilter) return false;
-      const firstDate = l.history?.[0]?.date || l.createdAt || '';
-      if (dateFrom && firstDate && firstDate < dateFrom) return false;
-      if (dateTo && firstDate && firstDate > dateTo) return false;
+      if (!leadInRange(l, dateFrom, dateTo)) return false;
       if (q) {
         const haystack = [
           l.contactPerson, l.phone, l.language, l.disposition,
@@ -97,6 +112,33 @@ export const LeadHistoryBlock = () => {
       return true;
     });
   }, [historyLeads, search, dispFilter, dateFrom, dateTo]);
+
+  // Excel: the leads shown, plus every timeline entry in the selected date range
+  const handleDownload = () => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      showToast('From Date is after To Date.', 'error');
+      return;
+    }
+    const leadRows = [['Contact Name', 'Phone', 'Language', 'Disposition', 'Assigned To', 'First Assigned', 'Entries in Range', 'Total Entries']];
+    const timelineRows = [['Contact Name', 'Phone', 'Assigned To', 'Date', 'Time', 'Entry', 'By']];
+    filteredLeads.forEach(l => {
+      const entries = entriesInRange(l, dateFrom, dateTo);
+      leadRows.push([l.contactPerson || '', l.phone || '', l.language || 'English', l.disposition || 'New Lead',
+        l.assignedToName || '', dayOf(l.history?.[0]?.date || l.createdAt), entries.length, (l.history || []).length]);
+      entries.forEach(h => timelineRows.push([l.contactPerson || '', l.phone || '', l.assignedToName || '',
+        dayOf(h.date), h.time || '', h.text || '', h.by || '']));
+    });
+    const wb = XLSX.utils.book_new();
+    const leadsSheet = XLSX.utils.aoa_to_sheet(leadRows);
+    leadsSheet['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 10 }, { wch: 26 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 10 }];
+    const timelineSheet = XLSX.utils.aoa_to_sheet(timelineRows);
+    timelineSheet['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 80 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, leadsSheet, 'Leads');
+    XLSX.utils.book_append_sheet(wb, timelineSheet, 'Assignment History');
+    const range = dateFrom || dateTo ? `${dateFrom || 'start'} to ${dateTo || 'today'}` : 'all dates';
+    XLSX.writeFile(wb, `Lead Assignment History (${range}).xlsx`);
+    showToast(`Downloaded ${filteredLeads.length} lead(s) and ${timelineRows.length - 1} history entries.`, 'success');
+  };
 
   const toggleRow = id => {
     setExpandedRows(prev => {
@@ -173,34 +215,30 @@ export const LeadHistoryBlock = () => {
         <select value={dispFilter} onChange={e => setDispFilter(e.target.value)} style={{ fontSize: '0.8rem', padding: '6px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', height: '36px' }}>
           {uniqueDispositions.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-        <button type="button" onClick={() => setShowFilters(f => !f)} className="btn-secondary" style={{ fontSize: '0.78rem', padding: '6px 12px', height: '36px', display: 'flex', alignItems: 'center', gap: '5px', borderColor: showFilters ? 'var(--accent-primary)' : 'var(--border-color)', color: showFilters ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
-          <Filter size={13} /> Date Filter {showFilters ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Calendar size={13} color="var(--accent-primary)" />
+          <label htmlFor="lah-from" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>From Date</label>
+          <input id="lah-from" type="date" value={dateFrom} max={dateTo || undefined} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '0.8rem', padding: '5px 8px', height: '36px', boxSizing: 'border-box', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label htmlFor="lah-to" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>To Date</label>
+          <input id="lah-to" type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '0.8rem', padding: '5px 8px', height: '36px', boxSizing: 'border-box', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
+        </div>
+        {(dateFrom || dateTo) && (
+          <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="btn-secondary" style={{ fontSize: '0.76rem', padding: '4px 10px', height: '36px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <X size={12} /> Clear Dates
+          </button>
+        )}
+        <button type="button" onClick={handleDownload} disabled={filteredLeads.length === 0} className="btn-secondary"
+          title="Download the leads shown and their assignment history in the selected date range (.xlsx)"
+          style={{ fontSize: '0.78rem', padding: '6px 12px', height: '36px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <Download size={13} /> Download Excel
         </button>
         <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           <span style={{ background: 'var(--accent-soft)', color: 'var(--accent-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', fontWeight: 700, fontSize: '0.82rem' }}>{filteredLeads.length}</span>
           of {historyLeads.length} leads
         </div>
       </div>
-
-      {showFilters && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '12px 20px', background: 'rgba(139,92,246, 0.04)', borderBottom: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={13} color="var(--accent-primary)" />
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '0.8rem', padding: '5px 8px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Calendar size={13} color="var(--accent-primary)" />
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '0.8rem', padding: '5px 8px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }} />
-          </div>
-          {(dateFrom || dateTo) && (
-            <button type="button" onClick={() => { setDateFrom(''); setDateTo(''); }} className="btn-secondary" style={{ fontSize: '0.76rem', padding: '4px 10px', height: '32px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <X size={12} /> Clear Dates
-            </button>
-          )}
-        </div>
-      )}
 
       <div className="table-responsive">
         <table className="crm-table">

@@ -409,6 +409,45 @@ button, input, select, textarea {
   border-radius: var(--radius-full);
 }
 
+/* Parent blocks (Leads, Reports, Compliance, Settings) */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-group-header {
+  font-weight: 600;
+}
+
+.nav-group-header.holds-active {
+  color: #F8FAFC;
+}
+
+.nav-group-chevron {
+  margin-left: auto;
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.nav-group-header .nav-badge + .nav-group-chevron {
+  margin-left: 6px;
+}
+
+.nav-group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 18px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-item-nested {
+  padding: 7px 12px;
+  font-size: 0.82rem;
+}
+
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -1396,6 +1435,14 @@ button.ekyc-light:disabled {
   .nav-item.active {
     border-left-color: transparent;
     border-bottom-color: var(--accent);
+  }
+  .nav-group,
+  .nav-group-children {
+    flex-direction: row;
+  }
+  .nav-group-children {
+    margin-left: 0;
+    border-left: none;
   }
   .top-header {
     padding: 0 18px;

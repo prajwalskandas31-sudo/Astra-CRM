@@ -12,6 +12,7 @@ import {
 } from '../services/emailService';
 import { ServiceExpiryEmail } from './ServiceExpiryEmail';
 import { EmailFailuresReport } from './EmailFailuresReport';
+import { EmailDeliveryReport } from './EmailDeliveryReport';
 
 const SECURITY = [
   { value: 'ssl', label: 'SSL/TLS (port 465)', port: 465 },
@@ -196,8 +197,8 @@ export const EmailBlock = () => {
             <Mail size={18} color="var(--accent)" /> Email Block
           </h3>
           <p>
-            The address client emails are sent from and the Welcome Kit files. "Send Welcome Kit" emails the client every uploaded
-            file and, once they have completed the Leegality e-sign, their signed agreement and e-KYC documents.
+            The address client emails are sent from and the Welcome Kit files. The kit itself is sent from the "Send Welcome Kit"
+            block: every uploaded file and, once the client has completed the Leegality e-sign, their signed agreement and e-KYC documents.
           </p>
         </div>
       </div>
@@ -347,19 +348,14 @@ export const EmailBlock = () => {
         </div>
       </div>
 
-      {/* ─── Send Welcome Kit ─── */}
-      <div style={{ borderTop: '1px solid var(--border-color)' }}>
-        <SectionHeader icon={Send} title="Send Welcome Kit">
-          Pick a client. The kit goes to the Email ID on their Client Information Page, from {settings?.senderEmail || 'the Sender Email ID above'}.
-        </SectionHeader>
-        <WelcomeKitSender sales={sales} onSent={async () => setLog(await getWelcomeKitLog())} />
-      </div>
-
       {/* ─── Service Expiry Email ─── */}
       <ServiceExpiryEmail canEdit={canEdit} />
 
       {/* ─── Failed Email Deliveries ─── */}
       <EmailFailuresReport />
+
+      {/* ─── Sent + failed, every client email, one Excel ─── */}
+      <EmailDeliveryReport />
 
       {/* ─── Recent sends ─── */}
       {log.length > 0 && (
@@ -443,10 +439,10 @@ const SlotCard = ({ slot, canEdit, busy, onUpload, onRemove, onDownload }) => {
 
 const clientEmail = (s) => s.email || s.fullClientInfo?.email || s.clientInfo?.email || '';
 
-const WelcomeKitSender = ({ sales, onSent }) => {
+export const WelcomeKitSender = ({ sales, onSent, initialSaleId = '' }) => {
   const { showToast } = useToast();
   const [query, setQuery] = useState('');
-  const [saleId, setSaleId] = useState('');
+  const [saleId, setSaleId] = useState(initialSaleId);
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
   const [sending, setSending] = useState(false);

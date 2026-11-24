@@ -6,7 +6,7 @@
 //     and sales still on their way through review
 // A record belongs to the client when it shares the lead, a phone number or a valid PAN.
 
-import { computeServiceEndDate, isTenureOver, todayKey, PAID_STATUS_EXPIRED } from './serviceTenure';
+import { computeServiceEndDate, isTenureOver, parseSignDate, todayKey, PAID_STATUS_EXPIRED } from './serviceTenure';
 
 export const SUB_ACTIVE = 'Active';
 export const SUB_EXPIRED = 'Expired';
@@ -91,7 +91,8 @@ export const buildSubscriptionHistory = ({
     const oldClient = s.clientType === OLD_CLIENT;
     const done = oldClient ? s.status === OLD_CLIENT_APPROVED : s.status === CONVERTED;
     const tenure = s.serviceTenure || info.serviceTenure || '';
-    const startDate = dateKey(info.paymentDate) || dateKey(s.date);
+    // A new client's service runs from the day they e-signed; an Old Client (no e-sign) from the Payment Date
+    const startDate = (!oldClient && parseSignDate(s.eSignedAt || s.eSignDetails?.signedAt)) || dateKey(info.paymentDate) || dateKey(s.date);
     const endDate = s.serviceEndDate || info.serviceEndDate || (done ? computeServiceEndDate(startDate, tenure) : '') || '';
     entries.push({
       id: s.id,
