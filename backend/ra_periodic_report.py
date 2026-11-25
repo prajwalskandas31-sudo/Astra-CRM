@@ -29,12 +29,14 @@ try:
     from backend import store, audit_report, reports
     from backend.auth import get_current_user
     from backend.running_account import IST
+    from backend.sync import INDIAN_STATES
 except ImportError:
     import store
     import audit_report
     import reports
     from auth import get_current_user
     from running_account import IST
+    from sync import INDIAN_STATES
 
 
 FEATURE_ID = "ra-periodic-report"
@@ -96,6 +98,30 @@ def _address(text, state="") -> dict:
             "city": "", "district": "", "pincode": pin.group(1) if pin else "", "country": "India" if text else ""}
 
 
+# Branch Profiles (Settings) keeps the address in these fields; branches saved before them only have "address"
+BRANCH_ADDRESS_FIELDS = {"line1": "addressLine1", "line2": "addressLine2", "state": "state", "city": "city",
+                         "district": "district", "pincode": "pincode", "country": "country"}
+
+
+def _state_in(text) -> str:
+    """The Indian State or UT named in a free-text address (the longest match, so "Andhra Pradesh" beats "Pradesh")."""
+    low = f" {re.sub(r'[^a-z0-9]+', ' ', _text(text).lower())} "
+    hits = [s for s in INDIAN_STATES if f" {re.sub(r'[^a-z0-9]+', ' ', s.lower()).strip()} " in low]
+    if not hits and " delhi " in low:
+        hits = ["Delhi (NCT)"]
+    return max(hits, key=len) if hits else ""
+
+
+def _branch_address(branch: dict) -> dict:
+    """One Branch Address row from a Branch Profile."""
+    row = {k: _text(branch.get(src)) for k, src in BRANCH_ADDRESS_FIELDS.items()}
+    if any(row.values()):
+        row["country"] = row["country"] or "India"
+    else:
+        row = _address(branch.get("address"), _state_in(branch.get("address")))
+    return row | {"name": _text(branch.get("name"))}
+
+
 def _in_period(stamp, start, end) -> bool:
     day = audit_report._day(stamp)
     return bool(day and start <= day <= end)
@@ -145,7 +171,7 @@ def auto_values(period: str) -> dict:
         "general": general,
         "complaints": {},
         "clientsFees": clients_fees,
-        "branches": [_address(b.get("address")) | {"name": _text(b.get("name"))} for b in branches],
+        "branches": [_branch_address(b) for b in branches],
         "websites": [{"url": _text(profile.get("website"))}] if _text(profile.get("website")) else [],
         "social": [],
         "banks": [{"holderName": company, "accountNo": _text(a.get("accountNumber")), "accountType": _text(a.get("accountType")).upper(),

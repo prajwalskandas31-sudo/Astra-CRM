@@ -177,6 +177,12 @@ BRANCH_CODE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{0,19}$")
 def _branch_check(user: dict, old: Optional[dict], new: Optional[dict]) -> Optional[str]:
     if new is None:
         return None
+    pincode = str(new.get("pincode") or "").strip()
+    if pincode and not re.fullmatch(r"\d{6}", pincode):
+        return "Branch Pincode must be 6 digits."
+    state = str(new.get("state") or "").strip()
+    if state and state not in INDIAN_STATES:
+        return f'"{state}" is not an Indian State / UT.'
     code = str(new.get("branchCode") or "").strip().upper()
     if not code:
         return None   # branches saved before Branch ID existed

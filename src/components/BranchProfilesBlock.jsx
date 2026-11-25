@@ -2,11 +2,23 @@ import React, { useMemo, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { GitBranch, Save, RotateCcw, Plus, Edit2, Trash2, MapPin, Phone, Users, Wand2 } from 'lucide-react';
+import { INDIAN_STATES } from './ClientInformationModal';
 
 // Roles that can be named as a branch manager
 const MANAGER_ROLES = ['Manager', 'Admin', 'Super Admin'];
 
-const EMPTY_FORM = { name: '', branchCode: '', address: '', managerIds: [], phone: '' };
+// The address parts are what the RA Periodic Report Block -> Branch Address fills in
+const ADDRESS_INPUTS = [
+  { key: 'addressLine1', label: 'Address Line 1', placeholder: 'e.g. 2nd Floor, 7-1-28', autoComplete: 'address-line1' },
+  { key: 'addressLine2', label: 'Address Line 2', placeholder: 'e.g. Ameerpet Main Road', autoComplete: 'address-line2' },
+  { key: 'city', label: 'City', placeholder: 'e.g. Hyderabad', autoComplete: 'address-level2' },
+  { key: 'district', label: 'District', placeholder: 'e.g. Hyderabad' },
+  { key: 'state', label: 'State', type: 'select' },
+  { key: 'pincode', label: 'Pincode', placeholder: '6 digits, e.g. 500016', autoComplete: 'postal-code' },
+  { key: 'country', label: 'Country', placeholder: 'India', autoComplete: 'country-name' }
+];
+const EMPTY_ADDRESS = Object.fromEntries(ADDRESS_INPUTS.map(f => [f.key, '']));
+const EMPTY_FORM = { name: '', branchCode: '', ...EMPTY_ADDRESS, country: 'India', managerIds: [], phone: '' };
 
 // Branch ID: matches BRANCH_CODE in backend/sync.py
 const CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{0,19}$/;
@@ -75,6 +87,11 @@ export const BranchProfilesBlock = () => {
       showToast(`Branch ID "${branchCode}" is already used by "${codeClash.name}".`, 'error');
       return;
     }
+    const pincode = (form.pincode || '').trim();
+    if (pincode && !/^\d{6}$/.test(pincode)) {
+      showToast('Pincode must be 6 digits.', 'error');
+      return;
+    }
     const data = { ...form, branchCode };
     if (editingId) {
       updateBranch(editingId, data);
@@ -91,7 +108,10 @@ export const BranchProfilesBlock = () => {
     setForm({
       name: branch.name || '',
       branchCode: branch.branchCode || '',
-      address: branch.address || '',
+      ...EMPTY_ADDRESS,
+      ...Object.fromEntries(ADDRESS_INPUTS.map(f => [f.key, branch[f.key] || ''])),
+      // A branch saved before the address had parts: its old address starts in Address Line 1
+      ...(ADDRESS_INPUTS.some(f => branch[f.key]) ? {} : { addressLine1: branch.address || '', country: 'India' }),
       managerIds: Array.isArray(branch.managerIds) ? branch.managerIds : [],
       phone: branch.phone || ''
     });
@@ -171,17 +191,24 @@ export const BranchProfilesBlock = () => {
                   autoComplete="tel"
                 />
               </div>
-              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="branch-address">Branch Address</label>
-                <textarea
-                  id="branch-address"
-                  rows={2}
-                  value={form.address}
-                  onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                  placeholder="e.g. 2nd Floor, 7-1-28 Ameerpet, Hyderabad 500016"
-                  autoComplete="street-address"
-                />
+              <div style={{ gridColumn: '1 / -1', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Branch Address <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(also fills RA Periodic Report Block → Branch Address)</span>
               </div>
+              {ADDRESS_INPUTS.map(f => (
+                <div className="form-group" key={f.key}>
+                  <label htmlFor={`branch-${f.key}`}>{f.label}</label>
+                  {f.type === 'select' ? (
+                    <select id={`branch-${f.key}`} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}>
+                      <option value="">-- Select State --</option>
+                      {INDIAN_STATES.map(st => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                  ) : (
+                    <input id={`branch-${f.key}`} type="text" value={form[f.key]} placeholder={f.placeholder} autoComplete={f.autoComplete}
+                      inputMode={f.key === 'pincode' ? 'numeric' : undefined} maxLength={f.key === 'pincode' ? 6 : 150}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: f.key === 'pincode' ? e.target.value.replace(/\D/g, '') : e.target.value }))} />
+                  )}
+                </div>
+              ))}
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label>Managers</label>
                 {managerChoices.length === 0 ? (
@@ -213,7 +240,7 @@ export const BranchProfilesBlock = () => {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-              {(editingId || form.name || form.branchCode || form.address || form.phone || form.managerIds.length > 0) && (
+              {(editingId || form.name || form.branchCode || ADDRESS_INPUTS.some(f => f.key !== 'country' && form[f.key]) || form.phone || form.managerIds.length > 0) && (
                 <button type="button" className="btn-secondary" onClick={resetForm}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                   <RotateCcw size={14} /> {editingId ? 'Cancel Edit' : 'Clear'}
