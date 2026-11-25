@@ -124,7 +124,8 @@ def auto_values(period: str) -> dict:
         "contactEmail": _text(profile.get("email")),
         "raCount": "",
         "researchReports": str(len(ready)),
-        "employees": str(len(users)),
+        # Point 38: active users whose Education (User Directory) is Graduate
+        "employees": str(sum(1 for u in users if _text(u.get("education")) == "Graduate")),
         "upiApplied": "Yes" if any(_text(a.get("upiId")) for a in accounts) else "No",
     }
     for prefix in ("reg", "corr", "ppb"):  # registered, correspondence, principal place of business
