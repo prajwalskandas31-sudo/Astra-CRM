@@ -2803,13 +2803,21 @@ export const CRMProvider = ({ children }) => {
   };
 
   // ─── Branch Profiles CRUD ────────────────────────────────────────────────
-  const cleanBranch = (data) => ({
-    name: (data.name || '').trim(),
-    branchCode: (data.branchCode || '').trim().toUpperCase(), // Branch ID: unique, checked in backend/sync.py
-    address: (data.address || '').trim(),
-    managerIds: Array.isArray(data.managerIds) ? data.managerIds : [],
-    phone: (data.phone || '').trim()
-  });
+  // Address parts feed the RA Periodic Report -> Branch Address; "address" is the same address on one line
+  const BRANCH_ADDRESS_KEYS = ['addressLine1', 'addressLine2', 'city', 'district', 'state', 'pincode', 'country'];
+  const cleanBranch = (data) => {
+    const parts = Object.fromEntries(BRANCH_ADDRESS_KEYS.map(k => [k, String(data[k] || '').trim()]));
+    const joined = [parts.addressLine1, parts.addressLine2, parts.city, parts.district,
+      [parts.state, parts.pincode].filter(Boolean).join(' - '), parts.country].filter(Boolean).join(', ');
+    return {
+      name: (data.name || '').trim(),
+      branchCode: (data.branchCode || '').trim().toUpperCase(), // Branch ID: unique, checked in backend/sync.py
+      ...parts,
+      address: joined || (data.address || '').trim(),
+      managerIds: Array.isArray(data.managerIds) ? data.managerIds : [],
+      phone: (data.phone || '').trim()
+    };
+  };
 
   const addBranch = (data) => {
     const branch = { id: 'br-' + Date.now() + '-' + Math.floor(100 + Math.random() * 900), ...cleanBranch(data) };

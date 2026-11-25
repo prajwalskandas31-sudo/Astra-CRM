@@ -121,3 +121,17 @@ def test_point_38_counts_active_graduates(crm_data):
     finally:
         for u in users:
             s.put("users", u["id"], u)
+
+
+def test_branch_address_comes_from_branch_profiles(crm_data):
+    s = crm_data.store
+    s.put("branches", "br2", {"id": "br2", "name": "Ameerpet", "addressLine1": "2nd Floor, 7-1-28", "addressLine2": "Ameerpet",
+                              "city": "Hyderabad", "district": "Hyderabad", "state": "Telangana", "pincode": "500016",
+                              "address": "ignored when the parts are set"})
+    s.put("branches", "br3", {"id": "br3", "name": "Old", "address": "12 MG Road, Ernakulam, Kerala 682016"})
+    rows = {r["name"]: r for r in get(crm_data).json()["auto"]["branches"]}
+    assert rows["Ameerpet"] == {"name": "Ameerpet", "line1": "2nd Floor, 7-1-28", "line2": "Ameerpet", "state": "Telangana",
+                                "city": "Hyderabad", "district": "Hyderabad", "pincode": "500016", "country": "India"}
+    # A branch saved with only the one-line address: State and Pincode are picked out of it
+    assert rows["Old"]["state"] == "Kerala" and rows["Old"]["pincode"] == "682016" and rows["Old"]["country"] == "India"
+    assert rows["Bengaluru"]["state"] == ""  # no State named in that address

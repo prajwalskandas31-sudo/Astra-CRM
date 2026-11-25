@@ -159,6 +159,13 @@ def test_branch_id_is_unique_and_well_formed(crm, tok):
     assert not push(crm, tok["sa"], "branches", [{"id": "br-d", "name": "Delhi", "branchCode": "BR-002"}])["rejected"]["branches"]
 
 
+def test_branch_address_parts_are_checked(crm, tok):
+    good = {"id": "br-p", "name": "Ameerpet", "addressLine1": "7-1-28", "city": "Hyderabad", "state": "Telangana", "pincode": "500016"}
+    assert not push(crm, tok["sa"], "branches", [good])["rejected"]["branches"]
+    assert push(crm, tok["sa"], "branches", [{**good, "pincode": "5000"}])["rejected"]["branches"]
+    assert push(crm, tok["sa"], "branches", [{**good, "state": "Atlantis"}])["rejected"]["branches"]
+
+
 def test_override_passwords_only_reach_admins(crm, tok):
     push(crm, tok["sa"], "financialSettings", [{"id": "adminOverridePassword", "value": "s3cret-override"},
                                                {"id": "maxGrossSales", "value": 200000}])
