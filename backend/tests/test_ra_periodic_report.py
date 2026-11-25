@@ -103,3 +103,21 @@ def test_rejects_bad_shapes(crm_data, bad):
 def test_long_text_is_trimmed(crm_data):
     res = put(crm_data, {"general": {"others": "x" * 5000}})
     assert res.status_code == 200 and len(res.json()["saved"]["general"]["others"]) == 1000
+
+
+def test_point_38_counts_active_graduates(crm_data):
+    s = crm_data.store
+    users = s.all("users")
+    # The Super Admin (who calls the API) is a Graduate; one other user is a Graduate too
+    sa = next(u for u in users if u.get("email") == SA)
+    other = next(u for u in users if u["id"] != sa["id"])
+    try:
+        for u in users:
+            grad = u["id"] in (sa["id"], other["id"])
+            s.put("users", u["id"], {**u, "education": "Graduate" if grad else "Non-Graduate", "status": "Active"})
+        assert get(crm_data).json()["auto"]["general"]["employees"] == "2"
+        s.put("users", other["id"], {**s.get("users", other["id"]), "status": "Inactive"})
+        assert get(crm_data).json()["auto"]["general"]["employees"] == "1"
+    finally:
+        for u in users:
+            s.put("users", u["id"], u)
