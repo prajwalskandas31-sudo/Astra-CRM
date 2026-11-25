@@ -210,3 +210,21 @@ def test_salary_pay_type_keeps_fixed_salary_and_target_only(crm, tokens):
     assert put_user(crm, tokens["admin"], EXEC_ID, {"payType": "Salary", "payDetails": {"fixedSalary": 30000, "targetValue": 90000}}) == 200
     assert crm.store.get("users", EXEC_ID)["payDetails"] == {"fixedSalary": 30000, "targetValue": 90000}
     assert put_user(crm, tokens["sa"], EXEC_ID, {"payDetails": {"targetValue": -5}}) == 400
+
+
+# ---- Education
+
+def test_education_saved_validated_and_editable_by_admins(crm, tokens):
+    tag = secrets.token_hex(3)
+    body = {"name": f"Edu Person {tag}", "mobile": f"97{secrets.randbelow(10**8):08d}", "password": STRONG,
+            "email": f"edu-{tag}@x.com", "reportingTo": "x", "education": "Graduate"}
+    created = crm.client.post("/api/users", json=body, headers=bearer(tokens["sa"]))
+    assert created.status_code == 200 and created.json()["education"] == "Graduate"
+    bad = crm.client.post("/api/users", json={**body, "name": f"Edu Two {tag}", "mobile": f"96{secrets.randbelow(10**8):08d}", "email": f"edu2-{tag}@x.com",
+                                               "education": "PhD"}, headers=bearer(tokens["sa"]))
+    assert bad.status_code == 400
+
+    assert put_user(crm, tokens["admin"], EXEC_ID, {"education": "Non-Graduate"}) == 200
+    assert crm.store.get("users", EXEC_ID)["education"] == "Non-Graduate"
+    assert put_user(crm, tokens["sa"], EXEC_ID, {"education": "Diploma"}) == 400
+    assert put_user(crm, tokens["exec"], EXEC_ID, {"education": "Graduate"}) == 403
