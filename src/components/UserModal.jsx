@@ -29,6 +29,8 @@ import * as XLSX from 'xlsx';
 
 // How a user is paid; must match PAY_TYPES in backend/main.py
 const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
+// Education background; must match EDUCATION_LEVELS in backend/main.py
+const EDUCATION_LEVELS = ['Graduate', 'Non-Graduate'];
 
 // Numeric pay figures asked for under a Pay Type; must match PAY_DETAIL_FIELDS in backend/main.py
 const PAY_DETAIL_FIELDS = {
@@ -138,6 +140,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     referredBy: userToEdit ? (userToEdit.referredBy || '') : '',
     branchId: userToEdit ? (userToEdit.branchId || '') : '',
     payType: userToEdit ? (userToEdit.payType || '') : '',
+    education: userToEdit ? (userToEdit.education || '') : '',
     payDetails: userToEdit ? payDetailsToForm(userToEdit.payDetails) : {},
     companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
@@ -195,6 +198,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: userToEdit.referredBy || '',
           branchId: userToEdit.branchId || '',
           payType: userToEdit.payType || '',
+          education: userToEdit.education || '',
           payDetails: payDetailsToForm(userToEdit.payDetails),
           companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
@@ -218,6 +222,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           referredBy: '',
           branchId: '',
           payType: '',
+          education: '',
           payDetails: {},
           companyAssets: []
         });
@@ -854,6 +859,16 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     onChange={handleChange}
                     placeholder="e.g. name@unitetech.trade"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Education</label>
+                  <select name="education" value={formData.education} onChange={handleChange}>
+                    <option value="">-- Select education --</option>
+                    {EDUCATION_LEVELS.map(e => (
+                      <option key={e} value={e}>{e}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">

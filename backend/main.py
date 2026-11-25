@@ -148,6 +148,7 @@ class UserCreate(BaseModel):
     referredBy: Optional[str] = ""
     branchId: Optional[str] = ""
     payType: Optional[str] = ""
+    education: Optional[str] = ""
     payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
@@ -167,6 +168,7 @@ class UserUpdate(BaseModel):
     referredBy: Optional[str] = None
     branchId: Optional[str] = None
     payType: Optional[str] = None
+    education: Optional[str] = None
     payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
@@ -387,6 +389,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "referredBy": req.referredBy or "",
         "branchId": req.branchId or "",
         "payType": _clean_pay_type(req.payType),
+        "education": _clean_education(req.education),
         "payDetails": _clean_pay_details(req.payType, req.payDetails),
         "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
@@ -396,6 +399,14 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     return public_user(new_user)
 
 PAY_TYPES = ("Commission", "Salary", "Salary plus Incentives")
+EDUCATION_LEVELS = ("Graduate", "Non-Graduate")  # kept in step with EDUCATION_LEVELS in UserModal.jsx
+
+def _clean_education(value: Optional[str]) -> str:
+    """Education background: one of EDUCATION_LEVELS, or "" when not set."""
+    value = (value or "").strip()
+    if value and value not in EDUCATION_LEVELS:
+        raise HTTPException(status_code=400, detail=f"Education must be one of: {', '.join(EDUCATION_LEVELS)}.")
+    return value
 
 def _clean_pay_type(pay_type: Optional[str]) -> str:
     """How the user is paid: one of PAY_TYPES, or "" when not set."""
@@ -461,7 +472,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "education", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -491,6 +502,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.referredBy is not None: user["referredBy"] = req.referredBy
     if req.branchId is not None: user["branchId"] = req.branchId
     if req.payType is not None: user["payType"] = _clean_pay_type(req.payType)
+    if req.education is not None: user["education"] = _clean_education(req.education)
     if req.payType is not None or req.payDetails is not None:
         # Figures that don't belong to the (new) Pay Type are dropped
         details = req.payDetails if req.payDetails is not None else user.get("payDetails")
