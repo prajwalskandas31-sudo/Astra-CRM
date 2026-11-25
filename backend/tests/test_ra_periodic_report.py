@@ -59,7 +59,7 @@ def test_auto_values_from_crm(crm_data):
     assert g["sebiRegNo"] == "INH000020350"
     assert g["pan"] == "AAIFU6012A"          # from the GSTIN
     assert g["logo"] == "Yes" and g["upiApplied"] == "Yes"
-    assert g["researchReports"] == "2"        # Ready, not test, inside the half
+    assert g["researchReports"] == "3"        # Ready (test ones too) inside the half; Held and outside not counted
     assert g["reg.state"] == "Gujarat" and g["reg.pincode"] == "395017" and g["corr.pincode"] == "395017"
     assert auto["branches"][0]["pincode"] == "560068" and auto["branches"][0]["line1"] == "122/3, First Floor"
     assert auto["websites"] == [{"url": "https://investeq.in/"}]

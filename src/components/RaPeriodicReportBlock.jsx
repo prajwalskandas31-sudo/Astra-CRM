@@ -247,7 +247,7 @@ const TableTab = ({ id, data, draft, setDraft }) => {
 };
 
 const AUTO_NOTES = {
-  general: 'From the CRM: name, SEBI number and logo (Company Profile), PAN (from the GSTIN), addresses (Registered Address and State), contact mobile / email, branches, website, social media and bank Yes / No (from those sub-blocks), research reports (Ready reports in the half), employees (point 38: active users whose Education is Graduate in the User Directory) and UPI. Everything else is typed in; the arrow brings back the CRM\'s value.',
+  general: 'From the CRM: name, SEBI number and logo (Company Profile), PAN (from the GSTIN), addresses (Registered Address and State), contact mobile / email, branches, website, social media and bank Yes / No (from those sub-blocks), research reports (point 35: every Ready report in the Research Reports Block whose call is in the half), employees (point 38: active users whose Education is Graduate in the User Directory) and UPI. Everything else is typed in; the arrow brings back the CRM\'s value.',
   complaints: 'Type the counts for SCORES and other sources; (d), the ageing total and the Total column are calculated.',
   clientsFees: 'From the Audit Report Blocks -> Client and Fee Details for the same half (including values typed there). (iv) and the totals are calculated; type over any value here.',
   branches: 'From Branch Profiles (address and pincode). Fill in State, City and District.',

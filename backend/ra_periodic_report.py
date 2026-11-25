@@ -108,8 +108,10 @@ def auto_values(period: str) -> dict:
     accounts = [a for a in (profile.get("bankAccounts") or []) if isinstance(a, dict)]
     branches = [b for b in store.all("branches") if isinstance(b, dict)]
     users = [u for u in store.all("users") if _text(u.get("status")) != "Inactive"]
+    # Point 35: every Ready report in the Research Reports Block whose call falls in the half (test reports too,
+    # as the block lists them); Held / Queued reports are not counted
     ready = [r for r in store.all(reports.REPORTS)
-             if r.get("status") == reports.STATUS_READY and not r.get("test")
+             if r.get("status") == reports.STATUS_READY
              and _in_period(r.get("callAt") or r.get("createdAt"), start, end)]
 
     company = _text(profile.get("companyName"))
