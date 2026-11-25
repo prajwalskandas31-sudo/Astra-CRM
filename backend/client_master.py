@@ -252,7 +252,9 @@ def client_status(sales: list, paid: list, pan: str, today: Optional[str] = None
                 "fetchedAt": (kra_last or {}).get("fetchedAt") or "", "saleId": (sale or {}).get("id")},
         "ekyc": {"completed": signed, "linkSent": link_sent or signed, "saleId": (sale or {}).get("id"),
                  "eSignStatus": (sale or {}).get("eSignStatus") or "", "documentId": (sale or {}).get("eSignDocumentId") or "",
-                 "signedAt": _iso_day(signed_at), "oldClientOnly": bool(sales) and not live},
+                 "signedAt": _iso_day(signed_at),
+                 # Only when every sale is an Old Client renewal; a rejected new-client sale still needs eKYC
+                 "oldClientOnly": bool(sales) and all(s.get("clientType") == OLD_CLIENT for s in sales)},
         "welcomeKit": {"sent": bool(kits), "sentAt": (kits[-1] if kits else {}).get("sentAt") or "",
                        "to": (kits[-1] if kits else {}).get("to") or "", "saleId": (kit_sale or {}).get("id")},
         "service": {"enabled": bool(enabled), "hasService": bool(current),

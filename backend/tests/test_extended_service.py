@@ -206,3 +206,17 @@ def test_send_welcome_kit_granted_to_a_non_admin_is_scoped_to_their_team(ext):
     res = crm.client.post("/api/email/welcome-kit/send", headers=tok, json={"saleId": "SL-2"})
     assert res.status_code == 404
     s.delete("userPermissions", exec_id)
+
+
+def test_client_status_old_client_only_when_every_sale_is_a_renewal(ext):
+    crm, _ = ext
+    s = crm.store
+    other = "QWERT1234Y"
+    # A new client whose only sale was rejected is not an Old Client: eKYC is simply not done
+    s.put("sales", "SL-REJ", _sale("SL-REJ", 10000, _ago(3), pan=other, status="Rejected by Super Admin"))
+    st = crm.client.get(f"/api/client-master/search?q={other}", headers=bearer(crm.token(SA))).json()["status"]
+    assert not st["ekyc"]["oldClientOnly"] and not st["ekyc"]["completed"] and st["ekyc"]["saleId"] is None
+    # Only Old Client renewals: eKYC is not required
+    s.put("sales", "SL-REJ", _sale("SL-REJ", 10000, _ago(3), pan=other, clientType="Old Client"))
+    st = crm.client.get(f"/api/client-master/search?q={other}", headers=bearer(crm.token(SA))).json()["status"]
+    assert st["ekyc"]["oldClientOnly"]
