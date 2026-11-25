@@ -1808,7 +1808,11 @@ export const CRMProvider = ({ children }) => {
         headers: authHeaders(),
         body: JSON.stringify(userData)
       });
-      if (res.ok) { refreshData(); return; }
+      if (res.ok) {
+        const created = await res.json().catch(() => null);
+        refreshData();
+        return created;
+      }
       if (isBackendAuthoritative()) throw new Error(await readErrorDetail(res, 'Failed to create user.'));
     } catch (err) {
       if (isBackendAuthoritative()) throw err;

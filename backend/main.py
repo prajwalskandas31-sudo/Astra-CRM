@@ -33,6 +33,7 @@ try:
     from backend import annexure_a_saas
     from backend import ra_compliance
     from backend import extended_service
+    from backend import user_nism
     from backend.db_init import init_database
 except ImportError:
     import store
@@ -61,6 +62,7 @@ except ImportError:
     import annexure_a_saas
     import ra_compliance
     import extended_service
+    import user_nism
     from db_init import init_database
 
 
@@ -101,6 +103,7 @@ app.include_router(ra_periodic_report.router)
 app.include_router(annexure_a_saas.router)
 app.include_router(ra_compliance.router)
 app.include_router(extended_service.router)
+app.include_router(user_nism.router)
 
 
 # Telegram pollers for Trade Call Broadcasts; off when no bots are configured in backend/.env
@@ -149,6 +152,7 @@ class UserCreate(BaseModel):
     branchId: Optional[str] = ""
     payType: Optional[str] = ""
     education: Optional[str] = ""
+    nism: Optional[dict] = None
     payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = []
     documents: Optional[List[dict]] = []
@@ -169,6 +173,7 @@ class UserUpdate(BaseModel):
     branchId: Optional[str] = None
     payType: Optional[str] = None
     education: Optional[str] = None
+    nism: Optional[dict] = None
     payDetails: Optional[dict] = None
     companyAssets: Optional[List[str]] = None
     documents: Optional[List[dict]] = None
@@ -390,6 +395,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "branchId": req.branchId or "",
         "payType": _clean_pay_type(req.payType),
         "education": _clean_education(req.education),
+        "nism": user_nism.clean_details(req.nism),
         "payDetails": _clean_pay_details(req.payType, req.payDetails),
         "companyAssets": _clean_asset_ids(req.companyAssets),
         "documents": req.documents or []
@@ -472,7 +478,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "education", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "education", "nism", "officeNumber", "officialEmail", "companyAssets"}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -503,6 +509,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.branchId is not None: user["branchId"] = req.branchId
     if req.payType is not None: user["payType"] = _clean_pay_type(req.payType)
     if req.education is not None: user["education"] = _clean_education(req.education)
+    if req.nism is not None: user["nism"] = user_nism.clean_details(req.nism)
     if req.payType is not None or req.payDetails is not None:
         # Figures that don't belong to the (new) Pay Type are dropped
         details = req.payDetails if req.payDetails is not None else user.get("payDetails")
@@ -572,6 +579,9 @@ def delete_user(user_id: str, current_user: dict = Depends(require_roles(["Super
     if store.all("leads", [user_id]):
         raise HTTPException(status_code=400, detail="User still holds leads. Reassign them before deleting.")
     store.delete("users", user_id)
+    for doc in user_nism._docs_of(user_id):  # the user's NISM documents go with them
+        store.delete(user_nism.DOC_FILES, doc["id"])
+        store.delete(user_nism.DOCS, doc["id"])
     return {"message": f"Deleted user {user['name']}."}
 
 # Dispositions & Pipeline Routes (Block 2)
