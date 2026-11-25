@@ -4,6 +4,8 @@ import { useToast } from './ToastNotification';
 import { isBackendAuthoritative } from '../services/backendConfig';
 import { CompanyAssetsField } from './CompanyAssetsField';
 import { ReportingHierarchy, ReportingChain } from './ReportingHierarchy';
+import { NismExamSummary, NismExamDetailsPage, EMPTY_NISM } from './NismExamDetails';
+import { listNismDocs, uploadNismDoc } from '../services/userNismService';
 import { 
   X, 
   UserPlus, 
@@ -141,9 +143,16 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     branchId: userToEdit ? (userToEdit.branchId || '') : '',
     payType: userToEdit ? (userToEdit.payType || '') : '',
     education: userToEdit ? (userToEdit.education || '') : '',
+    nism: { ...EMPTY_NISM, ...(userToEdit?.nism || {}) },
     payDetails: userToEdit ? payDetailsToForm(userToEdit.payDetails) : {},
     companyAssets: userToEdit && Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
   });
+
+  // NISM Exam Details: its own page inside this modal; files chosen for a new user wait until it is created
+  const [nismPageOpen, setNismPageOpen] = useState(false);
+  const [pendingNismFiles, setPendingNismFiles] = useState([]);
+  const [nismDocCount, setNismDocCount] = useState(0);
+  const handleNismChange = (key, value) => setFormData(prev => ({ ...prev, nism: { ...(prev.nism || EMPTY_NISM), [key]: value } }));
 
   // Attached Documents State (Direct upload on user creation/edit)
   const [attachedDocs, setAttachedDocs] = useState([]);
@@ -199,6 +208,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           branchId: userToEdit.branchId || '',
           payType: userToEdit.payType || '',
           education: userToEdit.education || '',
+          nism: { ...EMPTY_NISM, ...(userToEdit.nism || {}) },
           payDetails: payDetailsToForm(userToEdit.payDetails),
           companyAssets: Array.isArray(userToEdit.companyAssets) ? userToEdit.companyAssets : []
         });
@@ -223,6 +233,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           branchId: '',
           payType: '',
           education: '',
+          nism: { ...EMPTY_NISM },
           payDetails: {},
           companyAssets: []
         });
@@ -239,6 +250,12 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
       setEditingFieldId(null);
       setNewFieldForm({ fieldName: '', subField1Name: '', subField2Name: '' });
       setSelectedDocTypeId(documentTypes[0]?.id || '');
+      setNismPageOpen(false);
+      setPendingNismFiles([]);
+      setNismDocCount(0);
+      if (userToEdit?.id && isBackendAuthoritative()) {
+        listNismDocs(userToEdit.id).then(r => setNismDocCount((r.documents || []).length)).catch(() => {});
+      }
       setDocFileToUpload(null);
       if (docFileInputRef.current) docFileInputRef.current.value = '';
     }
@@ -675,8 +692,9 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
           : `${cleanName.toLowerCase().replace(/[^a-z0-9]/g, '')}@company.com`;
         const autoPass = formData.password || (isBackendAuthoritative() ? '' : '123456');
         
+        let created;
         try {
-          await addUser({
+          created = await addUser({
             ...formData,
             payDetails,
             name: cleanName,
@@ -688,6 +706,18 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
         } catch (err) {
           showToast(err.message || 'Failed to create user.', 'error');
           return;
+        }
+        // NISM documents chosen before the user existed go up now that it has an id
+        if (pendingNismFiles.length) {
+          if (!created?.id) {
+            showToast('User created, but the NISM documents could not be uploaded: no user ID came back. Open Edit User to add them.', 'warning');
+          } else {
+            const failed = [];
+            for (const p of pendingNismFiles) {
+              try { await uploadNismDoc(created.id, p.file); } catch (err) { failed.push(`${p.file.name} (${err.message})`); }
+            }
+            if (failed.length) showToast(`User created, but these NISM documents did not upload: ${failed.join('; ')}. Open Edit User to retry.`, 'warning');
+          }
         }
         showToast(`User '${cleanName}' created successfully. Login with Name (${cleanName}), Email (${autoEmail}), or Mobile!`, 'success');
       }
@@ -762,7 +792,18 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <div className="modal-body" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '20px 24px' }}>
-            {mode === 'single' ? (
+            {mode === 'single' && nismPageOpen ? (
+              <NismExamDetailsPage
+                userName={formData.name}
+                details={formData.nism}
+                onChange={handleNismChange}
+                userId={userToEdit?.id && isBackendAuthoritative() ? userToEdit.id : null}
+                pendingFiles={pendingNismFiles}
+                setPendingFiles={setPendingNismFiles}
+                onDocCount={setNismDocCount}
+                onBack={() => setNismPageOpen(false)}
+              />
+            ) : mode === 'single' ? (
               <div className="form-grid">
                 <div className="form-group">
                   <label>User Name *</label>
@@ -1585,6 +1626,13 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                       </div>
                     )}
                   </div>
+
+                {/* ── NISM Exam Details: opens its own page ── */}
+                <NismExamSummary
+                  details={formData.nism}
+                  docCount={userToEdit?.id && isBackendAuthoritative() ? nismDocCount : pendingNismFiles.length}
+                  onOpen={() => setNismPageOpen(true)}
+                />
 
               </div>
             ) : (
