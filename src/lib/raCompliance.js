@@ -1,8 +1,12 @@
 /**
  * RA Monthly Compliance Tracker: the sheets of the client's workbook (RA_Monthly_Compliance_Tracker_Unite.xlsx)
  * as data. Every sheet lists its columns (what the user types, drop-downs, and the automatic "grey" cells)
- * and the rule that gives each row its Status: Compliant, Non-compliant or Pending (blank = empty row).
- * The server (backend/ra_compliance.py) only stores the typed values, per month per sheet.
+ * and the rule that gives each row its Status: Compliant or Non-compliant (blank = empty row). A row with anything
+ * missing is Non-compliant, so Pending is always 0 (PENDING stays only as an internal step, see finalStatus).
+ * The server (backend/ra_compliance.py) stores the typed values, per month per sheet, and builds the lines that
+ * fill themselves in: Reco Register calls (Research Reports block) and Client Register clients (CRM), whose
+ * MITC / KYC / Invoices / Client Documents lines start from the client's `defaults`. A value the user changes on
+ * such a line is stored under the same id and wins over the default.
  *
  * Column types:
  *   text, longtext, number, date (YYYY-MM-DD), yn (Yes/No), ynna (Yes/No/NA), select (options),
@@ -64,7 +68,11 @@ export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
 const yesNoStatus = (v) => (v === 'Yes' ? COMPLIANT : v === 'No' ? NON_COMPLIANT : PENDING);
 
-const portalWeekStatus = (r) => (r.checked === 'NA' ? NA : yesNoStatus(r.checked));
+/** Non-compliant when any of `keys` is empty or answered No (or a `bad` value); otherwise Compliant. */
+const complete = (r, keys, bad = []) => (anyBlank(r, keys) || anyIs(r, keys, 'No') || bad.some(Boolean) ? NON_COMPLIANT : COMPLIANT);
+
+// A week that does not exist in the month (week 5 of February) has nothing to check
+const portalWeekStatus = (r, ctx, fixed) => (fixed && ctx?.month && !weekPeriod(ctx.month, fixed.week) ? '' : r.checked === 'NA' ? NA : yesNoStatus(r.checked));
 const complaintLogStatus = (r) => (allBlank(r, ['date', 'complainant', 'ref', 'nature']) ? '' : yesNoStatus(r.resolved));
 
 const weeklyColumns = (portal) => [
@@ -170,20 +178,51 @@ export const buildContext = (month, rowsOf) => {
   const mitc = byId(rowsOf('mitc'));
   const invoices = byId(rowsOf('invoices'));
   const docs = byId(rowsOf('clientDocuments'));
+  const clientsById = byId(clients);
   return {
     month,
     rowsOf,
     clients,
-    clientById: byId(clients),
+    clientById: clientsById,
     clientNo: Object.fromEntries(clients.map((c, i) => [c.id, i + 1])),
     recos,
     recoById: byId(recos),
     recoNo: Object.fromEntries(recos.map((r, i) => [r.id, i + 1])),
     reportOnFile: (recoId) => reports.some(r => r.recoId === recoId && r.maintained === 'Yes'),
-    mitcSigned: (clientId) => mitc[clientId]?.signed || 'Not updated',
-    invoiceIssued: (clientId) => invoices[clientId]?.issued || 'Not updated',
-    docsSent: (clientId) => `${DOC_KEYS.filter(k => docs[clientId]?.[k] === 'Yes').length} of 7`
+    // MITC / Invoices / Client Documents lines start from the client's CRM defaults
+    mitcSigned: (clientId) => withDefaults(clientsById[clientId], 'mitc', mitc[clientId]).signed || 'Not updated',
+    invoiceIssued: (clientId) => withDefaults(clientsById[clientId], 'invoices', invoices[clientId]).issued || 'Not updated',
+    docsSent: (clientId) => {
+      const row = withDefaults(clientsById[clientId], 'clientDocuments', docs[clientId]);
+      return `${DOC_KEYS.filter(k => row[k] === 'Yes').length} of 7`;
+    }
   };
+};
+
+/** A stored row laid over the defaults a CRM client brings for that sheet; an emptied value falls back to the default. */
+export const withDefaults = (client, sheet, stored) => {
+  const typed = Object.fromEntries(Object.entries(stored || {}).filter(([, v]) => !blank(v)));
+  return { ...(client?.defaults?.[sheet] || {}), ...typed };
+};
+
+/** Lines built elsewhere (`auto`, each with an id) merged with the stored rows: a stored row with the same id holds
+ * the user's changes; stored rows `hide` says duplicate an auto line are left out; the rest follow. */
+export const mergeAuto = (auto, stored, hide = () => false) => {
+  if (!auto.length) return stored;
+  const byId = Object.fromEntries(stored.map(r => [r.id, r]));
+  const autoIds = new Set(auto.map(r => r.id));
+  return [
+    ...auto.map(r => ({ ...r, ...Object.fromEntries(Object.entries(byId[r.id] || {}).filter(([, v]) => !blank(v))) })),
+    ...stored.filter(r => !autoIds.has(r.id) && !hide(r))
+  ];
+};
+
+/** The Client Register fee as a number: the CRM's total over all services, else the typed figure. */
+export const feeOf = (client) => {
+  if (!client) return '';
+  if (typeof client.feesTotal === 'number') return client.feesTotal;
+  const n = Number(String(client.fees ?? '').replace(/,/g, '').trim());
+  return blank(client.fees) || Number.isNaN(n) ? '' : n;
 };
 
 const clientAuto = [
@@ -266,9 +305,10 @@ export const SHEETS = [
       ],
       example: { date: '2026-10-05', nature: 'Positional call', security: 'ABC Ltd (NSE: ABC)', strike: '250 (trigger)', period: '2 months', callPut: 'Call', buyRate: '250', sellRate: '280', sl: '235', rationale: 'Yes', reportOnFile: 'Yes' },
       status: (r, ctx) => {
-        if (allBlank(r, ['date', 'nature', 'security', 'strike', 'period', 'callPut', 'buyRate', 'sellRate', 'sl', 'rationale'])) return '';
-        if (r.rationale === 'No' || !(r.reportId || ctx.reportOnFile(r.id))) return NON_COMPLIANT;
-        return blank(r.rationale) ? PENDING : COMPLIANT;
+        const fields = ['date', 'nature', 'security', 'strike', 'period', 'callPut', 'buyRate', 'sellRate', 'sl', 'rationale'];
+        if (allBlank(r, fields)) return '';
+        // Every field filled in, the rationale kept and the report on file
+        return complete(r, fields, [!(r.reportId || ctx.reportOnFile(r.id))]);
       }
     }]
   },
@@ -294,60 +334,60 @@ export const SHEETS = [
       example: { recoId: '#1 - 05-Oct-2026 - ABC Ltd (NSE: ABC)', recoDate: '05-Oct-2026', recoSecurity: 'ABC Ltd (NSE: ABC)', maintained: 'Yes', reportRef: 'RR/2026-27/001', sent: 'Yes', dateSent: '2026-10-05', mode: 'Email', disclaimer: 'Yes', disclosure: 'Yes', signed: 'No', remarks: 'Signature pending' },
       status: (r, ctx) => {
         if (blank(r.recoId)) return '';
-        const checks = ['maintained', 'sent', 'disclaimer', 'disclosure', 'signed'];
-        if (!ctx.recoById[r.recoId] || anyIs(r, checks, 'No')) return NON_COMPLIANT;
-        return anyBlank(r, checks) ? PENDING : COMPLIANT;
+        // Every field filled in (Remarks optional) and every check Yes
+        return complete(r, ['maintained', 'reportRef', 'sent', 'dateSent', 'mode', 'disclaimer', 'disclosure', 'signed'], [!ctx.recoById[r.recoId]]);
       }
     }]
   },
   {
     key: 'clientRegister', no: '4', short: 'Client Register', title: 'Register of clients', kind: 'list', noStatus: true,
-    intro: 'Add clients only here: MITC, KYC, Invoices and Client Documents pick them up automatically. "Add CRM clients" brings in this month\'s e-signed clients from the Paid block.',
+    intro: 'Fills itself from the CRM (marked "Auto"): clients who e-signed this month, and Old Client renewals whose Date of Payment is in this month, one line per client with every service they opted for. A value you change is kept. Add any other client with "Add row"; MITC, KYC, Invoices and Client Documents pick every client up automatically.',
     sections: [{
       key: 'rows', kind: 'list', numbered: true,
       columns: [
-        { key: 'joinDate', label: 'Date of Joining', type: 'date', hint: 'Date the client accepted the terms and conditions.' },
+        { key: 'joinDate', label: 'Date of Joining', type: 'date', hint: 'New client: the E-Sign date. Renewed client: the Date of Payment.' },
         { key: 'name', label: 'Name of the Client', type: 'text', width: 170, hint: 'Full name as per PAN.' },
-        { key: 'products', label: 'Details of products / securities', type: 'text', width: 170, placeholder: 'Equity cash & derivatives' },
+        { key: 'products', label: 'Details of products / securities', type: 'text', width: 170, placeholder: 'Equity Cash & Derivatives' },
         { key: 'natureOfService', label: 'Nature of Service', type: 'select', options: ['Research report', 'Research recommendation service', 'Both'] },
         { key: 'renewalDate', label: 'Date of Joining for Renewed Clients (blank = NA)', type: 'date' },
         { key: 'renewedName', label: 'Name of Renewed Clients', type: 'text', placeholder: 'NA' },
         { key: 'pan', label: 'PAN of Clients', type: 'text', width: 120, upper: true, placeholder: 'ABCDE1234F', check: v => (blank(v) || PAN_RE.test(v) ? '' : 'PAN should look like ABCDE1234F') },
         { key: 'kyc', label: 'Whether KYC is done (Yes/No)', type: 'yn' },
-        { key: 'natureOfAdvice', label: 'Nature of Advice provided', type: 'text', width: 160, placeholder: 'Positional calls' },
-        { key: 'tenure', label: 'Tenure of Service', type: 'text', width: 200, placeholder: '3 months (03/10/2026 to 02/01/2027)' },
-        { key: 'recoDetails', label: 'Details of Recommendation made', type: 'text', width: 200, placeholder: 'As per Recommendation Register, Ref. No. 1' },
-        { key: 'feeDate', label: 'Date of Fees charged', type: 'date' },
-        { key: 'fees', label: 'Fees Charged (Rs)', type: 'number' },
+        { key: 'natureOfAdvice', label: 'Nature of Advice provided', type: 'select', width: 190, options: ['Positional Calls / Intraday Calls', 'Positional Calls', 'Intraday Calls'] },
+        { key: 'tenure', label: 'Tenure of Service', type: 'text', width: 260, placeholder: 'Stock Cash: 3 Months (03/10/2026 to 02/01/2027)' },
+        { key: 'recoDetails', label: 'Details of Recommendation made', type: 'text', width: 200, placeholder: 'As per Recommendation Register' },
+        { key: 'feeDate', label: 'Date of Fees charged', type: 'text', width: 150, placeholder: '03-Oct-2026' },
+        { key: 'fees', label: 'Fees Charged (Rs)', type: 'text', width: 130, placeholder: '5900' },
         { key: 'mitcSigned', label: 'MITC signed? (auto from MITC)', type: 'auto', value: (r, ctx) => ctx.mitcSigned(r.id) },
         { key: 'docsSent', label: 'Documents sent (auto from Client Documents)', type: 'auto', value: (r, ctx) => ctx.docsSent(r.id) },
         { key: 'invoiceIssued', label: 'Invoice issued? (auto from Invoices)', type: 'auto', value: (r, ctx) => ctx.invoiceIssued(r.id) }
       ],
-      example: { joinDate: '2026-10-03', name: 'Rahul Sharma (SAMPLE)', products: 'Equity cash & derivatives', natureOfService: 'Research recommendation service', renewedName: 'NA', pan: 'ABCDE1234F', kyc: 'Yes', natureOfAdvice: 'Positional calls', tenure: '3 months (03/10/2026 to 02/01/2027)', recoDetails: 'As per Recommendation Register, Ref. No. 1', feeDate: '2026-10-03', fees: 5900, mitcSigned: 'Yes', docsSent: '7 of 7', invoiceIssued: 'Yes' }
+      example: { joinDate: '2026-10-03', name: 'Rahul Sharma (SAMPLE)', products: 'Equity Cash & Derivatives', natureOfService: 'Research recommendation service', renewedName: 'NA', pan: 'ABCDE1234F', kyc: 'Yes', natureOfAdvice: 'Positional Calls / Intraday Calls', tenure: 'Stock Cash: 3 Months (03/10/2026 to 02/01/2027)', recoDetails: 'As per Recommendation Register', feeDate: '03-Oct-2026', fees: '5900', mitcSigned: 'Yes', docsSent: '7 of 7', invoiceIssued: 'Yes' }
     }]
   },
   {
     key: 'mitc', no: '5', short: 'MITC', title: 'MITC (Most Important Terms and Conditions) - every client', kind: 'client',
-    intro: 'One line for every client in the Client Register.',
+    intro: 'One line for every client in the Client Register. For CRM clients it fills itself: the KRA record when there is one, else the Leegality e-sign (signed date, signed agreement); "sent" from the Welcome Kit. Change any value if needed.',
     sections: [{
       key: 'rows', kind: 'client',
       columns: [
         ...clientAuto,
-        { key: 'joinDate', label: 'Date of joining (auto)', type: 'auto', value: (r, ctx) => fmtDate(ctx.clientById[r.id]?.joinDate) },
+        { key: 'joinDate', label: 'Date of joining (auto)', type: 'auto', value: (r, ctx) => mitcJoinDate(r, ctx) },
         { key: 'sent', label: 'MITC sent to client? (Yes/No)', type: 'yn' },
         { key: 'dateSent', label: 'Date sent', type: 'date' },
         { key: 'mode', label: 'Mode of sending', type: 'select', options: ['Email', 'WhatsApp', 'Physical', 'e-Sign', 'Other'] },
         { key: 'signed', label: 'MITC signed / accepted by client? (Yes/No)', type: 'yn' },
         { key: 'dateSigned', label: 'Date signed', type: 'date' },
-        { key: 'ref', label: 'Signed copy ref. / file name', type: 'text', placeholder: 'MITC_RahulSharma.pdf' },
-        { key: 'remarks', label: 'Remarks', type: 'text', width: 170 }
+        { key: 'ref', label: 'Signed copy ref. / file name', type: 'text', width: 200, placeholder: 'Signed Agreement - Rahul Sharma.pdf' },
+        { key: 'remarks', label: 'Remarks', type: 'text', width: 170, placeholder: '-' }
       ],
-      status: (r) => (anyIs(r, ['sent', 'signed'], 'No') ? NON_COMPLIANT : anyBlank(r, ['sent', 'signed']) ? PENDING : COMPLIANT)
+      status: (r, ctx) => complete(r, ['sent', 'dateSent', 'mode', 'signed', 'dateSigned', 'ref'],
+        [blank(ctx.clientById[r.id]?.name), blank(mitcJoinDate(r, ctx))])
     }]
   },
   {
     key: 'kyc', no: '6', short: 'KYC', title: 'KYC - every client', kind: 'client',
-    intro: 'One line for every client in the Client Register. "Matches Client Register" flags a KYC answer that differs from the register.',
+    intro: 'One line for every client in the Client Register. For CRM clients "KYC done" is Yes once KRA is completed (or, until a KRA record exists, the Leegality e-KYC / e-sign), dated the same day. "Matches Client Register" flags a KYC answer that differs from the register.',
     sections: [{
       key: 'rows', kind: 'client',
       columns: [
@@ -356,12 +396,13 @@ export const SHEETS = [
         { key: 'registerKyc', label: 'KYC status in Client Register (auto)', type: 'auto', value: (r, ctx) => ctx.clientById[r.id]?.kyc || '' },
         { key: 'done', label: 'KYC done? (Yes/No)', type: 'yn' },
         { key: 'date', label: 'Date KYC completed', type: 'date' },
-        { key: 'through', label: 'KYC done through', type: 'select', options: ['SEBI-registered KRA', 'Own process', 'Other'] },
+        { key: 'through', label: 'KYC done through', type: 'select', width: 170, options: ['SEBI Registered KRA', 'Own process', 'Other'] },
         { key: 'docs', label: 'KYC documents on file? (Yes/No)', type: 'yn' },
-        { key: 'matches', label: 'Matches Client Register? (auto)', type: 'auto', value: (r, ctx) => (blank(r.done) ? '' : r.done === ctx.clientById[r.id]?.kyc ? 'Yes' : 'No - update register') },
-        { key: 'remarks', label: 'Remarks', type: 'text', width: 170 }
+        { key: 'matches', label: 'Matches Client Register? (auto)', type: 'auto', value: (r, ctx) => kycMatches(r, ctx) },
+        { key: 'remarks', label: 'Remarks', type: 'text', width: 170, placeholder: '-' }
       ],
-      status: (r) => (anyIs(r, ['done', 'docs'], 'No') ? NON_COMPLIANT : anyBlank(r, ['done', 'docs']) ? PENDING : COMPLIANT)
+      status: (r, ctx) => complete(r, ['done', 'date', 'through', 'docs'],
+        [blank(ctx.clientById[r.id]?.pan), blank(ctx.clientById[r.id]?.kyc), kycMatches(r, ctx) !== 'Yes'])
     }]
   },
   portalSheet('scores', '7A', 'SCORES', 'SCORES portal - weekly check and complaints', 'SCORES',
@@ -387,7 +428,7 @@ export const SHEETS = [
   },
   {
     key: 'upiBank', no: '9', short: 'UPI and Bank', title: 'Bank accounts and UPI - every account used to collect fees', kind: 'list',
-    intro: 'Every bank account used to collect fees must have UPI. "Add from Company Profile" brings in the company\'s bank accounts.',
+    intro: 'Every bank account used to collect fees must have UPI. The Company Profile\'s bank accounts fill in by themselves (marked "Auto"; account holder = company name, last 4 digits only); fill in the Date verified. Add any other account with "Add row".',
     carry: ['bankName', 'holder', 'last4', 'type', 'upiId'],
     sections: [{
       key: 'rows', kind: 'list',
@@ -399,13 +440,12 @@ export const SHEETS = [
         { key: 'upiId', label: 'UPI ID', type: 'text', width: 170, placeholder: 'abcresearch@bank' },
         { key: 'upiEnabled', label: 'UPI taken / enabled? (Yes/No)', type: 'yn' },
         { key: 'verifiedOn', label: 'Date verified', type: 'date' },
-        { key: 'remarks', label: 'Remarks', type: 'text', width: 170 }
+        { key: 'remarks', label: 'Remarks', type: 'text', width: 170, placeholder: '-' }
       ],
-      example: { bankName: 'Sample Bank', holder: 'ABC Research Services', last4: '1234', type: 'Current', upiId: 'abcresearch@samplebank', upiEnabled: 'Yes', verifiedOn: '2026-10-01' },
+      example: { bankName: 'Sample Bank', holder: 'ABC Research Services', last4: '1234', type: 'Current', upiId: 'abcresearch@samplebank', upiEnabled: 'Yes', verifiedOn: '2026-10-01', remarks: '-' },
       status: (r) => {
         if (allBlank(r, ['bankName', 'holder', 'last4', 'type', 'upiId'])) return '';
-        if (r.upiEnabled === 'No') return NON_COMPLIANT;
-        return r.upiEnabled === 'Yes' && !blank(r.upiId) ? COMPLIANT : PENDING;
+        return complete(r, ['bankName', 'holder', 'last4', 'type', 'upiId', 'upiEnabled', 'verifiedOn']);
       }
     }]
   },
@@ -485,12 +525,12 @@ export const SHEETS = [
   },
   {
     key: 'invoices', no: '14', short: 'Invoices', title: 'Invoices - every client', kind: 'client',
-    intro: 'One line for every client in the Client Register; the fee comes from the register and is checked against the invoice amount.',
+    intro: 'One line for every client in the Client Register; the fee (Gross Sales) comes from the register and is checked against the invoice amount. For CRM clients the invoice number and date come from the Invoice Block (an Old Client renewal: its emailed invoice), and "issued / sent" is Yes once the Welcome Kit (renewal: the invoice email) has gone.',
     sections: [{
       key: 'rows', kind: 'client',
       columns: [
         ...clientAuto,
-        { key: 'registerFees', label: 'Fees per Client Register (Rs) (auto)', type: 'auto', value: (r, ctx) => ctx.clientById[r.id]?.fees ?? '' },
+        { key: 'registerFees', label: 'Fees per Client Register (Rs) (auto)', type: 'auto', value: (r, ctx) => feeOf(ctx.clientById[r.id]) },
         { key: 'issued', label: 'Invoice issued? (Yes/No)', type: 'yn' },
         { key: 'invoiceNo', label: 'Invoice no.', type: 'text', placeholder: 'INV/2026-27/001' },
         { key: 'invoiceDate', label: 'Invoice date', type: 'date' },
@@ -498,36 +538,55 @@ export const SHEETS = [
         { key: 'sentToClient', label: 'Invoice sent to client? (Yes/No)', type: 'yn' },
         { key: 'viaBank', label: 'Fee received via bank / UPI? (Yes/No)', type: 'yn' },
         { key: 'matches', label: 'Amount matches register? (auto)', type: 'auto', value: (r, ctx) => invoiceMatches(r, ctx) },
-        { key: 'remarks', label: 'Remarks', type: 'text', width: 170 }
+        { key: 'remarks', label: 'Remarks', type: 'text', width: 170, placeholder: '-' }
       ],
-      status: (r, ctx) => {
-        if (anyIs(r, ['issued', 'sentToClient', 'viaBank'], 'No') || invoiceMatches(r, ctx) === 'No') return NON_COMPLIANT;
-        return anyBlank(r, ['issued', 'sentToClient', 'viaBank']) ? PENDING : COMPLIANT;
-      }
+      status: (r, ctx) => complete(r, ['issued', 'invoiceNo', 'invoiceDate', 'amount', 'sentToClient', 'viaBank'],
+        [blank(ctx.clientById[r.id]?.name), blank(feeOf(ctx.clientById[r.id])), invoiceMatches(r, ctx) !== 'Yes'])
     }]
   },
   {
     key: 'clientDocuments', no: '15', short: 'Client Documents', title: 'Documents sent to every client', kind: 'client',
-    intro: 'The seven documents every client must receive.',
+    intro: 'The seven documents every client must receive. They are Yes by default (change any to No if it was not sent); for CRM clients the date of sending comes from the Welcome Kit, by Email.',
     sections: [{
       key: 'rows', kind: 'client',
       columns: [
         ...clientAuto,
         ...CLIENT_DOCUMENTS.map(([key, label]) => ({ key, label, type: 'yn' })),
-        { key: 'proof', label: 'Date(s), mode and proof of sending', type: 'text', width: 190, placeholder: '03-Oct-2026 by email' },
-        { key: 'remarks', label: 'Remarks', type: 'text', width: 170 },
+        { key: 'proof', label: 'Date(s), mode and proof of sending', type: 'text', width: 190, placeholder: '03-Oct-2026, by Email' },
+        { key: 'remarks', label: 'Remarks', type: 'text', width: 170, placeholder: '-' },
         { key: 'sentCount', label: 'Documents sent (auto)', type: 'auto', value: r => `${DOC_KEYS.filter(k => r[k] === 'Yes').length} of 7` }
       ],
-      status: (r) => (anyIs(r, DOC_KEYS, 'No') ? NON_COMPLIANT : DOC_KEYS.every(k => r[k] === 'Yes') ? COMPLIANT : PENDING)
+      status: (r) => complete(r, [...DOC_KEYS, 'proof'])
     }]
   }
 ];
 
 function invoiceMatches(r, ctx) {
   if (blank(r.amount)) return '';
-  const fee = Number(ctx.clientById[r.id]?.fees) || 0;
+  const fee = feeOf(ctx.clientById[r.id]);
+  if (fee === '') return 'No';
   return Math.round((Number(r.amount) - fee) * 100) === 0 ? 'Yes' : 'No';
 }
+
+/** MITC's date of joining: the KRA / e-sign date the CRM gives, else the Client Register's Date of Joining. */
+function mitcJoinDate(r, ctx) {
+  return fmtDate(r.joinDate || ctx.clientById[r.id]?.joinDate);
+}
+
+function kycMatches(r, ctx) {
+  if (blank(r.done)) return '';
+  return r.done === ctx.clientById[r.id]?.kyc ? 'Yes' : 'No - update register';
+}
+
+/** Every row is Compliant or Non-compliant: an incomplete row (the workbook's "Pending") counts as Non-compliant. */
+const finalStatus = (status) => (status === PENDING ? NON_COMPLIANT : status);
+SHEETS.forEach(sheet => sheet.sections.forEach(section => {
+  section.sheet = sheet.key;
+  if (section.status) {
+    const rule = section.status;
+    section.status = (row, ctx, fixed) => finalStatus(rule(row, ctx, fixed));
+  }
+}));
 
 export const SHEET_BY_KEY = Object.fromEntries(SHEETS.map(s => [s.key, s]));
 
@@ -547,7 +606,7 @@ export const displayRows = (section, stored, ctx) => {
   const saved = Array.isArray(stored) ? stored : [];
   if (section.kind === 'list') return saved.map(r => ({ row: r }));
   const byId = Object.fromEntries(saved.map(r => [r.id, r]));
-  if (section.kind === 'client') return ctx.clients.map(c => ({ row: byId[c.id] || { id: c.id } }));
+  if (section.kind === 'client') return ctx.clients.map(c => ({ row: { ...withDefaults(c, section.sheet, byId[c.id]), id: c.id } }));
   return section.fixedRows.map(f => {
     const row = byId[f.id] || { id: f.id };
     return { row: f.renamable ? row : { ...row, label: f.label }, fixed: f };
@@ -578,7 +637,8 @@ export const SUMMARY_LINES = [
   ['clientDocuments', 'rows', 'Documents sent to every client']
 ];
 
-export const overallStatus = (c) => (c.items === 0 ? 'No data' : c.nc > 0 ? 'Action needed' : c.pending > 0 ? 'In progress' : 'Compliant');
+// Action needed when anything is Non-compliant, else Compliant (Pending is always 0)
+export const overallStatus = (c) => (c.items === 0 ? 'No data' : c.nc > 0 ? 'Action needed' : 'Compliant');
 
 /** {sheet, section, area, items, ok, nc, pending, pct, overall} per summary line, plus the total. */
 export const summarize = (ctx) => {
