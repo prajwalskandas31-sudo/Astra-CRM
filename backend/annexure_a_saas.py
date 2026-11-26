@@ -367,7 +367,11 @@ def build_pdf(doc: dict) -> bytes:
     regular, bold, _ = invoice._fonts()
     margin = 12.7 * mm
     usable = A4[0] - 2 * margin
-    head = ParagraphStyle("head", fontName=bold, fontSize=8.5, leading=10.5, alignment=1)
+    try:
+        from backend import report_style
+    except ImportError:
+        import report_style
+    head = ParagraphStyle("head", fontName=bold, fontSize=8.5, leading=10.5, alignment=1, textColor=colors.white)
     # A 12-character enlistment number (INH000012345) fits its narrow column on one line at 7.5 pt
     cell = ParagraphStyle("cell", fontName=regular, fontSize=7.5, leading=9.5, alignment=1)
     text = ParagraphStyle("text", fontName=bold, fontSize=11, leading=14)
@@ -382,15 +386,12 @@ def build_pdf(doc: dict) -> bytes:
     # Blank rows keep the format's row height (572 twips, about 10 mm); filled rows grow with their text
     heights = [None] + [None if _filled(r) else 10 * mm for r in doc.get("rows") or []]
     table = Table(data, colWidths=widths, repeatRows=1, rowHeights=heights)
-    table.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 1, colors.black),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    table.setStyle(TableStyle(report_style.table_commands(1) + [
         ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
     ]))
 
-    story = [Paragraph(TITLE, ParagraphStyle("title", fontName=bold, fontSize=11, leading=14, alignment=1)),
-             Spacer(1, 4), table, Spacer(1, 18), Paragraph("With Regards", text), Spacer(1, 14),
+    story = [report_style.banner(TITLE, usable, bold, regular, [doc.get("label", "")]),
+             Spacer(1, 8), table, Spacer(1, 18), Paragraph("With Regards", text), Spacer(1, 14),
              Paragraph("________________", text)]
     for value in (doc.get("signatoryName"), doc.get("signatoryDesignation")):
         if value:

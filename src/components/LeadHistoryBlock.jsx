@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import {
@@ -129,14 +130,14 @@ export const LeadHistoryBlock = () => {
         dayOf(h.date), h.time || '', h.text || '', h.by || '']));
     });
     const wb = XLSX.utils.book_new();
-    const leadsSheet = XLSX.utils.aoa_to_sheet(leadRows);
-    leadsSheet['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 10 }, { wch: 26 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 10 }];
-    const timelineSheet = XLSX.utils.aoa_to_sheet(timelineRows);
-    timelineSheet['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 80 }, { wch: 18 }];
+    const range = dateFrom || dateTo ? `${dateFrom || 'start'} to ${dateTo || 'today'}` : 'all dates';
+    const leadsSheet = tableSheet({ title: 'Lead Assignment History - Leads', subtitle: `Period: ${range}`, header: leadRows[0], rows: leadRows.slice(1),
+      cols: [26, 14, 12, 26, 20, 14, 12, 12] });
+    const timelineSheet = tableSheet({ title: 'Lead Assignment History - Timeline', subtitle: `Period: ${range}`, header: timelineRows[0], rows: timelineRows.slice(1),
+      cols: [26, 14, 20, 12, 10, 80, 18] });
     XLSX.utils.book_append_sheet(wb, leadsSheet, 'Leads');
     XLSX.utils.book_append_sheet(wb, timelineSheet, 'Assignment History');
-    const range = dateFrom || dateTo ? `${dateFrom || 'start'} to ${dateTo || 'today'}` : 'all dates';
-    XLSX.writeFile(wb, `Lead Assignment History (${range}).xlsx`);
+    writeReport(wb, `Lead Assignment History (${range}).xlsx`);
     showToast(`Downloaded ${filteredLeads.length} lead(s) and ${timelineRows.length - 1} history entries.`, 'success');
   };
 

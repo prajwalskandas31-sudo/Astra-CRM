@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { reportSheet, tableSheet, writeReport } from '../lib/reportExcel';
 
 // Global settings for a month. Keys must match SETTING_FIELDS in backend/salary.py.
 export const SETTING_FIELDS = [
@@ -105,11 +106,12 @@ export const exportConsolidated = (payType, month, rows, settings) => {
   const body = rows.map(r => employeeFields(payType, r, settings).map(([, v]) => v));
   const total = header.map((h, i) => (i === 0 ? `Total (${rows.length})` : h === 'Final Total Salary' || h === 'Net Sales'
     ? r2(body.reduce((s, row) => s + (Number(row[i]) || 0), 0)) : ''));
-  const sheet = XLSX.utils.aoa_to_sheet([[`Salary Block - ${payType} - ${month}`], [], header, ...body, total]);
-  sheet['!cols'] = header.map(h => ({ wch: Math.min(Math.max(h.length, 10), 28) }));
+  const sheet = tableSheet({ title: `Salary Block - ${payType}`, subtitle: month, header, rows: body, total,
+    cols: header.map(h => Math.min(Math.max(h.length + 2, 12), 28)) });
   XLSX.utils.book_append_sheet(wb, sheet, payType.slice(0, 31));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Setting', `Value for ${month}`], ...settingsRows(settings)]), 'Settings');
-  XLSX.writeFile(wb, `${fileStem(payType, month)}_All.xlsx`);
+  XLSX.utils.book_append_sheet(wb, tableSheet({ title: 'Salary Settings', subtitle: month, header: ['Setting', `Value for ${month}`],
+    rows: settingsRows(settings), cols: [44, 18] }), 'Settings');
+  writeReport(wb, `${fileStem(payType, month)}_All.xlsx`);
 };
 
 /** One workbook, one sheet per employee with every field, the calculation and their transactions. */
@@ -117,18 +119,19 @@ export const exportIndividual = (payType, month, rows, settings) => {
   const wb = XLSX.utils.book_new();
   const used = new Set();
   rows.forEach(r => {
-    const aoa = [[`${r.name} - ${payType} - ${month}`], [], ['Field', 'Value'], ...employeeFields(payType, r, settings)];
-    aoa.push([], ['Closed client transactions'], ['Payment Date', 'Client', 'Sale', 'Credited as', 'Net Sales credited']);
-    (r.transactions || []).forEach(t => aoa.push([t.paymentDate, t.clientName || '', t.saleId, t.role, money(t.credited)]));
-    if (!(r.transactions || []).length) aoa.push(['None in this month']);
-    aoa.push([], ['Settings applied'], ...settingsRows(settings));
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    sheet['!cols'] = [{ wch: 44 }, { wch: 22 }, { wch: 16 }, { wch: 12 }, { wch: 18 }];
+    const fields = employeeFields(payType, r, settings);
+    const b = reportSheet().title(`${r.name} - ${payType}`).subtitle(month)
+      .header(['Field', 'Value']).rows(fields.slice(0, -1)).total(fields[fields.length - 1]);
+    b.blank().section('Closed client transactions').header(['Payment Date', 'Client', 'Sale', 'Credited as', 'Net Sales credited']);
+    (r.transactions || []).forEach(t => b.body([t.paymentDate, t.clientName || '', t.saleId, t.role, money(t.credited)]));
+    if (!(r.transactions || []).length) b.note('None in this month');
+    b.blank().section('Settings applied').header(['Setting', `Value for ${month}`]).rows(settingsRows(settings));
+    const sheet = b.build({ cols: [44, 24, 16, 14, 20] });
     const base = (`${r.name}${r.employeeId ? ` ${r.employeeId}` : ''}`).replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 28) || 'Employee';
     let name = base;
     for (let i = 2; used.has(name.toLowerCase()); i += 1) name = `${base.slice(0, 26)} ${i}`;
     used.add(name.toLowerCase());
     XLSX.utils.book_append_sheet(wb, sheet, name);
   });
-  XLSX.writeFile(wb, `${fileStem(payType, month)}_Individual.xlsx`);
+  writeReport(wb, `${fileStem(payType, month)}_Individual.xlsx`);
 };

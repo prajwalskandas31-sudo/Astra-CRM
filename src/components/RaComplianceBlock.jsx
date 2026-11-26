@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { reportSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { loadComplianceMonth, loadComplianceMonths, loadRecoFromReports, saveComplianceSheet } from '../services/raComplianceService';
@@ -192,37 +193,35 @@ const SectionTable = ({ sheet, section, rows, ctx, showExample, onRowChange, onD
 const exportExcel = (month, ctx, details, profile, summary) => {
   const wb = XLSX.utils.book_new();
   const detail = (f) => details[f.key] || (f.profile ? profile?.[f.profile] : '') || '';
-  const dash = [
-    ['RESEARCH ANALYST - MONTHLY COMPLIANCE CHECKLIST'],
-    ['Based on the SEBI (Research Analysts) Regulations, 2014 and circulars issued under them. Self-check aid; confirm against the latest SEBI circulars.'],
-    [],
-    ['Compliance month', monthLabel(month)],
-    ...DETAIL_FIELDS.map(f => [f.label, f.type === 'date' ? fmtDate(detail(f)) : detail(f)]),
-    [],
-    ['#', 'Compliance area', 'Tab', 'Items checked', 'Compliant', 'Non-compliant', 'Pending', 'Compliance %', 'Overall status'],
-    ...summary.lines.map((l, i) => [i + 1, l.area, l.tab, l.items, l.ok, l.nc, l.pending, l.pct === null ? '-' : l.pct, l.overall]),
-    ['', 'OVERALL', '', summary.total.items, summary.total.ok, summary.total.nc, summary.total.pending, summary.total.pct === null ? '-' : summary.total.pct, summary.total.overall]
-  ];
-  const ds = XLSX.utils.aoa_to_sheet(dash);
-  ds['!cols'] = [{ wch: 34 }, { wch: 52 }, { wch: 24 }, { wch: 13 }, { wch: 11 }, { wch: 14 }, { wch: 10 }, { wch: 13 }, { wch: 16 }];
+  const d = reportSheet()
+    .title('RESEARCH ANALYST - MONTHLY COMPLIANCE CHECKLIST')
+    .subtitle('Based on the SEBI (Research Analysts) Regulations, 2014 and circulars issued under them. Self-check aid; confirm against the latest SEBI circulars.')
+    .blank()
+    .kv('Compliance month', monthLabel(month));
+  DETAIL_FIELDS.forEach(f => d.kv(f.label, f.type === 'date' ? fmtDate(detail(f)) : detail(f)));
+  d.blank()
+    .header(['#', 'Compliance area', 'Tab', 'Items checked', 'Compliant', 'Non-compliant', 'Pending', 'Compliance %', 'Overall status'])
+    .rows(summary.lines.map((l, i) => [i + 1, l.area, l.tab, l.items, l.ok, l.nc, l.pending, l.pct === null ? '-' : l.pct, l.overall]))
+    .total(['', 'OVERALL', '', summary.total.items, summary.total.ok, summary.total.nc, summary.total.pending, summary.total.pct === null ? '-' : summary.total.pct, summary.total.overall]);
+  const ds = d.build({ cols: [34, 52, 24, 13, 11, 14, 10, 13, 16] });
   // percentages as %
-  for (let r = 0; r < dash.length; r += 1) {
+  for (let r = 0; r < d.row; r += 1) {
     const cell = ds[XLSX.utils.encode_cell({ r, c: 7 })];
     if (cell && typeof cell.v === 'number') cell.z = '0%';
   }
   XLSX.utils.book_append_sheet(wb, ds, 'Dashboard');
 
   SHEETS.forEach(sheet => {
-    const aoa = [[`${sheet.no}. ${sheet.title.toUpperCase()}`], [`Month: ${monthLabel(month)}`]];
+    const b = reportSheet().title(`${sheet.no}. ${sheet.title.toUpperCase()}`).subtitle(`Month: ${monthLabel(month)}`);
     let widths = [];
     sheet.sections.forEach(section => {
-      if (sheet.sections.length > 1) aoa.push([], [section.title]);
+      if (sheet.sections.length > 1) b.blank().section(section.title);
       const lead = [...(section.labelColumn ? [section.labelColumn] : []), ...(section.infoColumns || [])];
       const header = ['Sr. No', ...lead.map(c => c.label), ...section.columns.map(c => c.label), ...(sheet.noStatus ? [] : ['Status'])];
-      aoa.push(header);
+      b.header(header);
       widths = header.map((h, i) => Math.max(widths[i] || 8, Math.min(40, String(h).length + 2)));
       displayRows(section, ctx.rowsOf(sheet.key, section.key), ctx).forEach(({ row, fixed }, i) => {
-        aoa.push([
+        b.body([
           i + 1,
           ...lead.map(c => (c.key === 'label' ? (row.label || fixed?.label || '') : fixed?.[c.key] ?? '')),
           ...section.columns.map(c => cellText(c, row, ctx, fixed)),
@@ -230,11 +229,10 @@ const exportExcel = (month, ctx, details, profile, summary) => {
         ]);
       });
     });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = widths.map(w => ({ wch: w }));
+    const ws = b.build({ cols: widths.map(w => Math.max(w, 12)) });
     XLSX.utils.book_append_sheet(wb, ws, `${sheet.no}. ${sheet.short}`.slice(0, 31));
   });
-  XLSX.writeFile(wb, `RA Monthly Compliance Tracker ${month}.xlsx`);
+  writeReport(wb, `RA Monthly Compliance Tracker ${month}.xlsx`);
 };
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────

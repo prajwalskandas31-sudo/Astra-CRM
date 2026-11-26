@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { reportSheet, writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import {
   listAnnexureReports, createAnnexureReport, loadAnnexureReport, saveAnnexureReport,
@@ -61,20 +62,15 @@ const checks = (rows, columns) => {
 const exportExcel = (report, columns) => {
   const header = ['SN', ...columns.map(c => c.title)];
   const ccLines = String(report.cc || '').split('\n').map(s => s.trim()).filter(Boolean);
-  const aoa = [
-    [TITLE],
-    header,
-    ...report.rows.map((r, i) => [i + 1, ...columns.map(c => r[c.key] || '')]),
-    [], ['With Regards'], [], ['________________'],
-    ...[report.signatoryName, report.signatoryDesignation].filter(Boolean).map(v => [v]),
-    ...(ccLines.length ? [[], ...ccLines.map((l, i) => [i === 0 ? `c.c.:   ${l}` : l])] : [])
-  ];
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } }];
-  sheet['!cols'] = [{ wch: 6 }, ...columns.map(c => ({ wch: Math.round((COLUMN_WIDTHS[c.key] || 140) / 6.5) }))];
+  const b = reportSheet().title(TITLE).subtitle(report.label || '').header(header)
+    .rows(report.rows.map((r, i) => [i + 1, ...columns.map(c => r[c.key] || '')]));
+  b.blank().text('With Regards').blank().text('________________');
+  [report.signatoryName, report.signatoryDesignation].filter(Boolean).forEach(v => b.text(v));
+  if (ccLines.length) { b.blank(); ccLines.forEach((l, i) => b.text(i === 0 ? `c.c.:   ${l}` : l)); }
+  const sheet = b.build({ cols: [6, ...columns.map(c => Math.round((COLUMN_WIDTHS[c.key] || 140) / 6.5))] });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet, 'Annexure A');
-  XLSX.writeFile(wb, fileName(report.label, 'xlsx'));
+  writeReport(wb, fileName(report.label, 'xlsx'));
 };
 
 const cellInput = { width: '100%', height: '32px', fontSize: '0.8rem', boxSizing: 'border-box', padding: '0 6px' };

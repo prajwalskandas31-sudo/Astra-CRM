@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { reportSheet, writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import {
   loadStatement, adjustEntry, addManualEntry, editManualEntry, deleteManualEntry, downloadStatementPdf
@@ -109,16 +110,16 @@ const exportExcel = (data) => {
   TABS.forEach(([id, title]) => {
     const list = id === 'all' ? data.entries : withBalance(data.entries.filter(e => e.section === id));
     const totals = list.reduce((t, e) => ({ c: t.c + e.credit, d: t.d + e.debit, n: t.n + e.neutral }), { c: 0, d: 0, n: 0 });
-    const aoa = [
-      [`Running Account Statement - ${title}`], [data.monthName], ['Opening Balance', 0], [], head,
-      ...list.map(e => [e.entryDate, e.adjustedDate, e.narration, e.credit, e.debit, e.neutral, e.balance]),
-      ['', '', 'Total', r2(totals.c), r2(totals.d), r2(totals.n), r2(totals.c - totals.d)]
-    ];
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    sheet['!cols'] = [{ wch: 12 }, { wch: 13 }, { wch: 70 }, { wch: 14 }, { wch: 14 }, { wch: 13 }, { wch: 16 }];
+    const sheet = reportSheet()
+      .title(`Running Account Statement - ${title}`).subtitle(data.monthName)
+      .blank().kv('Opening Balance', 0).blank()
+      .header(head)
+      .rows(list.map(e => [e.entryDate, e.adjustedDate, e.narration, e.credit, e.debit, e.neutral, e.balance]))
+      .total(['', '', 'Total', r2(totals.c), r2(totals.d), r2(totals.n), r2(totals.c - totals.d)])
+      .build({ cols: [14, 14, 70, 14, 14, 14, 17] });
     XLSX.utils.book_append_sheet(wb, sheet, title.replace(/&/g, 'and').slice(0, 31));
   });
-  XLSX.writeFile(wb, `Running Account Statement ${data.monthName}.xlsx`);
+  writeReport(wb, `Running Account Statement ${data.monthName}.xlsx`);
 };
 
 export const RunningAccountBlock = () => {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { NotebookPen, Plus, Trash2, Download, Search } from 'lucide-react';
@@ -159,24 +160,22 @@ export const ResearchRecommendationsBlock = () => {
   // The same layout as the reference sheet: company name, title, the ten column headings, then the rows
   const exportExcel = () => {
     const title = year === 'all' ? SHEET_TITLE : `${SHEET_TITLE} ${year}`;
-    const aoa = [
-      [companyName || 'Company Name'],
-      [title],
-      COLUMNS.map(c => c.label),
-      ...rows.map((r, i) => [
+    const sheet = tableSheet({
+      title: companyName || 'Company Name',
+      subtitle: title,
+      header: COLUMNS.map(c => c.label),
+      cols: [8, 12, 24, 30, 16, 16, 12, 12, 12, 30],
+      rows: rows.map((r, i) => [
         r.srNo === '' || r.srNo === undefined ? i + 1 : Number(r.srNo),
         showDate(r.date), r.nature || '', r.product || '', r.strikePrice || '', r.period || '', r.callPutHold || '',
         r.buyRate === '' || r.buyRate === undefined ? '' : Number(r.buyRate),
         r.sellRate === '' || r.sellRate === undefined ? '' : Number(r.sellRate),
         r.rationaleMaintained || ''
       ])
-    ];
-    const sheet = XLSX.utils.aoa_to_sheet(aoa);
-    sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }];
-    sheet['!cols'] = [6, 12, 24, 30, 16, 16, 12, 12, 12, 30].map(wch => ({ wch }));
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, 'Sheet1');
-    XLSX.writeFile(wb, `Records for Research Recommendations${year === 'all' ? '' : ` FY ${year}`}.xlsx`);
+    writeReport(wb, `Records for Research Recommendations${year === 'all' ? '' : ` FY ${year}`}.xlsx`);
   };
 
   const field = { padding: '7px 10px', fontSize: '0.82rem', boxSizing: 'border-box', width: '100%' };

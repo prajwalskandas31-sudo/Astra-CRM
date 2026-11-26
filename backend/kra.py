@@ -22,17 +22,17 @@ from typing import List, Optional, Tuple
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 try:
-    from backend import store
+    from backend import report_style, store
     from backend.auth import get_current_user, is_admin
     from backend.sync import team_ids
 except ImportError:
+    import report_style
     import store
     from auth import get_current_user, is_admin
     from sync import team_ids
@@ -117,26 +117,24 @@ def _can_see(user: dict, owner: Optional[str]) -> bool:
 # ==========================================
 def render_pdf(client_name: str, pan: str, rows: List[Tuple[str, str]], fetched_at: datetime, fetched_by: str) -> bytes:
     styles = getSampleStyleSheet()
-    title = ParagraphStyle("kraTitle", parent=styles["Title"], fontSize=16, spaceAfter=2)
-    small = ParagraphStyle("kraSmall", parent=styles["Normal"], fontSize=8.5, textColor=colors.HexColor("#555555"))
-    cell = ParagraphStyle("kraCell", parent=styles["Normal"], fontSize=9.5, leading=12)
-    label = ParagraphStyle("kraLabel", parent=cell, textColor=colors.HexColor("#444444"))
+    small = ParagraphStyle("kraSmall", parent=styles["Normal"], fontSize=8.5, textColor=report_style.NOTE)
+    cell = ParagraphStyle("kraCell", parent=styles["Normal"], fontSize=9.5, leading=12, textColor=report_style.INK)
+    label = ParagraphStyle("kraLabel", parent=cell, fontName="Helvetica-Bold")
+    head = report_style.header_style(cell, "Helvetica-Bold")
 
     when = fetched_at.astimezone(IST).strftime("%d %b %Y %H:%M:%S IST")
     story = [
-        Paragraph("KYC Details - CVL KRA", title),
-        Paragraph(escape(f"{client_name} | PAN {pan}"), styles["Heading4"]),
-        Paragraph(escape(f"Fetched on {when} by {fetched_by} from CVL KRA (KYC Inquiry)"), small),
+        report_style.banner("KYC Details - CVL KRA", 170 * mm, "Helvetica-Bold", "Helvetica",
+                            [f"{client_name} | PAN {pan}", f"Fetched on {when} by {fetched_by} from CVL KRA (KYC Inquiry)"]),
         Spacer(1, 6 * mm),
     ]
-    data = [[Paragraph(escape(str(k)), label), Paragraph(escape(str(v if v not in (None, "") else "-")), cell)]
-            for k, v in rows]
-    table = Table(data, colWidths=[60 * mm, 110 * mm])
-    table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#DDDDDD")),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    data = [[Paragraph("Field", head), Paragraph("Value", head)]]
+    data += [[Paragraph(escape(str(k)), label), Paragraph(escape(str(v if v not in (None, "") else "-")), cell)]
+             for k, v in rows]
+    table = Table(data, colWidths=[60 * mm, 110 * mm], repeatRows=1)
+    table.setStyle(TableStyle(report_style.table_commands(1) + [
+        ("BACKGROUND", (0, 1), (0, -1), report_style.LABEL),
+        ("TOPPADDING", (0, 1), (-1, -1), 5), ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
     ]))
     story += [table, Spacer(1, 8 * mm),
               Paragraph("Disclaimer: these details are as held by the KRA on the date above and are for the "

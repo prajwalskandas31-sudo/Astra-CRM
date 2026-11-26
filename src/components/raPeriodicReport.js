@@ -3,6 +3,7 @@
  * and the Excel workbook (one sheet per sub-block, laid out as RA_Periodic_Report_31-03-2026.xlsx).
  * Server side: backend/ra_periodic_report.py (auto values, saving per half).
  */
+import { styleSheet } from '../lib/reportExcel';
 
 export const YES_NO = ['Yes', 'No'];
 const ADDRESS_FIELDS = [['line1', 'Address Line 1'], ['line2', 'Address Line 2'], ['state', 'State'], ['city', 'City'],
@@ -256,7 +257,7 @@ export const feeCells = (data, draft) => {
   return out;
 };
 
-// ---------------- Excel ----------------
+// ---------------- Excel (house style from ../lib/reportExcel) ----------------
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 /** 'YYYY-MM-DD' -> a real Excel date (DD-MM-YYYY); other text as is. */
 const dateCell = (v) => {
@@ -271,11 +272,14 @@ const merge = (r1, c1, r2_, c2) => ({ s: { r: r1, c: c1 }, e: { r: r2_, c: c2 } 
 export const dmyDash = (iso) => { const m = ISO.exec(iso || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : ''; };
 const halfName = (data) => `the half year ended ${new Date(`${data.to}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}`; // "March 31, 2026"
 
-const sheetOf = (XLSX, aoa, merges, widths) => {
+/** Row 1 the sheet name, row 2 its description band, then `headerRows` heading rows, the rows, an optional total. */
+const sheetOf = (XLSX, aoa, merges, widths, headerRows = 1, totalLast = false) => {
   const s = XLSX.utils.aoa_to_sheet(aoa);
   s['!merges'] = merges;
   s['!cols'] = widths.map(wch => ({ wch }));
-  return s;
+  const roles = aoa.map((_, r) => (r === 0 ? 'title' : r === 1 ? 'subtitle' : r < 2 + headerRows ? 'header'
+    : totalLast && r === aoa.length - 1 ? 'total' : 'body'));
+  return styleSheet(s, roles);
 };
 
 const generalSheet = (XLSX, data, draft) => {
@@ -349,7 +353,7 @@ const feesSheet = (XLSX, data, draft) => {
       merges.push(merge(aoa.length - 1, 2, aoa.length - 1, 7));
     }
   });
-  return sheetOf(XLSX, aoa, merges, [8, 60, 14, 16, 10, 14, 16, 10, 20]);
+  return sheetOf(XLSX, aoa, merges, [8, 60, 14, 16, 10, 14, 16, 10, 20], 2);
 };
 
 const tableSheet = (XLSX, data, draft, id) => {
@@ -367,11 +371,12 @@ const tableSheet = (XLSX, data, draft, id) => {
     aoa.push(['SR', ...t.columns.map(c => c.label)]);
   }
   rows.forEach((row, i) => aoa.push([String(i + 1), ...t.columns.map(c => typed(c, row[c.key]))]));
-  if (id === 'shareholding' && rows.length) {
+  const total = id === 'shareholding' && rows.length > 0;
+  if (total) {
     aoa.push(['Total', '', '', r2(rows.reduce((s, row) => s + num(row.percent), 0))]);
     merges.push(merge(aoa.length - 1, 0, aoa.length - 1, 2));
   }
-  return sheetOf(XLSX, aoa, merges, [6, ...t.columns.map(c => (c.wide ? 70 : c.type === 'date' ? 14 : 28))]);
+  return sheetOf(XLSX, aoa, merges, [6, ...t.columns.map(c => (c.wide ? 70 : c.type === 'date' ? 14 : 28))], id === 'nism' ? 2 : 1, total);
 };
 
 /** The workbook for the given sub-blocks (all 11 by default), sheets in the order of the reference file. */

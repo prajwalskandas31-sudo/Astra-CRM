@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import { MailX, RefreshCw, Download, CheckCircle2, AlertCircle, Clock, Search, Undo2 } from 'lucide-react';
 import {
@@ -110,7 +111,8 @@ export const EmailFailuresReport = () => {
   };
 
   const exportExcel = () => {
-    const sheet = XLSX.utils.json_to_sheet(rows.map(r => ({
+    const today = new Date().toISOString().slice(0, 10);
+    const records = rows.map(r => ({
       'Date': when(r.at),
       'Client': r.clientName || '(not matched to a client)',
       'Email ID': r.to || '',
@@ -123,11 +125,15 @@ export const EmailFailuresReport = () => {
       'Resolved': r.resolved || '',
       'Reviewed By': r.review ? `${r.review.by} (${when(r.review.at)})` : '',
       'Follow-up Note': r.review?.note || ''
-    })));
-    sheet['!cols'] = [18, 24, 30, 20, 28, 16, 12, 60, 18, 36, 26, 36].map(wch => ({ wch }));
+    }));
+    const sheet = tableSheet({
+      title: 'Failed Email Deliveries', subtitle: `As on ${today}`, records,
+      header: ['Date', 'Client', 'Email ID', 'Email', 'Subject', 'Problem', 'Status Code', 'Failure Details', 'Attempted By', 'Resolved', 'Reviewed By', 'Follow-up Note'],
+      cols: [18, 24, 30, 20, 28, 16, 12, 60, 18, 36, 26, 36]
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet, 'Failed Emails');
-    XLSX.writeFile(wb, `Failed Email Deliveries ${new Date().toISOString().slice(0, 10)}.xlsx`);
+    writeReport(wb, `Failed Email Deliveries ${today}.xlsx`);
   };
 
   const summary = data?.summary;

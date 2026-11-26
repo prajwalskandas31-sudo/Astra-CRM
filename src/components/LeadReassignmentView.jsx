@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { 
   Layers, ArrowRight, Calendar, Hash, Globe, Filter, CheckCircle2, Search, 
   RotateCcw, X, BookmarkCheck, FileSpreadsheet, Download, Printer, 
@@ -362,7 +363,8 @@ export const LeadReassignmentView = () => {
         { Parameter: 'Daily New Inflows / Bulk Uploads', Value: todayInflowsCount },
         { Parameter: 'Active Executives Engaged', Value: activeEngagedOwnersCount }
       ];
-      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      const eodDay = selectedEodDate === 'ALL' ? 'All Historic Logs' : selectedEodDate;
+      const wsSummary = tableSheet({ title: 'End of Day (EOD) Executive Report', subtitle: `Report date: ${eodDay}`, records: summaryRows, cols: [38, 48] });
       XLSX.utils.book_append_sheet(wb, wsSummary, 'EOD_Executive_Summary');
 
       // Sheet 2: Owner Workload Matrix
@@ -374,7 +376,9 @@ export const LeadReassignmentView = () => {
         "Today's Actions Logged": o.todayActionsCount,
         'Dispositions Mix': Object.entries(o.dispositions).map(([k, v]) => `${k} (${v})`).join(', ')
       }));
-      const wsOwner = XLSX.utils.json_to_sheet(ownerRows);
+      const wsOwner = tableSheet({ title: 'Executive Workload', subtitle: `Report date: ${eodDay}`, records: ownerRows,
+        header: ['Owner / Executive', 'Role', 'Active Leads Held', 'Managed Value (INR)', "Today's Actions Logged", 'Dispositions Mix'],
+        cols: [26, 16, 14, 18, 16, 60] });
       XLSX.utils.book_append_sheet(wb, wsOwner, 'Executive_Workload');
 
       // Sheet 3: Dispositions Pipeline
@@ -385,7 +389,9 @@ export const LeadReassignmentView = () => {
         '% of Pipeline': ((d.count / (leads.length || 1)) * 100).toFixed(1) + '%',
         'Daily Actions Logged': d.todayActions
       }));
-      const wsDisp = XLSX.utils.json_to_sheet(dispRows);
+      const wsDisp = tableSheet({ title: 'Pipeline Dispositions', subtitle: `Report date: ${eodDay}`, records: dispRows,
+        header: ['Disposition Stage', 'Lead Count', 'Total Value (INR)', '% of Pipeline', 'Daily Actions Logged'],
+        cols: [28, 12, 18, 14, 18] });
       XLSX.utils.book_append_sheet(wb, wsDisp, 'Pipeline_Dispositions');
 
       // Sheet 4: Daily Immutable Audit Logs
@@ -401,10 +407,12 @@ export const LeadReassignmentView = () => {
         'Action Classification': ev.actionType,
         'Audit Trail Log Entry': ev.text
       }));
-      const wsAudit = XLSX.utils.json_to_sheet(auditRows);
+      const wsAudit = tableSheet({ title: 'Daily Audit Logs', subtitle: `Report date: ${eodDay}`, records: auditRows,
+        header: ['Sl No', 'Date', 'Contact Name', 'Phone Number', 'Language', 'Current Owner', 'Disposition', 'Value', 'Action Classification', 'Audit Trail Log Entry'],
+        cols: [7, 12, 24, 15, 12, 22, 20, 12, 20, 60] });
       XLSX.utils.book_append_sheet(wb, wsAudit, 'Daily_Audit_Logs');
 
-      XLSX.writeFile(wb, `EOD_Report_${selectedEodDate}.xlsx`);
+      writeReport(wb, `EOD_Report_${selectedEodDate}.xlsx`);
       showToast(`EOD Report (${selectedEodDate}) exported to Excel (.xlsx)!`, 'success');
     } catch (err) {
       showToast('Error exporting to Excel: ' + err.message, 'error');
