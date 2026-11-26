@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
+import { useShowMore, ShowMoreRow } from '../lib/useShowMore';
 import { useCRM, isPaidOrConvertedDisposition } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
@@ -22,9 +23,12 @@ import {
   AlertCircle,
   ArrowRightLeft
 } from 'lucide-react';
-import { LeadHistoryBlock } from './LeadHistoryBlock';
-import { ClientInformationModal } from './ClientInformationModal';
+import { lazyNamed } from '../lib/lazyNamed';
 import { DASHBOARD_SUB_BLOCKS } from './Sidebar';
+
+// Loaded when first opened: Lead History brings the Excel library, the client form is large
+const LeadHistoryBlock = lazyNamed(() => import('./LeadHistoryBlock'), 'LeadHistoryBlock');
+const ClientInformationModal = lazyNamed(() => import('./ClientInformationModal'), 'ClientInformationModal');
 
 export const CRMDashboard = ({ onOpenBlock }) => {
   const { 
@@ -59,6 +63,8 @@ export const CRMDashboard = ({ onOpenBlock }) => {
   const [showClientInfoModal, setShowClientInfoModal] = useState(false);
   const [clientInfoLead, setClientInfoLead] = useState(null);
   const [clientInfoCompleted, setClientInfoCompleted] = useState(false);
+  const clientInfoModalUsed = React.useRef(false);
+  if (showClientInfoModal) clientInfoModalUsed.current = true;
 
   // Manage Shortcuts & Request Leads Modals
   const [showManageShortcuts, setShowManageShortcuts] = useState(false);
@@ -70,7 +76,8 @@ export const CRMDashboard = ({ onOpenBlock }) => {
   const isSuperAdmin = simulatedRole === 'Super Admin';
   const [adminViewUserFilter, setAdminViewUserFilter] = useState('ALL');
 
-  const scopedLeads = leads.filter(l => {
+  // Recomputed only when the leads or the filter change, not on every keystroke in the call form
+  const scopedLeads = useMemo(() => leads.filter(l => {
     // Unassigned leads should NEVER appear in the Assigned Leads Pipeline
     if (l.isUnassigned || !l.assignedToId || l.assignedToId === 'unassigned' || l.assignedToName === 'Unassigned') {
       return false;
@@ -99,12 +106,35 @@ export const CRMDashboard = ({ onOpenBlock }) => {
       (currentName && (l.assignedToName || '').trim().toLowerCase() === currentName) ||
       (currentEmail && l.assignedToEmail && l.assignedToEmail.trim().toLowerCase() === currentEmail)
     );
-  });
+  }), [leads, users, isSuperAdmin, adminViewUserFilter, currentUser]);
+
+  // Assigned-lead counts for the Super Admin's "Show leads of" picker, in one pass over the leads
+  const assignedCounts = useMemo(() => {
+    if (!isSuperAdmin) return { all: 0, byUser: new Map() };
+    const active = (users || []).filter(u => u.status === 'Active');
+    const byId = new Map(active.map(u => [u.id, u]));
+    const byName = new Map();
+    active.forEach(u => { if (!byName.has(u.name)) byName.set(u.name, []); byName.get(u.name).push(u); });
+    const byUser = new Map();
+    let all = 0;
+    leads.forEach(l => {
+      if (l.isUnassigned || l.assignedToName === 'Unassigned') return;
+      if (l.assignedToId) all += 1;
+      if (l.assignedToId === 'unassigned') return;
+      const owners = new Set();
+      if (byId.has(l.assignedToId)) owners.add(byId.get(l.assignedToId));
+      if (byId.has(l.assigned_user_id)) owners.add(byId.get(l.assigned_user_id));
+      (byName.get(l.assignedToName) || []).forEach(u => owners.add(u));
+      owners.forEach(u => byUser.set(u.id, (byUser.get(u.id) || 0) + 1));
+    });
+    return { all, byUser };
+  }, [leads, users, isSuperAdmin]);
 
   const filteredLeads = scopedLeads.filter(l => {
     if (selectedDispFilter === 'All') return true;
     return l.disposition === selectedDispFilter;
   });
+  const leadRows = useShowMore(filteredLeads);
 
   // Dynamic counter sync for 'New Lead' status (Block 2 & Block 3 Report requirement)
   const newLeadsCount = scopedLeads.filter(l => l.disposition === 'New Lead').length;
@@ -457,10 +487,10 @@ export const CRMDashboard = ({ onOpenBlock }) => {
                   onChange={(e) => setAdminViewUserFilter(e.target.value)}
                   style={{ fontSize: '0.8rem', padding: '5px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                 >
-                  <option value="ALL">All Assigned Leads ({leads.filter(l => !l.isUnassigned && l.assignedToId && l.assignedToName !== 'Unassigned').length})</option>
+                  <option value="ALL">All Assigned Leads ({assignedCounts.all})</option>
                   <optgroup label="One user">
                     {users?.filter(u => u.status === 'Active').map(u => {
-                      const count = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
+                      const count = assignedCounts.byUser.get(u.id) || 0;
                       return (
                         <option key={u.id} value={u.id}>
                           {u.name} ({u.role}) — {count} Assigned Leads
@@ -493,7 +523,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
                   </td>
                 </tr>
               ) : (
-                filteredLeads.map(l => (
+                leadRows.visible.map(l => (
                   <tr key={l.id}>
                     {/* 1. CONTACT NAME */}
                     <td style={{ fontWeight: 600 }}>{l.contactPerson}</td>
@@ -592,6 +622,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
                   </tr>
                 ))
               )}
+              <ShowMoreRow more={leadRows} />
             </tbody>
           </table>
         </div>
@@ -602,7 +633,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
       {/* ============================================================ */}
       {/* HISTORY BLOCK — Lead Assignment History (All Roles)         */}
       {/* ============================================================ */}
-      {activeSubBlock === 'history' && hasPermission('lead-history') && <LeadHistoryBlock />}
+      {activeSubBlock === 'history' && hasPermission('lead-history') && <Suspense fallback={null}><LeadHistoryBlock /></Suspense>}
 
       {/* Post-Call Disconnect Modal */}
       {activeCallLead && (
@@ -1063,6 +1094,8 @@ export const CRMDashboard = ({ onOpenBlock }) => {
       {/* ============================================================ */}
       {/* CLIENT INFORMATION PAGE MODAL (BLOCK 2 MANDATORY WORKFLOW)  */}
       {/* ============================================================ */}
+      {/* Its code loads on first open; it then stays mounted so a half-filled form survives closing */}
+      {clientInfoModalUsed.current && <Suspense fallback={null}>
       <ClientInformationModal
         isOpen={showClientInfoModal}
         lead={clientInfoLead || activeCallLead}
@@ -1080,6 +1113,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
           }
         }}
       />
+      </Suspense>}
     </div>
   );
 };

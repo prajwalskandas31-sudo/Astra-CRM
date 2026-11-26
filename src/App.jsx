@@ -1,22 +1,10 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import { ToastProvider, useToast } from './components/ToastNotification';
 import { ConfirmDialogHost } from './components/ConfirmDialog';
-import { LoginPage } from './components/LoginPage';
 import { LoginDisclaimerModal } from './components/LoginDisclaimerModal';
 import { Navbar } from './components/Navbar';
 import { Sidebar, ALL_TAB_IDS, buildNavTree } from './components/Sidebar';
-import { CRMDashboard } from './components/CRMDashboard';
-import { UserDirectory } from './components/UserDirectory';
-import { DispositionsManager } from './components/DispositionsManager';
-import { LeadUploadModule } from './components/LeadUploadModule';
-import { LeadSummarySuperAdmin } from './components/LeadSummarySuperAdmin';
-import { TeamMonitoring } from './components/TeamMonitoring';
-import { TeamPerformanceBlock } from './components/TeamPerformanceBlock';
-import { SaleApprovalWorkflow } from './components/SaleApprovalWorkflow';
-import { LeadReassignmentView } from './components/LeadReassignmentView';
-import { SystemSettings } from './components/SystemSettings';
-import { CustomRolesBuilder } from './components/CustomRolesBuilder';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -50,33 +38,54 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-import { FeatureAccessBlock } from './components/FeatureAccessBlock';
-import { LeadHistoryBlock } from './components/LeadHistoryBlock';
-import { ESignManagementBlock } from './components/ESignManagementBlock';
-import { PaidBlock } from './components/PaidBlock';
-import { KraBlock } from './components/KraBlock';
-import { ClientMasterBlock } from './components/ClientMasterBlock';
-import { InvoiceBlock } from './components/InvoiceBlock';
-import { RunningAccountBlock } from './components/RunningAccountBlock';
-import { AuditReportBlock } from './components/AuditReportBlock';
-import { RaPeriodicReportBlock } from './components/RaPeriodicReportBlock';
-import { AnnexureASaasBlock } from './components/AnnexureASaasBlock';
-import { RaComplianceBlock } from './components/RaComplianceBlock';
-import { ServiceMasterBlock } from './components/ServiceMasterBlock';
-import { ResearchRecommendationsBlock } from './components/ResearchRecommendationsBlock';
-import { SalaryBlock } from './components/SalaryBlock';
-import { TelegramControlBlock } from './components/TelegramControlBlock';
-import { CompanyProfileBlock } from './components/CompanyProfileBlock';
-import { BranchProfilesBlock } from './components/BranchProfilesBlock';
-import { EmailBlock } from './components/EmailBlock';
-import { SendWelcomeKitBlock } from './components/SendWelcomeKitBlock';
-import { ExtendedServiceBlock } from './components/ExtendedServiceBlock';
-import { ResearchReportsBlock } from './components/ResearchReportsBlock';
-import { SuperAdminEmailReviewModal } from './components/SuperAdminEmailReviewModal';
-import { VoiceAgentCallModal } from './components/VoiceAgentCallModal';
 import { isRealLeegalityDispatch } from './services/leegalityService';
-import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchModal';
 import { useEKycDeepLink } from './services/clientInfoTelegramService';
+
+import { lazyNamed } from './lib/lazyNamed';
+
+// Screens, the sign-in page and the global modals load on first use, so the first download is only the
+// app shell. Each becomes its own file; shared libraries (xlsx, motion) load with the first screen needing them.
+const LoginPage = lazyNamed(() => import('./components/LoginPage'), 'LoginPage');
+const CRMDashboard = lazyNamed(() => import('./components/CRMDashboard'), 'CRMDashboard');
+const UserDirectory = lazyNamed(() => import('./components/UserDirectory'), 'UserDirectory');
+const DispositionsManager = lazyNamed(() => import('./components/DispositionsManager'), 'DispositionsManager');
+const LeadUploadModule = lazyNamed(() => import('./components/LeadUploadModule'), 'LeadUploadModule');
+const LeadSummarySuperAdmin = lazyNamed(() => import('./components/LeadSummarySuperAdmin'), 'LeadSummarySuperAdmin');
+const TeamMonitoring = lazyNamed(() => import('./components/TeamMonitoring'), 'TeamMonitoring');
+const TeamPerformanceBlock = lazyNamed(() => import('./components/TeamPerformanceBlock'), 'TeamPerformanceBlock');
+const SaleApprovalWorkflow = lazyNamed(() => import('./components/SaleApprovalWorkflow'), 'SaleApprovalWorkflow');
+const LeadReassignmentView = lazyNamed(() => import('./components/LeadReassignmentView'), 'LeadReassignmentView');
+const SystemSettings = lazyNamed(() => import('./components/SystemSettings'), 'SystemSettings');
+const CustomRolesBuilder = lazyNamed(() => import('./components/CustomRolesBuilder'), 'CustomRolesBuilder');
+const FeatureAccessBlock = lazyNamed(() => import('./components/FeatureAccessBlock'), 'FeatureAccessBlock');
+const LeadHistoryBlock = lazyNamed(() => import('./components/LeadHistoryBlock'), 'LeadHistoryBlock');
+const ESignManagementBlock = lazyNamed(() => import('./components/ESignManagementBlock'), 'ESignManagementBlock');
+const PaidBlock = lazyNamed(() => import('./components/PaidBlock'), 'PaidBlock');
+const KraBlock = lazyNamed(() => import('./components/KraBlock'), 'KraBlock');
+const ClientMasterBlock = lazyNamed(() => import('./components/ClientMasterBlock'), 'ClientMasterBlock');
+const InvoiceBlock = lazyNamed(() => import('./components/InvoiceBlock'), 'InvoiceBlock');
+const RunningAccountBlock = lazyNamed(() => import('./components/RunningAccountBlock'), 'RunningAccountBlock');
+const AuditReportBlock = lazyNamed(() => import('./components/AuditReportBlock'), 'AuditReportBlock');
+const RaPeriodicReportBlock = lazyNamed(() => import('./components/RaPeriodicReportBlock'), 'RaPeriodicReportBlock');
+const AnnexureASaasBlock = lazyNamed(() => import('./components/AnnexureASaasBlock'), 'AnnexureASaasBlock');
+const RaComplianceBlock = lazyNamed(() => import('./components/RaComplianceBlock'), 'RaComplianceBlock');
+const ServiceMasterBlock = lazyNamed(() => import('./components/ServiceMasterBlock'), 'ServiceMasterBlock');
+const ResearchRecommendationsBlock = lazyNamed(() => import('./components/ResearchRecommendationsBlock'), 'ResearchRecommendationsBlock');
+const SalaryBlock = lazyNamed(() => import('./components/SalaryBlock'), 'SalaryBlock');
+const TelegramControlBlock = lazyNamed(() => import('./components/TelegramControlBlock'), 'TelegramControlBlock');
+const CompanyProfileBlock = lazyNamed(() => import('./components/CompanyProfileBlock'), 'CompanyProfileBlock');
+const BranchProfilesBlock = lazyNamed(() => import('./components/BranchProfilesBlock'), 'BranchProfilesBlock');
+const EmailBlock = lazyNamed(() => import('./components/EmailBlock'), 'EmailBlock');
+const SendWelcomeKitBlock = lazyNamed(() => import('./components/SendWelcomeKitBlock'), 'SendWelcomeKitBlock');
+const ExtendedServiceBlock = lazyNamed(() => import('./components/ExtendedServiceBlock'), 'ExtendedServiceBlock');
+const ResearchReportsBlock = lazyNamed(() => import('./components/ResearchReportsBlock'), 'ResearchReportsBlock');
+const SuperAdminEmailReviewModal = lazyNamed(() => import('./components/SuperAdminEmailReviewModal'), 'SuperAdminEmailReviewModal');
+const VoiceAgentCallModal = lazyNamed(() => import('./components/VoiceAgentCallModal'), 'VoiceAgentCallModal');
+const LiveLeegalityDispatchModal = lazyNamed(() => import('./components/LiveLeegalityDispatchModal'), 'LiveLeegalityDispatchModal');
+
+const ScreenLoading = () => (
+  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading…</div>
+);
 
 /** Page titles (header and browser tab) are the sidebar labels, so the two never disagree. */
 const TAB_TITLES = Object.fromEntries(
@@ -204,7 +213,7 @@ const AppContent = () => {
   });
 
   if (!authToken || !currentUser) {
-    return <LoginPage />;
+    return <Suspense fallback={<ScreenLoading />}><LoginPage /></Suspense>;
   }
 
   // Mandatory Login Disclaimer: the CRM is not rendered at all until it is accepted
@@ -320,13 +329,17 @@ const AppContent = () => {
         />
         <main className="page-body">
           <ErrorBoundary key={activeTab}>
-            {renderTabContent()}
+            <Suspense fallback={<ScreenLoading />}>
+              {renderTabContent()}
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>
 
+      {/* Global modals: mounted (and their code loaded) only while open */}
+      <Suspense fallback={null}>
       {/* Global Super Admin Email Review Modal */}
-      <SuperAdminEmailReviewModal
+      {!!globalReviewSale && <SuperAdminEmailReviewModal
         isOpen={!!globalReviewSale}
         sale={globalReviewSale}
         onClose={() => setGlobalReviewSale(null)}
@@ -347,10 +360,10 @@ const AppContent = () => {
             showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
           }
         }}
-      />
+      />}
 
       {/* Global Automated Voice Agent Verification Modal */}
-      <VoiceAgentCallModal
+      {!!globalVoiceSale && <VoiceAgentCallModal
         isOpen={!!globalVoiceSale}
         sale={globalVoiceSale}
         onClose={() => setGlobalVoiceSale(null)}
@@ -362,15 +375,16 @@ const AppContent = () => {
             showToast(`Leegality Dispatch Notice: ${err.message}`, 'error');
           }
         }}
-      />
+      />}
 
       {/* Leegality e-KYC & E-Sign status modal (live data via CRM backend) */}
-      <LiveLeegalityDispatchModal
-        isOpen={!!globalLiveDispatchData}
+      {!!globalLiveDispatchData && <LiveLeegalityDispatchModal
+        isOpen
         sale={globalLiveDispatchData?.sale}
         dispatchResult={globalLiveDispatchData?.result}
         onClose={() => setGlobalLiveDispatchData(null)}
-      />
+      />}
+      </Suspense>
 
     </div>
   );

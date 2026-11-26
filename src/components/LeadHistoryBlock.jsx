@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useShowMore, ShowMoreRow } from '../lib/useShowMore';
 import * as XLSX from 'xlsx';
 import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
@@ -113,6 +114,7 @@ export const LeadHistoryBlock = () => {
       return true;
     });
   }, [historyLeads, search, dispFilter, dateFrom, dateTo]);
+  const leadRows = useShowMore(filteredLeads);
 
   // Excel: the leads shown, plus every timeline entry in the selected date range
   const handleDownload = () => {
@@ -267,7 +269,7 @@ export const LeadHistoryBlock = () => {
                 </td>
               </tr>
             ) : (
-              filteredLeads.map(l => {
+              leadRows.visible.map(l => {
                 const isExpanded = expandedRows.has(l.id);
                 const firstDate = l.history?.[0]?.date || l.createdAt || '—';
                 const dispCol = dispColor(l.disposition || 'New Lead');
@@ -325,6 +327,7 @@ export const LeadHistoryBlock = () => {
                 );
               })
             )}
+            <ShowMoreRow more={leadRows} />
           </tbody>
         </table>
       </div>

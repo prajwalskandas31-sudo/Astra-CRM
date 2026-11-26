@@ -56,3 +56,32 @@ def test_clients_own_lead_does_not_count(crm, tok):
 def test_invalid_pan_and_anonymous_are_refused(crm, tok):
     assert check(crm, tok["exec"], "ABC%").status_code == 400
     assert crm.client.get("/api/sync/pan-check", params={"pan": "AAAPL1111A"}).status_code in (401, 403)
+
+
+def test_pan_index_follows_edits_and_deletes(crm, tok):
+    sa = bearer(tok["sa"])
+    lead = {"id": "pan-lead-edit", "assignedToId": "usr-6", "assigned_user_id": "usr-6", "history": [],
+            "clientInfo": {"panNumber": "EEEPL5555E"}}
+    assert crm.client.post("/api/sync", headers=sa, json={"collections": {"leads": {"upserts": [lead]}}}).status_code == 200
+    assert check(crm, tok["exec"], "EEEPL5555E").json()["exists"] is True
+
+    # The PAN is corrected on the same lead: the old one is free again, the new one is on file
+    lead["clientInfo"] = {"panNumber": "FFFPL6666F"}
+    assert crm.client.post("/api/sync", headers=sa, json={"collections": {"leads": {"upserts": [lead]}}}).status_code == 200
+    assert check(crm, tok["exec"], "EEEPL5555E").json() == {"exists": False}
+    assert check(crm, tok["exec"], "FFFPL6666F").json()["exists"] is True
+
+    assert crm.client.post("/api/sync", headers=sa, json={"collections": {"leads": {"deletes": ["pan-lead-edit"]}}}).status_code == 200
+    assert check(crm, tok["exec"], "FFFPL6666F").json() == {"exists": False}
+
+
+def test_pan_index_is_built_for_records_written_before_it(crm, tok):
+    """Records stored before the PAN index existed (an older deploy) are indexed on first use."""
+    store = crm.store
+    db = store.backend()
+    with store.transaction():
+        with store._conn() as conn:
+            conn.execute(db.sql("DELETE FROM record_keys WHERE collection = ?"), ("paidClients",))
+            conn.execute(db.sql("DELETE FROM record_keys_built WHERE collection = ?"), ("paidClients",))
+    store._keys_ready.discard("paidClients")
+    assert check(crm, tok["exec"], "DDDPL4444D").json() == {"exists": True, "source": "an existing paid client"}

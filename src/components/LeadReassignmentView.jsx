@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useShowMore, ShowMoreRow } from '../lib/useShowMore';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import * as XLSX from 'xlsx';
@@ -120,6 +121,7 @@ export const LeadReassignmentView = () => {
       return true;
     });
   }, [leads, tableDispositionFilter, tableUserFilter, tableSearch, users]);
+  const tableRows = useShowMore(filteredTableLeads);
 
   // --- END OF DAY (EOD) REPORT GENERATION ENGINE ---
   const [blockView, setBlockView] = useState('directory'); // 'directory' | 'eod-report'
@@ -1291,7 +1293,7 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
                       </td>
                     </tr>
                   ) : (
-                    filteredTableLeads.map(l => (
+                    tableRows.visible.map(l => (
                       <tr key={l.id}>
                         <td style={{ fontWeight: 600 }}>{l.contactPerson}</td>
                         <td>{l.phone}</td>
@@ -1315,6 +1317,7 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
                       </tr>
                     ))
                   )}
+                  <ShowMoreRow more={tableRows} />
                 </tbody>
               </table>
             </div>

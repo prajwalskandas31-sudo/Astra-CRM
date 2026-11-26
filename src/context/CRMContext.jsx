@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
 import { 
   getLeegalityConfig, 
   saveLeegalityConfig, 
@@ -27,11 +27,54 @@ const cacheSet = (key, value) => {
   }
 };
 
+// The big collections change often (every sync poll, every lead edit) and serializing them blocks the
+// screen, so they are written in the background: at most once every couple of seconds, when the browser is
+// idle, and right away when the page is hidden or closed.
+const pendingCache = new Map();
+let cacheTimer = null;
+const flushCache = () => {
+  if (cacheTimer) { clearTimeout(cacheTimer); cacheTimer = null; }
+  const entries = [...pendingCache];
+  pendingCache.clear();
+  entries.forEach(([key, value]) => cacheSet(key, JSON.stringify(value)));
+};
+const cacheLater = (key, value) => {
+  pendingCache.set(key, value);
+  if (cacheTimer) return;
+  cacheTimer = setTimeout(() => {
+    cacheTimer = null;
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(flushCache, { timeout: 2000 });
+    else flushCache();
+  }, 1500);
+};
+/** Forget writes not made yet, so data being cleared from the cache is not written back. */
+const dropPendingCache = () => {
+  pendingCache.clear();
+  if (cacheTimer) { clearTimeout(cacheTimer); cacheTimer = null; }
+};
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushCache);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushCache(); });
+}
+
 const uniqueId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 // ─── IP Detection & Restriction Utilities ───────────────────────────────────
 // Fetches the user's current public IP from a free, no-auth API.
+// A private/loopback address means the server is not the public face (local development): ask ipify instead.
+const isPrivateIP = (ip) => /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|f[cd]|fe80:|localhost)/i.test(ip || '');
+
 async function detectPublicIP() {
+  // The CRM server sees the browser's public address already: no call to a third-party service
+  if (isBackendEnabled()) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/client-ip`, { cache: 'no-store' });
+      if (res.ok) {
+        const { ip } = await res.json();
+        if (ip && !isPrivateIP(ip)) return ip;
+      }
+    } catch (_) {}
+  }
   try {
     const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
     if (res.ok) {
@@ -868,7 +911,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_users', JSON.stringify(users));
+    cacheLater('crm_users', users);
   }, [users]);
 
   useEffect(() => {
@@ -1118,7 +1161,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_leads', JSON.stringify(leads));
+    cacheLater('crm_leads', leads);
   }, [leads]);
 
   const [sales, setSales] = useState(() => {
@@ -1136,7 +1179,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_sales', JSON.stringify(sales));
+    cacheLater('crm_sales', sales);
   }, [sales]);
 
   const [dispositions, setDispositions] = useState(DEFAULT_DISPOSITIONS);
@@ -1153,7 +1196,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_lead_requests', JSON.stringify(leadRequests));
+    cacheLater('crm_lead_requests', leadRequests);
   }, [leadRequests]);
 
   const [assignmentInstances, setAssignmentInstances] = useState(() => {
@@ -1180,7 +1223,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_assignment_instances', JSON.stringify(assignmentInstances));
+    cacheLater('crm_assignment_instances', assignmentInstances);
   }, [assignmentInstances]);
 
   const [masterRecords, setMasterRecords] = useState(() => {
@@ -1195,7 +1238,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_master_records', JSON.stringify(masterRecords));
+    cacheLater('crm_master_records', masterRecords);
   }, [masterRecords]);
 
   // ─── Services Master (Super Admin Managed) ──────────────────────────────
@@ -1328,7 +1371,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_notifications', JSON.stringify(notifications));
+    cacheLater('crm_notifications', notifications);
   }, [notifications]);
 
 
@@ -1345,7 +1388,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_esign_records', JSON.stringify(eSignRecords));
+    cacheLater('crm_esign_records', eSignRecords);
   }, [eSignRecords]);
 
   // ─── Paid Block: clients who completed e-KYC & E-Sign, tracked by service tenure ──
@@ -1373,7 +1416,7 @@ export const CRMProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    cacheSet('crm_paid_clients', JSON.stringify(paidClients));
+    cacheLater('crm_paid_clients', paidClients);
   }, [paidClients]);
 
   // ─── Team Performance Tracking ─────────────────────────────────────────────
@@ -1391,11 +1434,11 @@ export const CRMProvider = ({ children }) => {
   const [attendance, setAttendance] = useState(() => readCachedList('crm_attendance'));
 
   useEffect(() => {
-    cacheSet('crm_call_stats', JSON.stringify(callStats));
+    cacheLater('crm_call_stats', callStats);
   }, [callStats]);
 
   useEffect(() => {
-    cacheSet('crm_attendance', JSON.stringify(attendance));
+    cacheLater('crm_attendance', attendance);
   }, [attendance]);
 
   // ─── Shared data ↔ server (hosted deployments) ─────────────────────────────
@@ -1673,6 +1716,7 @@ export const CRMProvider = ({ children }) => {
             cacheSet('crm_last_user_id', data.user.id);
             if (lastUserId && lastUserId !== data.user.id) {
               const keep = new Set(['crm_token', 'crm_user', 'crm_simulated_role', 'crm_last_user_id']);
+              dropPendingCache();
               Object.keys(localStorage)
                 .filter(k => k.startsWith('crm_') && !keep.has(k))
                 .forEach(k => localStorage.removeItem(k));
@@ -2025,6 +2069,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   const purgeAllData = () => {
+    dropPendingCache();
     localStorage.removeItem('crm_leads');
     localStorage.removeItem('crm_assignment_instances');
     localStorage.removeItem('crm_master_records');
@@ -3725,7 +3770,7 @@ export const CRMProvider = ({ children }) => {
   };
 
   return (
-    <CRMContext.Provider value={{
+    <CRMContext.Provider value={useCRMStore({
       authToken,
       authUser,
       canSwitchProfiles,
@@ -3875,11 +3920,100 @@ export const CRMProvider = ({ children }) => {
       // ─── Leegality API Integration Config & Credentials ────────
       leegalityConfig,
       updateLeegalityConfig
-    }}>
+    })}>
       {children}
     </CRMContext.Provider>
   );
 };
 
-export const useCRM = () => useContext(CRMContext);
+/*
+ * Selective re-rendering.
+ *
+ * The provider holds ~140 values. With a plain context every state change (a sync poll, a notification,
+ * a call counter) re-rendered every screen using useCRM(). Instead the provider publishes its values to a
+ * small store, and each component re-renders only when a value it actually read during its last render
+ * changed. Components keep using `const { leads, addLead } = useCRM()` unchanged.
+ *
+ * Action functions (addLead, updateUser, ...) are recreated on every provider render; they are handed out
+ * as stable wrappers that always call the newest version, so reading one does not cause re-renders.
+ * Functions whose RESULT is shown on screen (hasPermission, ...) must change whenever the state they read
+ * changes, or screens would keep showing old results. GETTER_DEPS lists that state for each of them; their
+ * identity changes exactly when one of those values does. A getter not listed here, including any new
+ * function named get.../has.../is.../can.../check..., is passed through as it is and changes on every provider render,
+ * which is always correct. Keep the lists in step when a getter starts reading more state.
+ */
+const GETTER_DEPS = {
+  hasPermission: ['currentUser', 'users', 'simulatedRole', 'userPermissions'],
+  getUserPermissionCount: ['currentUser', 'users', 'simulatedRole', 'userPermissions'],
+  isShortcutEnabled: ['currentUser', 'userShortcutSettings'],
+  canSwitchProfiles: ['authUser'],
+  checkDuplicatePhone2: ['leads', 'users']
+};
+const isUnlistedGetter = (key) => /^(get|has|is|can|check)[A-Z]/.test(key);
+
+function useCRMStore(values) {
+  const ref = useRef(null);
+  if (!ref.current) ref.current = { value: {}, latest: {}, stable: {}, listeners: new Set() };
+  const store = ref.current;
+  const prev = store.value;
+  const value = {};
+  const wrapper = (key) => (...args) => store.latest[key](...args);
+  Object.keys(values).forEach((key) => {
+    const v = values[key];
+    if (typeof v !== 'function') {
+      value[key] = v;
+      return;
+    }
+    const deps = GETTER_DEPS[key];
+    if (!deps && isUnlistedGetter(key)) {
+      value[key] = v;
+      return;
+    }
+    store.latest[key] = v;
+    if (!store.stable[key] || (deps && deps.some(d => !Object.is(prev[d], values[d])))) {
+      store.stable[key] = wrapper(key);
+    }
+    value[key] = store.stable[key];
+  });
+  store.value = value;
+  // After the provider commits, wake the components whose values changed (before the browser paints)
+  useLayoutEffect(() => { store.listeners.forEach(listener => listener(value)); });
+  return store;
+}
+
+export const useCRM = () => {
+  const store = useContext(CRMContext);
+  const [, rerender] = useReducer(n => n + 1, 0);
+  const used = useRef(null);
+  const seen = useRef(null);
+  used.current = new Set();
+  seen.current = store.value;
+
+  useLayoutEffect(() => {
+    const listener = (next) => {
+      const prev = seen.current;
+      if (prev === next) return;
+      for (const key of used.current) {
+        if (!Object.is(prev[key], next[key])) { rerender(); return; }
+      }
+    };
+    store.listeners.add(listener);
+    listener(store.value); // the values may have changed between this render and subscribing
+    return () => { store.listeners.delete(listener); };
+  }, [store]);
+
+  const view = useRef(null);
+  if (!view.current) {
+    const readAll = () => { Object.keys(store.value).forEach(k => used.current.add(k)); };
+    view.current = new Proxy({}, {
+      get: (_, key) => { used.current.add(key); return store.value[key]; },
+      has: (_, key) => { used.current.add(key); return key in store.value; },
+      ownKeys: () => { readAll(); return Reflect.ownKeys(store.value); },
+      getOwnPropertyDescriptor: (_, key) => (key in store.value
+        ? { value: store.value[key], enumerable: true, configurable: true, writable: false }
+        : undefined)
+    });
+  }
+  return view.current;
+};
 

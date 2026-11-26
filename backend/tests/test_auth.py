@@ -109,3 +109,8 @@ def test_verify_password_scopes(crm):
 def test_api_docs_not_exposed(crm):
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert crm.client.get(path).status_code == 404
+
+
+def test_client_ip_reports_the_address_nginx_forwards(crm):
+    res = crm.client.get("/api/client-ip", headers={"X-Real-IP": "203.0.113.7"})
+    assert res.status_code == 200 and res.json() == {"ip": "203.0.113.7"}
