@@ -458,6 +458,42 @@ button, input, select, textarea {
   font-size: 0.77rem;
 }
 
+/* A block button with a chevron beside it that shows/hides the list under it */
+.nav-item-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-item-row > .nav-item {
+  flex: 1;
+  min-width: 0;
+  margin-right: 0;
+}
+
+.nav-expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.nav-expand-toggle:hover {
+  opacity: 1;
+  color: #F8FAFC;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);

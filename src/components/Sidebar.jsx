@@ -128,6 +128,19 @@ export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
     if (activeGroup) setOpenGroups(g => (g.includes(activeGroup) ? g : [...g, activeGroup]));
   }, [activeGroup]);
 
+  // Blocks with their own page AND a collapsible list under them (CRM Dashboard, Team Performance
+  // Tracking) open when one of the pages inside them is showing
+  const expandableKeys = tree
+    .filter(n => n.subItems?.some(c => c.id === activeTab))
+    .map(n => n.id)
+    .concat(tree.flatMap(n => n.subItems || []).filter(c => c.sections && c.id === activeTab).map(c => c.id))
+    .join(',');
+  useEffect(() => {
+    if (!expandableKeys) return;
+    const keys = expandableKeys.split(',');
+    setOpenGroups(g => (keys.every(k => g.includes(k)) ? g : [...new Set([...g, ...keys])]));
+  }, [expandableKeys]);
+
   useEffect(() => {
     try { localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups)); } catch { /* storage blocked */ }
   }, [openGroups]);
@@ -135,25 +148,50 @@ export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
   const toggleGroup = (group) =>
     setOpenGroups(g => (g.includes(group) ? g.filter(x => x !== group) : [...g, group]));
 
-  const renderItem = (item, nested = false) => {
+  /** A block's own button; with `expandKey` it also gets a chevron that shows/hides the list under it. */
+  const renderButton = (item, nested, expandKey = null) => {
     const Icon = item.icon;
     const button = (
       <button
         key={item.id}
         className={`nav-item ${nested ? 'nav-item-nested' : ''} ${activeTab === item.id && !(item.sections && activeSection) ? 'active' : ''}`}
-        onClick={() => setActiveTab(item.id)}
+        onClick={() => {
+          setActiveTab(item.id);
+          // Opening Team Performance Tracking also shows its sub-blocks; the CRM Dashboard stays as it is
+          if (expandKey && item.sections && !openGroups.includes(expandKey)) toggleGroup(expandKey);
+        }}
       >
         <Icon size={nested ? 14 : 16} />
         <span>{item.label}</span>
         {item.badge && <span className="nav-badge">{item.badge}</span>}
       </button>
     );
-    if (!item.sections) return button;
-    // A block whose sub-blocks each get their own button underneath it
+    if (!expandKey) return button;
+    const open = openGroups.includes(expandKey);
+    return (
+      <div key={item.id} className="nav-item-row">
+        {button}
+        <button
+          type="button"
+          className="nav-expand-toggle"
+          onClick={() => toggleGroup(expandKey)}
+          aria-expanded={open}
+          aria-label={`${open ? 'Collapse' : 'Expand'} ${item.label}`}
+          title={open ? 'Collapse' : 'Expand'}
+        >
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+      </div>
+    );
+  };
+
+  const renderItem = (item, nested = false) => {
+    if (!item.sections) return renderButton(item, nested);
+    // A block whose sub-blocks each get their own button underneath it (collapsible)
     return (
       <div key={item.id} className="nav-group">
-        {button}
-        <div className="nav-group-children nav-section-children">
+        {renderButton(item, nested, item.id)}
+        {openGroups.includes(item.id) && <div className="nav-group-children nav-section-children">
           {item.sections.map(sec => {
             const SecIcon = sec.icon;
             return (
@@ -167,7 +205,7 @@ export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
               </button>
             );
           })}
-        </div>
+        </div>}
       </div>
     );
   };
@@ -189,11 +227,26 @@ export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
           if (!node.children) {
             const subItems = node.subItems || [];
             if (subItems.length === 0) return renderItem(node);
-            // A block with its own page plus separate blocks listed under it (CRM Dashboard)
+            // A block with its own page plus separate blocks listed under it (CRM Dashboard), collapsible
+            const open = openGroups.includes(node.id);
+            if (!hasPermission(node.id)) {
+              // No access to the page itself: the header only shows/hides the list
+              const Icon = node.icon;
+              return (
+                <div key={node.id} className="nav-group">
+                  <button className="nav-item nav-group-header" onClick={() => toggleGroup(node.id)} aria-expanded={open}>
+                    <Icon size={16} />
+                    <span>{node.label}</span>
+                    <span className="nav-group-chevron">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
+                  </button>
+                  {open && <div className="nav-group-children">{subItems.map(c => renderItem(c, true))}</div>}
+                </div>
+              );
+            }
             return (
               <div key={node.id} className="nav-group">
-                {hasPermission(node.id) && renderItem(node)}
-                <div className="nav-group-children">{subItems.map(c => renderItem(c, true))}</div>
+                {renderButton(node, false, node.id)}
+                {open && <div className="nav-group-children">{subItems.map(c => renderItem(c, true))}</div>}
               </div>
             );
           }
