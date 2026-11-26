@@ -13,7 +13,14 @@ import {
  * and disappears when there are none.
  */
 export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, eSignCount = 0 } = {}) => [
-  { id: 'dashboard', label: 'CRM Dashboard', icon: LayoutDashboard },
+  {
+    id: 'dashboard', label: 'CRM Dashboard', icon: LayoutDashboard,
+    // Separate blocks listed under the CRM Dashboard (the dashboard's "Switch to" dropdown opens them too)
+    subItems: [
+      { id: 'team-monitoring', label: 'Team Monitoring', icon: TrendingUp },
+      { id: 'team-performance', label: 'Team Performance Tracking', icon: Activity }
+    ]
+  },
   { id: 'lead-history', label: 'Lead History (Block 5)', icon: History },
   {
     group: 'leads', label: 'Leads', icon: Upload,
@@ -23,8 +30,6 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
       { id: 'lead-reassignment', label: 'Lead Re-assignment', icon: Shuffle }
     ]
   },
-  { id: 'team-monitoring', label: 'Team Monitoring', icon: TrendingUp },
-  { id: 'team-performance', label: 'Team Performance Tracking', icon: Activity },
   { id: 'sale-approvals', label: 'Sale Approvals', icon: CheckCircle, badge: pendingSalesCount || null },
   { id: 'esign-block', label: 'E-Sign Block', icon: FileSignature, badge: eSignCount || null },
   { id: 'paid-block', label: 'Paid', icon: BadgeIndianRupee },
@@ -69,7 +74,12 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
 ];
 
 /** Every tab id in sidebar order (App.jsx falls back to the first one the user may open). */
-export const ALL_TAB_IDS = buildNavTree().flatMap(n => (n.children ? n.children.map(c => c.id) : [n.id]));
+export const ALL_TAB_IDS = buildNavTree().flatMap(n =>
+  n.children ? n.children.map(c => c.id) : [n.id, ...(n.subItems || []).map(c => c.id)]
+);
+
+/** The blocks listed under the CRM Dashboard, for its "Switch to" dropdown. */
+export const DASHBOARD_SUB_BLOCKS = buildNavTree().find(n => n.id === 'dashboard').subItems;
 
 const OPEN_GROUPS_KEY = 'astra_sidebar_open_groups';
 
@@ -94,7 +104,8 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
   // Role does not inherently restrict features; visibility is driven strictly by permissions
   const visibleTree = tree
     .map(n => (n.children ? { ...n, children: n.children.filter(c => hasPermission(c.id)) } : n))
-    .filter(n => (n.children ? n.children.length > 0 : hasPermission(n.id)));
+    .map(n => (n.subItems ? { ...n, subItems: n.subItems.filter(c => hasPermission(c.id)) } : n))
+    .filter(n => (n.children ? n.children.length > 0 : hasPermission(n.id) || n.subItems?.length > 0));
 
   const [openGroups, setOpenGroups] = useState(readOpenGroups);
 
@@ -140,7 +151,17 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
 
       <nav className="sidebar-nav">
         {visibleTree.map(node => {
-          if (!node.children) return renderItem(node);
+          if (!node.children) {
+            const subItems = node.subItems || [];
+            if (subItems.length === 0) return renderItem(node);
+            // A block with its own page plus separate blocks listed under it (CRM Dashboard)
+            return (
+              <div key={node.id} className="nav-group">
+                {hasPermission(node.id) && renderItem(node)}
+                <div className="nav-group-children">{subItems.map(c => renderItem(c, true))}</div>
+              </div>
+            );
+          }
           const Icon = node.icon;
           const open = openGroups.includes(node.group);
           const badgeTotal = node.children.reduce((sum, c) => sum + (c.badge || 0), 0);
