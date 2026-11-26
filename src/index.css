@@ -725,7 +725,7 @@ input[type="text"],
 input[type="number"],
 input[type="date"],
 input[type="month"],
-input[type="week"],
+input[type="time"],
 input[type="datetime-local"],
 input[type="search"],
 select,
@@ -783,18 +783,27 @@ input[type="number"] {
   box-shadow: 0 0 0 2px var(--accent-glow, rgba(16, 185, 129, 0.2)) !important;
 }
 
-input[type="date"],
-input[type="month"],
-input[type="week"],
-input[type="datetime-local"] {
-  color-scheme: dark;
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+  cursor: pointer;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator,
+/* Month/time pickers: the browser draws their text, icon and popup itself, so
+   tell it which theme we are in instead of inverting the icon. */
+input[type="month"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+  min-width: 150px;
+}
+[data-theme="light"] input[type="month"],
+[data-theme="light"] input[type="time"],
+[data-theme="light"] input[type="datetime-local"] {
+  color-scheme: light;
+}
 input[type="month"]::-webkit-calendar-picker-indicator,
-input[type="week"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
   cursor: pointer;
 }
 

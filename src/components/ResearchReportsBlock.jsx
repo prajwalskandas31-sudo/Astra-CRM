@@ -248,26 +248,39 @@ export const ResearchReportsBlock = () => {
         )}
 
         {isSuperAdmin && (!analytics?.saved || daysLeft < 30) && (
-          <form onSubmit={saveToken} style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '0.82rem' }}>
-            <span style={{ flex: '1 1 100%', color: 'var(--text-muted)' }}>
-              {analytics?.saved
-                ? `The Upstox token expires in ${daysLeft} day(s). Generate a new one in Upstox (Apps, Analytics tab) and paste it here.`
-                : 'Paste the Upstox Analytics Token (Upstox, Apps, Analytics tab). It is read-only and lasts one year, so no daily login is needed.'}
-            </span>
-            <input
-              type="password"
-              value={tokenDraft}
-              onChange={e => setTokenDraft(e.target.value)}
-              required
-              autoComplete="off"
-              placeholder="Upstox Analytics Token"
-              aria-label="Upstox Analytics Token"
-              style={{ flex: '1 1 260px', minWidth: 0, fontSize: '0.82rem', padding: '6px 10px', height: '36px' }}
-            />
-            <button type="submit" className="btn-primary" disabled={savingToken || !tokenDraft.trim()}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <KeyRound size={14} /> {savingToken ? 'Checking…' : 'Save token'}
-            </button>
+          <form
+            onSubmit={saveToken}
+            style={{
+              display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 16px',
+              border: '1px solid var(--border-color, #e5e7eb)', borderRadius: '10px', fontSize: '0.82rem',
+            }}
+          >
+            <label htmlFor="upstox-analytics-token" style={{ display: 'flex', flexDirection: 'column', gap: '4px', margin: 0 }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Upstox Analytics Token</span>
+              <span style={{ color: 'var(--text-muted)', lineHeight: 1.5, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                {analytics?.saved
+                  ? `The Upstox token expires in ${daysLeft} day(s). Generate a new one in Upstox (Apps, Analytics tab) and paste it here.`
+                  : 'Paste the Upstox Analytics Token (Upstox, Apps, Analytics tab). It is read-only and lasts one year, so no daily login is needed.'}
+              </span>
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'stretch' }}>
+              <input
+                id="upstox-analytics-token"
+                className="form-control"
+                type="password"
+                value={tokenDraft}
+                onChange={e => setTokenDraft(e.target.value)}
+                required
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Paste token here"
+                style={{ flex: '1 1 280px', minWidth: 0, width: '100%', height: '40px', boxSizing: 'border-box', fontSize: '0.84rem', padding: '8px 12px', margin: 0 }}
+              />
+              <button type="submit" className="btn-primary" disabled={savingToken || !tokenDraft.trim()}
+                style={{ flex: '0 0 auto', height: '40px', justifyContent: 'center', whiteSpace: 'nowrap', padding: '0 18px' }}>
+                <KeyRound size={14} /> {savingToken ? 'Checking…' : 'Save token'}
+              </button>
+            </div>
           </form>
         )}
 
