@@ -724,6 +724,9 @@ button, input, select, textarea {
 input[type="text"],
 input[type="number"],
 input[type="date"],
+input[type="month"],
+input[type="week"],
+input[type="datetime-local"],
 input[type="search"],
 select,
 textarea {
@@ -780,7 +783,17 @@ input[type="number"] {
   box-shadow: 0 0 0 2px var(--accent-glow, rgba(16, 185, 129, 0.2)) !important;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"],
+input[type="month"],
+input[type="week"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8);
   cursor: pointer;
 }

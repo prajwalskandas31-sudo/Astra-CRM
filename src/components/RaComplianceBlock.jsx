@@ -564,14 +564,14 @@ export const RaComplianceBlock = () => {
         </div>
       </div>
 
-      <div className="paid-filters" style={{ flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <div className="paid-filters" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '10px', margin: '0 20px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button type="button" className="btn-secondary" style={{ ...btn, padding: '0 8px' }} aria-label="Previous month" onClick={() => changeMonth(shiftMonth(month, -1))}><ChevronLeft size={16} /></button>
-          <input type="month" aria-label="Compliance month" value={month} onChange={e => changeMonth(e.target.value)} style={{ height: '34px' }} />
+          <input type="month" aria-label="Compliance month" value={month} onChange={e => e.target.value && changeMonth(e.target.value)} style={{ height: '34px', width: '170px', padding: '0 10px' }} />
           <button type="button" className="btn-secondary" style={{ ...btn, padding: '0 8px' }} aria-label="Next month" onClick={() => changeMonth(shiftMonth(month, 1))}><ChevronRight size={16} /></button>
         </div>
-        <strong style={{ fontSize: '0.9rem' }}>{monthLabel(month)}</strong>
-        <div style={{ flex: 1 }} />
+        <strong style={{ fontSize: '0.95rem', whiteSpace: 'nowrap', marginLeft: '4px' }}>{monthLabel(month)}</strong>
+        <div style={{ flex: '1 1 0', minWidth: 0 }} />
         <button type="button" className="btn-secondary" style={btn} disabled={loading} onClick={() => (!dirty || window.confirm('Discard unsaved changes and reload?')) && load(month)}>
           <RefreshCw size={14} /> {loading ? 'Loading...' : 'Refresh'}
         </button>
@@ -595,14 +595,14 @@ export const RaComplianceBlock = () => {
         </div>
       )}
 
-      <div role="tablist" aria-label="Compliance sub-blocks" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '0 20px 14px' }}>
+      <div role="tablist" aria-label="Compliance sub-blocks" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', margin: '0 20px 18px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
         {SUB_BLOCKS.map((b, i) => {
           const on = active === b.key;
           const dot = b.key === 'dashboard' ? null : lineStatus(b.key);
           return (
             <button key={b.key} type="button" role="tab" aria-selected={on} onClick={() => setActive(b.key)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '8px', fontSize: '0.78rem',
+                display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '7px 12px', borderRadius: '8px', fontSize: '0.78rem', lineHeight: 1.2, whiteSpace: 'nowrap', flex: '0 0 auto',
                 fontWeight: on ? 600 : 500, cursor: 'pointer',
                 border: `1px solid ${on ? 'var(--accent-border, var(--accent))' : 'var(--border-color)'}`,
                 background: on ? 'var(--accent-soft, rgba(99,102,241,0.12))' : 'transparent',
