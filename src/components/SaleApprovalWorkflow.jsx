@@ -22,6 +22,7 @@ import { VoiceAgentCallModal } from './VoiceAgentCallModal';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
 import { isRealLeegalityDispatch, getEKycLight, getSignatureTypes } from '../services/leegalityService';
 import { SaleSignatureTypeToggle } from './SaleSignatureTypeToggle';
+import { confirmAsync } from './ConfirmDialog';
 
 const LIGHTS = ['red', 'yellow', 'green'];
 
@@ -137,9 +138,9 @@ export const SaleApprovalWorkflow = () => {
   const canDeleteLink = (s) => currentUser?.role === 'Super Admin' && isRealLeegalityDispatch(s) && s.eSignStatus !== 'Completed';
   const handleDeleteLink = async (s) => {
     const docId = s.eSignDocumentId || s.eSignDetails?.documentId;
-    if (!window.confirm(`Delete the e-sign link sent to '${s.clientName}' (Leegality Doc ID: ${docId})?
+    if (!await confirmAsync(`Delete the e-sign link sent to '${s.clientName}' (Leegality Doc ID: ${docId})?
 
-The client will no longer be able to sign it. The sale goes back to the pending queue so e-KYC & E-Sign can be sent again.`)) return;
+The client will no longer be able to sign it. The sale goes back to the pending queue so e-KYC & E-Sign can be sent again.`, { danger: true, confirmLabel: 'Delete link' })) return;
     setDeletingId(s.id);
     try {
       await deleteESignLink(s.id);

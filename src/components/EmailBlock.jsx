@@ -13,6 +13,7 @@ import {
 import { ServiceExpiryEmail } from './ServiceExpiryEmail';
 import { EmailFailuresReport } from './EmailFailuresReport';
 import { EmailDeliveryReport } from './EmailDeliveryReport';
+import { confirmAsync } from './ConfirmDialog';
 
 const SECURITY = [
   { value: 'ssl', label: 'SSL/TLS (port 465)', port: 465 },
@@ -125,7 +126,7 @@ export const EmailBlock = () => {
   };
 
   const handleClearPassword = async () => {
-    if (!window.confirm('Remove the saved mailbox password? No email can be sent until a new one is saved.')) return;
+    if (!await confirmAsync('Remove the saved mailbox password? No email can be sent until a new one is saved.', { danger: true, confirmLabel: 'Remove' })) return;
     try {
       const saved = await clearSmtpPassword();
       setSettings(s => ({ ...s, ...saved }));
@@ -154,7 +155,7 @@ export const EmailBlock = () => {
   };
 
   const handleRemove = async (s) => {
-    if (!window.confirm(`Remove ${s.fileName} from slot ${s.slot}?`)) return;
+    if (!await confirmAsync(`Remove ${s.fileName} from slot ${s.slot}?`, { danger: true, confirmLabel: 'Remove' })) return;
     setBusySlot(s.slot);
     try {
       await deleteWelcomeKitFile(s.slot);
@@ -544,8 +545,8 @@ export const WelcomeKitSender = ({ sales, onSent, initialSaleId = '' }) => {
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
             <button type="button" className="btn-primary" style={btn} disabled={!canSend || sending}
-              onClick={() => {
-                if (preview.lastSent && !window.confirm(`A Welcome Kit was already sent to ${preview.client.email}. Send it again?`)) return;
+              onClick={async () => {
+                if (preview.lastSent && !await confirmAsync(`A Welcome Kit was already sent to ${preview.client.email}. Send it again?`, { confirmLabel: 'Send again' })) return;
                 handleSend();
               }}>
               <Send size={14} /> {sending ? 'Sending…' : 'Send Welcome Kit'}

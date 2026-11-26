@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import { ToastProvider, useToast } from './components/ToastNotification';
+import { ConfirmDialogHost } from './components/ConfirmDialog';
 import { LoginPage } from './components/LoginPage';
 import { LoginDisclaimerModal } from './components/LoginDisclaimerModal';
 import { Navbar } from './components/Navbar';
-import { Sidebar, ALL_TAB_IDS } from './components/Sidebar';
+import { Sidebar, ALL_TAB_IDS, buildNavTree } from './components/Sidebar';
 import { CRMDashboard } from './components/CRMDashboard';
 import { UserDirectory } from './components/UserDirectory';
 import { DispositionsManager } from './components/DispositionsManager';
@@ -77,15 +78,33 @@ import { isRealLeegalityDispatch } from './services/leegalityService';
 import { LiveLeegalityDispatchModal } from './components/LiveLeegalityDispatchModal';
 import { useEKycDeepLink } from './services/clientInfoTelegramService';
 
+/** Page titles (header and browser tab) are the sidebar labels, so the two never disagree. */
+const TAB_TITLES = Object.fromEntries(
+  buildNavTree()
+    .flatMap(n => (n.children ? n.children : [n, ...(n.subItems || [])]))
+    .filter(n => n.id)
+    .map(n => [n.id, n.label])
+);
+
+/** The open page lives in the URL hash (#paid-block, #team-performance/teams) so refresh and Back keep it. */
+const readHash = () => {
+  try {
+    const [tab, section] = decodeURIComponent(window.location.hash.replace(/^#/, '')).split('/');
+    return ALL_TAB_IDS.includes(tab) ? { tab, section: section || null } : null;
+  } catch {
+    return null;
+  }
+};
+
 const AppContent = () => {
   const {
     authToken, currentUser, simulatedRole, hasPermission, userPermissions, triggerEKycAndESign, sales,
     loginDisclaimer, loginDisclaimerPending, loginDisclaimerReady, acknowledgeLoginDisclaimer, handleLogout, companyProfile
   } = useCRM();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => readHash()?.tab || 'dashboard');
   // A sub-block of the open page picked in the sidebar (Team Performance Tracking), or null for the whole page
-  const [activeSection, setActiveSection] = useState(null);
+  const [activeSection, setActiveSection] = useState(() => readHash()?.section || null);
   const openTab = (tab, section = null) => {
     setActiveTab(tab);
     setActiveSection(section);
@@ -94,12 +113,55 @@ const AppContent = () => {
   const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
   const [globalLiveDispatchData, setGlobalLiveDispatchData] = useState(null);
 
+  // Keep the URL hash in step with the open page (a new history entry per page, so Back returns to it)
+  React.useEffect(() => {
+    if (!currentUser) return;
+    const hash = `#${activeTab}${activeSection ? `/${activeSection}` : ''}`;
+    if (window.location.hash === hash) return;
+    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    if (window.location.hash) window.history.pushState(null, '', url);
+    else window.history.replaceState(null, '', url);
+  }, [activeTab, activeSection, currentUser?.id]);
+
+  // Back / Forward (or a pasted link) open the page named in the hash
+  React.useEffect(() => {
+    const onHash = () => {
+      const target = readHash();
+      if (target) { setActiveTab(target.tab); setActiveSection(target.section); }
+    };
+    window.addEventListener('popstate', onHash);
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      window.removeEventListener('popstate', onHash);
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, []);
+
+  // A newly opened page starts at its top, not at the previous page's scroll position
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+    document.querySelector('.page-body')?.scrollTo?.(0, 0);
+  }, [activeTab, activeSection]);
+
+  // Browser tab title follows the open page
+  React.useEffect(() => {
+    document.title = currentUser ? `${TAB_TITLES[activeTab] || 'CRM'} · Astra CRM` : 'Sign in · Astra CRM';
+  }, [activeTab, currentUser?.id]);
+
+  // After signing out, the next person to sign in starts on the dashboard (a refresh keeps the page)
+  const lastUserId = React.useRef(currentUser?.id);
+  React.useEffect(() => {
+    if (lastUserId.current && !currentUser) {
+      setActiveTab('dashboard');
+      setActiveSection(null);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+    lastUserId.current = currentUser?.id;
+  }, [currentUser?.id]);
+
   // Enforce permission-based tab guards: user roles do not inherently restrict availability
   React.useEffect(() => {
-    if (!currentUser) {
-      setActiveTab('dashboard');
-      return;
-    }
+    if (!currentUser) return;
 
     const allTabs = ALL_TAB_IDS;
 
@@ -160,41 +222,7 @@ const AppContent = () => {
     );
   }
 
-  const tabTitles = {
-    dashboard: 'CRM Dashboard & Dynamic Dispositions Bar',
-    'lead-history': 'Lead Assignment History (Block 5) - Full Search & Audit Timeline',
-    directory: 'User Directory & Account Controls',
-    dispositions: 'Dispositions & Pipeline Manager (Block 2 Settings)',
-    'lead-upload': 'Lead Upload Module & Block 3 Report Sync',
-    'lead-summary': 'Lead Summary & Super Admin Operations (Block 4)',
-    'team-monitoring': 'Team Performance & Compliance Monitoring',
-    'team-performance': 'Team Performance Tracking',
-    'sale-approvals': 'Sale Approval & eKYC Workflow Queue',
-    'esign-block': 'Dedicated E-Sign Block (Leegality) - Digital Signature Records',
-    'paid-block': 'Paid - Clients by Service Name & Service Tenure',
-    'send-welcome-kit': 'Send Welcome Kit - Welcome Kit Files and the Signed Agreement to the Client',
-    'extended-service': 'Extended Service Block - Clients Above a Net Value Limit in the Last 12 Months',
-    'salary-block': 'Salary Block - Commission, Salary and Salary plus Incentives',
-    'kra-block': 'KRA Block - Fetch & Store Client KRA from CVL KRA',
-    'client-master': 'Client MASTER - Client Details, Leegality Signing, Invoices & Grievances',
-    'invoice-block': 'Invoice Block - Tax Invoices for E-Signed Clients',
-    'running-account': 'Running Account Statement - Monthly Credits, Debits & Net Balance',
-    'audit-reports': 'Audit Report Blocks - Client and Fee Details (Half-Yearly)',
-    'ra-periodic-report': 'RA Periodic Report Block - SEBI Half-Yearly Report (11 Sub-Blocks, Excel)',
-    'annexure-a-saas': 'Annexure A for SaaS Reporting - SaaS / Hosted Services (Manual Input)',
-    'ra-compliance': 'RA Monthly Compliance Tracker - SEBI Research Analyst Monthly Checklist',
-    'telegram-control': 'Telegram Control Block - E-Signed Clients & Trade Call Broadcasts',
-    'lead-reassignment': 'Lead Reassignment & Audit Protocol',
-    'research-reports': 'Research Reports - Auto-Generated Report for Every Telegram Call',
-    'research-recommendations': 'Records for Research Recommendations - Recommendations Made During the Year',
-    'service-master': 'Service Master - Service Names & Values for the Client Information Page',
-    'company-profile': 'Company Profile - Company Name, SEBI Registration & Contact Details',
-    'branch-profiles': 'Branch Profiles - Branch Details, Managers & Contact Numbers',
-    'email-block': 'Email Block - Sender Email ID, Welcome Kit Files & Email Reports',
-    'system-settings': 'System Settings & UI Customization',
-    'custom-roles': 'Custom Roles Builder (Annexure-I)',
-    'feature-access': 'Feature Access & Permissions Master Block'
-  };
+
 
   // Real Leegality status for dispatched sales; anything else is sent from Sale Approvals
   const openLeegalityForSale = (sale) => {
@@ -286,7 +314,7 @@ const AppContent = () => {
       <Sidebar activeTab={activeTab} activeSection={activeTab === 'team-performance' ? activeSection : null} setActiveTab={openTab} />
       <div className="main-content">
         <Navbar 
-          currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} 
+          currentTabTitle={TAB_TITLES[activeTab] || 'Astra CRM'} 
           onOpenReviewModal={(sale) => setGlobalReviewSale(sale)}
           onOpenESignModal={openLeegalityForSale}
         />
@@ -353,6 +381,7 @@ export function App() {
     <ToastProvider>
       <CRMProvider>
         <AppContent />
+        <ConfirmDialogHost />
       </CRMProvider>
     </ToastProvider>
   );

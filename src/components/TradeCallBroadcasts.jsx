@@ -110,7 +110,21 @@ export const TradeCallBroadcasts = () => {
             {config.testRecipients.length > 0 && <Tone tone="warning">Test mode: only {config.testRecipients.join(', ')} receive SMS</Tone>}
             {config.dryRun && <Tone tone="warning">Dry run: no SMS is sent</Tone>}
             {config.blockedHours && <span style={{ color: 'var(--text-muted)' }}>No SMS {config.blockedHours} (carrier rule for route {config.service})</span>}
-            {config.problems.map(p => <span key={p} style={{ color: 'var(--status-danger)' }}>{p}</span>)}
+            {(() => {
+              // "X is not set in backend/.env" lines become one sentence; anything else is shown as it is
+              const missing = config.problems.map(p => /^(\w+) is not set in backend\/\.env\.?$/.exec(p)?.[1]).filter(Boolean);
+              const other = config.problems.filter(p => !/^\w+ is not set in backend\/\.env\.?$/.test(p));
+              return (
+                <>
+                  {missing.length > 0 && (
+                    <span style={{ color: 'var(--status-danger)' }}>
+                      Server setup needed: {missing.join(', ')} {missing.length === 1 ? 'is' : 'are'} missing from the server settings.
+                    </span>
+                  )}
+                  {other.map(p => <span key={p} style={{ color: 'var(--status-danger)' }}>{p}</span>)}
+                </>
+              );
+            })()}
           </div>
         )}
 
@@ -142,7 +156,7 @@ export const TradeCallBroadcasts = () => {
             </thead>
             <tbody>
               {segments.length === 0 && (
-                <tr><td colSpan={4} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No Telegram bots configured yet (TELEGRAM_BOTS in backend/.env).</td></tr>
+                <tr><td colSpan={4} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No Telegram bots are set up on the server yet (TELEGRAM_BOTS server setting).</td></tr>
               )}
               {segments.map(s => (
                 <tr key={s.segment}>

@@ -5,6 +5,7 @@ import { PackagePlus, Search, AlertCircle, Download, Send, CheckCircle2, Refresh
 import {
   loadExtendedService, assignExtendedService, resendExtendedServiceInvoice, downloadExtendedServiceInvoice
 } from '../services/extendedServiceService';
+import { confirmAsync } from './ConfirmDialog';
 
 const btn = { display: 'inline-flex', alignItems: 'center', gap: '6px' };
 const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -76,7 +77,7 @@ export const ExtendedServiceBlock = () => {
       showToast(`'${service.name}' has no Value (₹) in the Service Master; set one so the invoice can be issued.`, 'error');
       return;
     }
-    if (!window.confirm(`Assign '${service.name}' to ${client.clientName}?\n\nThe service goes live in Paid / Telegram, an invoice for ${inr(serviceValue(service))} (GST included) is generated, and it is emailed to ${client.email || 'the client'}.`)) return;
+    if (!await confirmAsync(`Assign '${service.name}' to ${client.clientName}?\n\nThe service goes live in Paid / Telegram, an invoice for ${inr(serviceValue(service))} (GST included) is generated, and it is emailed to ${client.email || 'the client'}.`, { confirmLabel: 'Assign service' })) return;
     setBusy(client.clientKey);
     try {
       const res = await assignExtendedService({ clientKey: client.clientKey, serviceId, limit: data.limit });

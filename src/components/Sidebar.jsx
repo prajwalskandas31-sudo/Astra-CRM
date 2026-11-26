@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
+import { getEKycLight } from '../services/leegalityService';
 import {
   LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History,
   FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet,
@@ -34,12 +35,12 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
       }
     ]
   },
-  { id: 'lead-history', label: 'Lead History (Block 5)', icon: History },
+  { id: 'lead-history', label: 'Lead History', icon: History },
   {
     group: 'leads', label: 'Leads', icon: Upload,
     children: [
       { id: 'lead-upload', label: 'Lead Upload & Reports', icon: Upload },
-      { id: 'lead-summary', label: 'Lead Summary (Block 4)', icon: PieChart, badge: pendingRequestsCount || null },
+      { id: 'lead-summary', label: 'Lead Summary', icon: PieChart, badge: pendingRequestsCount || null },
       { id: 'lead-reassignment', label: 'Lead Re-assignment', icon: Shuffle }
     ]
   },
@@ -77,9 +78,9 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
       { id: 'directory', label: 'User Directory', icon: Users },
       { id: 'email-block', label: 'Email Block', icon: Mail },
       { id: 'system-settings', label: 'System & UI Settings', icon: Sliders },
-      { id: 'custom-roles', label: 'Custom Roles (Annexure-I)', icon: Shield },
+      { id: 'custom-roles', label: 'Custom Roles', icon: Shield },
       { id: 'feature-access', label: 'Feature Access Block', icon: Key },
-      { id: 'dispositions', label: 'Dispositions (Block 2)', icon: Layers },
+      { id: 'dispositions', label: 'Dispositions', icon: Layers },
       { id: 'service-master', label: 'Service Master', icon: Tags },
       { id: 'invoice-block', label: 'Invoice Block', icon: Receipt }
     ]
@@ -106,12 +107,13 @@ const readOpenGroups = () => {
 };
 
 export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
-  const { simulatedRole, sales, leadRequests, eSignRecords = [], hasPermission } = useCRM();
+  const { simulatedRole, sales = [], leadRequests, hasPermission } = useCRM();
 
   const tree = buildNavTree({
-    pendingSalesCount: sales.filter(s => s.status.includes('Pending')).length,
+    pendingSalesCount: sales.filter(s => String(s.status || '').includes('Pending')).length,
     pendingRequestsCount: leadRequests?.filter(r => r.status === 'Pending').length || 0,
-    eSignCount: eSignRecords.length
+    // Sent to Leegality and still waiting for the client to sign (not the all-time total)
+    eSignCount: sales.filter(s => getEKycLight(s) === 'yellow').length
   });
 
   // Role does not inherently restrict features; visibility is driven strictly by permissions
@@ -218,7 +220,7 @@ export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
         </div>
         <div className="brand-info">
           <h1>Astra CRM</h1>
-          <span className="build-tag">Enterprise V1.0</span>
+
         </div>
       </div>
 

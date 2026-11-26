@@ -29,6 +29,7 @@ import {
   Plus,
   Hash
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 export const LeadSummarySuperAdmin = () => {
   const {
@@ -81,7 +82,7 @@ export const LeadSummarySuperAdmin = () => {
   const [showGranularReassignModal, setShowGranularReassignModal] = useState(false);
   const [granularTargetUserId, setGranularTargetUserId] = useState('');
 
-  // Language-Based Lead Assignment Engine (Block 1 Routing) in Block 4
+  // Assign Leads by Language in Block 4
   const [b4AssignLang, setB4AssignLang] = useState('Hindi');
   const [b4AssignQty, setB4AssignQty] = useState('10');
   const [b4AssignTargetUserId, setB4AssignTargetUserId] = useState('');
@@ -113,7 +114,7 @@ export const LeadSummarySuperAdmin = () => {
       return;
     }
     if (!b4AssignTargetUserId) {
-      addToast('Validation: Please select a target user from the Block 1 Hierarchy.', 'warning');
+      addToast('Validation: Please pick the user to assign the leads to.', 'warning');
       return;
     }
     const targetUser = users.find(u => u.id === b4AssignTargetUserId);
@@ -127,11 +128,11 @@ export const LeadSummarySuperAdmin = () => {
     );
     const availableCount = currentLangMatching.length;
     if (availableCount === 0) {
-      addToast(`Quantity Validation: No unassigned leads available in the queue for language '${b4AssignLang}'. Allocation strictly prevented.`, 'error');
+      addToast(`Quantity Validation: There are no unassigned ${b4AssignLang} leads to assign.`, 'error');
       return;
     }
     if (qty > availableCount) {
-      addToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Requested quantity exceeds total unassigned leads (${availableCount}) available for language '${b4AssignLang}'. Allocation strictly prevented.`, 'error');
+      addToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Only ${availableCount} unassigned ${b4AssignLang} lead(s) are available.`, 'error');
       return;
     }
 
@@ -160,7 +161,7 @@ export const LeadSummarySuperAdmin = () => {
           Access Restricted — Feature Permission Required
         </h2>
         <p style={{ color: 'var(--text-muted)', maxWidth: '500px', margin: '0 auto 1.5rem auto', fontSize: '0.9rem' }}>
-          Block 4: Lead Summary is governed by permissions managed by the Super Admin. Please have a Super Admin enable this capability for your user account in the Feature Access Block.
+          Lead Summary is governed by permissions managed by the Super Admin. Please have a Super Admin enable this capability for your user account in the Feature Access Block.
         </p>
       </div>
     );
@@ -235,9 +236,9 @@ export const LeadSummarySuperAdmin = () => {
   };
 
   // Handle Batch Deletion
-  const handleDeleteSelectedInstances = () => {
+  const handleDeleteSelectedInstances = async () => {
     if (selectedInstanceIds.length === 0) return;
-    if (window.confirm(`Are you sure you want to delete ${selectedInstanceIds.length} assignment file(s)? Associated leads will be deleted.`)) {
+    if (await confirmAsync(`Are you sure you want to delete ${selectedInstanceIds.length} assignment file(s)? Associated leads will be deleted.`, { danger: true, confirmLabel: 'Delete' })) {
       deleteAssignmentFiles(selectedInstanceIds);
       addToast(`Deleted ${selectedInstanceIds.length} assignment file(s)`, 'success');
       setSelectedInstanceIds([]);
@@ -294,9 +295,9 @@ export const LeadSummarySuperAdmin = () => {
     setShowGranularReassignModal(false);
   };
 
-  const handleGranularDelete = () => {
+  const handleGranularDelete = async () => {
     if (selectedGranularLeadIds.length === 0) return;
-    if (window.confirm(`Permanently delete ${selectedGranularLeadIds.length} selected lead(s)?`)) {
+    if (await confirmAsync(`Permanently delete ${selectedGranularLeadIds.length} selected lead(s)?`, { danger: true, confirmLabel: 'Delete' })) {
       granularDeleteLeads(selectedGranularLeadIds);
       addToast(`Deleted ${selectedGranularLeadIds.length} lead(s)`, 'success');
       setSelectedGranularLeadIds([]);
@@ -367,7 +368,7 @@ export const LeadSummarySuperAdmin = () => {
           <div className="card" style={{ padding: '1.25rem 1.5rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 700, color: 'var(--text-main)' }}>
-                <UserCheck size={18} color="var(--accent)" /> Language-Based Lead Assignment Engine (Block 1 Routing)
+                <UserCheck size={18} color="var(--accent)" /> Assign Leads by Language
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span className="badge" style={{ backgroundColor: currentLangAvailableCount > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.12)', color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700, padding: '4px 10px', fontSize: '0.78rem' }}>
@@ -380,7 +381,7 @@ export const LeadSummarySuperAdmin = () => {
             </div>
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Super Admin allocates unassigned uploaded leads to users in the <strong>Block 1 Hierarchy</strong>. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
+              Super Admin allocates unassigned uploaded leads to users. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
             </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', alignItems: 'start' }}>
@@ -632,13 +633,13 @@ export const LeadSummarySuperAdmin = () => {
 
                 {/* Validation Status Messages */}
                 {currentLangAvailableCount === 0 && (
-                  <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertTriangle size={12} /> 0 unassigned leads in queue for {b4AssignLang}. Allocation prevented.
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    No unassigned {b4AssignLang} leads to assign right now.
                   </div>
                 )}
-                {isQtyExceeded && (
+                {isQtyExceeded && currentLangAvailableCount > 0 && (
                   <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertTriangle size={12} /> Exceeds available leads ({currentLangAvailableCount} max). Allocation strictly prevented.
+                    <AlertTriangle size={12} /> Only {currentLangAvailableCount} {b4AssignLang} {currentLangAvailableCount === 1 ? 'lead is' : 'leads are'} available.
                   </div>
                 )}
                 {!isQtyValid && !isQtyEmpty && (
@@ -653,9 +654,9 @@ export const LeadSummarySuperAdmin = () => {
                 )}
               </div>
 
-              {/* Assign To User (Block 1 Hierarchy) */}
+              {/* Assign To User */}
               <div className="form-group">
-                <label style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>Assign To User (Block 1 Hierarchy):</label>
+                <label style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>Assign To User:</label>
                 <select 
                   value={b4AssignTargetUserId} 
                   onChange={(e) => setB4AssignTargetUserId(e.target.value)}
@@ -753,8 +754,8 @@ export const LeadSummarySuperAdmin = () => {
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       className="btn btn-sm"
-                      onClick={() => {
-                        if (window.confirm(`Are you sure you want to discard the lead request for ${req.quantity} (${req.language}) leads from ${req.requestedByName}?`)) {
+                      onClick={async () => {
+                        if (await confirmAsync(`Are you sure you want to discard the lead request for ${req.quantity} (${req.language}) leads from ${req.requestedByName}?`, { danger: true, confirmLabel: 'Discard request' })) {
                           discardLeadRequest(req.id);
                           addToast('Lead request discarded.', 'info');
                         }
@@ -1113,8 +1114,8 @@ export const LeadSummarySuperAdmin = () => {
                         )}
                         <button
                           className="btn btn-sm btn-danger"
-                          onClick={() => {
-                            if (window.confirm(`Delete assignment file '${displayFileName}'?`)) {
+                          onClick={async () => {
+                            if (await confirmAsync(`Delete assignment file '${displayFileName}'?`, { danger: true, confirmLabel: 'Delete' })) {
                               deleteAssignmentFiles([inst.id]);
                               addToast(`Deleted assignment file '${displayFileName}'`, 'success');
                             }

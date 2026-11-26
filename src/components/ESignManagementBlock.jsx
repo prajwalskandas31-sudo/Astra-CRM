@@ -39,6 +39,7 @@ import {
   Mail,
   CalendarClock
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 export const ESignManagementBlock = () => {
   const {
@@ -48,7 +49,8 @@ export const ESignManagementBlock = () => {
     eSignRecords = [],
     triggerEKycAndESign,
     deleteESignRecord,
-    leegalityConfig
+    leegalityConfig,
+    companyProfile
   } = useCRM();
 
   const { showToast } = useToast();
@@ -125,7 +127,7 @@ export const ESignManagementBlock = () => {
       showToast("This record is not linked to a sale, so the client's email is unknown.", 'error');
       return;
     }
-    if (!window.confirm(`Email the Welcome Kit, the signed agreement and the e-KYC documents to ${rec.clientName}${rec.email ? ` (${rec.email})` : ''}?`)) return;
+    if (!await confirmAsync(`Email the Welcome Kit, the signed agreement and the e-KYC documents to ${rec.clientName}${rec.email ? ` (${rec.email})` : ''}?`, { confirmLabel: 'Send email' })) return;
     setSendingKitFor(rec.id);
     try {
       showToast(describeSend(await sendWelcomeKit(rec.saleId)), 'success');
@@ -211,7 +213,7 @@ export const ESignManagementBlock = () => {
                 gap: '6px'
               }}>
                 <CheckCircle2 size={14} color="#10b981" />
-                <span>All approved sales e-signed (Workflow: KKliSJp)</span>
+                <span>No approved sales waiting for e-sign</span>
               </div>
             )}
           </div>
@@ -265,13 +267,13 @@ export const ESignManagementBlock = () => {
             borderRadius: '8px'
           }}>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '4px' }}>
-              Registration ID / Entity
+              SEBI Registration / Entity
             </div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary, #ffffff)' }}>
-              {primarySignatory?.sebiReg || 'EMP-001'}
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: companyProfile?.sebiRegistrationNumber ? 'var(--text-primary, #ffffff)' : 'var(--text-muted)' }}>
+              {companyProfile?.sebiRegistrationNumber || 'Not set'}
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#10b981' }}>
-              ✓ {primarySignatory?.entity || 'Astra CRM Enterprise'}
+            <div style={{ fontSize: '0.72rem', color: companyProfile?.companyName ? '#10b981' : 'var(--status-warning)' }}>
+              {companyProfile?.companyName || 'Set it in Settings → Company Profile'}
             </div>
           </div>
 
@@ -285,10 +287,10 @@ export const ESignManagementBlock = () => {
               Leegality Gateway API
             </div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0284c7' }}>
-              API v3.0 Live
+              API v3.1
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
-              <span>● Token held by CRM backend</span>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #94a3b8)', marginTop: '2px' }}>
+              Test the connection in Settings → System &amp; UI Settings
             </div>
           </div>
         </div>
@@ -405,9 +407,9 @@ export const ESignManagementBlock = () => {
 
           <span style={{
             fontSize: '0.74rem',
-            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-            color: '#10b981',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
+            backgroundColor: primarySignatory?.signatureDataUrl ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.12)',
+            color: primarySignatory?.signatureDataUrl ? '#10b981' : '#f59e0b',
+            border: primarySignatory?.signatureDataUrl ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
             padding: '4px 10px',
             borderRadius: '6px',
             fontWeight: 600,
@@ -415,7 +417,7 @@ export const ESignManagementBlock = () => {
             alignItems: 'center',
             gap: '6px'
           }}>
-            <ShieldCheck size={14} /> Certified Digital Signer Active
+            <ShieldCheck size={14} /> {primarySignatory?.signatureDataUrl ? 'Uploaded signature on file' : 'Using a generated signature stamp (none uploaded)'}
           </span>
         </div>
 
@@ -726,8 +728,8 @@ export const ESignManagementBlock = () => {
                           </button>
                         )}
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Delete E-Sign record for '${rec.clientName}'?`)) {
+                          onClick={async () => {
+                            if (await confirmAsync(`Delete E-Sign record for '${rec.clientName}'?`, { danger: true, confirmLabel: 'Delete' })) {
                               deleteESignRecord(rec.id);
                               showToast('E-Sign record removed.', 'info');
                             }

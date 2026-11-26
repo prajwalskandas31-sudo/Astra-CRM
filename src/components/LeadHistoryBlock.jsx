@@ -261,7 +261,7 @@ export const LeadHistoryBlock = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                     <History size={28} style={{ opacity: 0.3 }} />
                     <span style={{ fontSize: '0.88rem' }}>
-                      {search || dispFilter !== 'All' || dateFrom || dateTo ? 'No leads match your search / filter criteria.' : 'No assignment history found for this user.'}
+                      {search || dispFilter !== 'All' || dateFrom || dateTo ? 'No leads match your search or filters.' : (isSuperAdmin && historyUserFilter === 'ALL' ? 'No leads have been assigned yet.' : 'No assignment history for this user yet.')}
                     </span>
                   </div>
                 </td>

@@ -2030,13 +2030,12 @@ export const CRMProvider = ({ children }) => {
     localStorage.removeItem('crm_master_records');
     localStorage.removeItem('crm_sales');
     localStorage.removeItem('crm_lead_requests');
-    localStorage.removeItem('crm_users');
     setLeads([]);
     setAssignmentInstances([]);
     setMasterRecords([]);
     setSales([]);
     setLeadRequests([]);
-    setUsers(DEFAULT_USERS);
+    // Users are kept: they live on the server, and swapping in the demo seed list only showed the wrong people
   };
 
   // ==========================================

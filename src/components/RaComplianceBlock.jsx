@@ -13,6 +13,7 @@ import {
   ShieldCheck, Save, RefreshCw, FileSpreadsheet, Plus, Trash2, ChevronLeft, ChevronRight, Loader2,
   AlertTriangle, Download, Copy, Building2, Eye, EyeOff
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 // RA Monthly Compliance Tracker (backend/ra_compliance.py; sheets and status rules in src/lib/raCompliance.js).
 // The Dashboard plus 17 input sheets from the client's workbook. Everything typed is kept per month;
@@ -378,9 +379,9 @@ export const RaComplianceBlock = () => {
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
-  const changeMonth = (m) => {
+  const changeMonth = async (m) => {
     if (!m || m === month) return;
-    if (dirty && !window.confirm(`You have unsaved changes for ${monthLabel(month)}. Leave them?`)) return;
+    if (dirty && !await confirmAsync(`You have unsaved changes for ${monthLabel(month)}. Leave them?`, { danger: true, confirmLabel: 'Leave without saving' })) return;
     setMonth(m);
   };
 
@@ -401,13 +402,13 @@ export const RaComplianceBlock = () => {
   const addRow = (sheet, section) => setRows(sheet, section, rows => [...rows, { id: newId() }]);
 
   const LINKED = ['mitc', 'kyc', 'invoices', 'clientDocuments'];
-  const deleteRow = (sheet, section, id) => {
+  const deleteRow = async (sheet, section, id) => {
     if (sheet === 'clientRegister') {
       const linked = LINKED.some(s => rowsOf(s).some(r => r.id === id && Object.keys(r).length > 1));
-      if (linked && !window.confirm('Delete this client? Their MITC, KYC, Invoice and Client Documents lines go too.')) return;
+      if (linked && !await confirmAsync('Delete this client? Their MITC, KYC, Invoice and Client Documents lines go too.', { danger: true, confirmLabel: 'Delete' })) return;
       LINKED.forEach(s => { if (rowsOf(s).some(r => r.id === id)) setRows(s, 'rows', rows => rows.filter(r => r.id !== id)); });
     } else if (sheet === 'recoRegister' && rowsOf('researchReports').some(r => r.recoId === id)
-      && !window.confirm('A research report is linked to this call; it will show "Not in register". Delete anyway?')) {
+      && !await confirmAsync('A research report is linked to this call; it will show "Not in register". Delete anyway?', { danger: true, confirmLabel: 'Delete anyway' })) {
       return;
     }
     setRows(sheet, section, rows => rows.filter(r => r.id !== id));
@@ -522,7 +523,7 @@ export const RaComplianceBlock = () => {
         showToast(`Nothing to copy from ${monthLabel(from)}.`, 'info');
         return;
       }
-      if (!window.confirm(`Copy ${carried.length} line(s) from ${monthLabel(from)}? Only names / accounts are copied; the checks are left for this month.`)) return;
+      if (!await confirmAsync(`Copy ${carried.length} line(s) from ${monthLabel(from)}? Only names / accounts are copied; the checks are left for this month.`, { confirmLabel: 'Copy lines' })) return;
       const def = SHEET_BY_KEY[sheet];
       setRows(sheet, 'rows', rows => {
         if (def.kind === 'fixed') {
@@ -572,7 +573,7 @@ export const RaComplianceBlock = () => {
         </div>
         <strong style={{ fontSize: '0.95rem', whiteSpace: 'nowrap', marginLeft: '4px' }}>{monthLabel(month)}</strong>
         <div style={{ flex: '1 1 0', minWidth: 0 }} />
-        <button type="button" className="btn-secondary" style={btn} disabled={loading} onClick={() => (!dirty || window.confirm('Discard unsaved changes and reload?')) && load(month)}>
+        <button type="button" className="btn-secondary" style={btn} disabled={loading} onClick={async () => (!dirty || await confirmAsync('Discard unsaved changes and reload?', { danger: true, confirmLabel: 'Discard & reload' })) && load(month)}>
           <RefreshCw size={14} /> {loading ? 'Loading...' : 'Refresh'}
         </button>
         <button type="button" className="btn-primary" style={btn} disabled={!dirty || saving} onClick={save}>
