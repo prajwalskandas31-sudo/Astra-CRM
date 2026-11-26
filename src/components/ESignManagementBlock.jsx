@@ -197,30 +197,8 @@ export const ESignManagementBlock = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            {pendingESignSales.length > 0 ? (
-              <button
-                onClick={() => handleTriggerRealLeegality(pendingESignSales[0])}
-                disabled={isDispatching}
-                className="btn-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
-                  padding: '9px 18px',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
-                  border: 'none',
-                  boxShadow: '0 4px 15px rgba(6, 182, 212, 0.35)',
-                  cursor: isDispatching ? 'not-allowed' : 'pointer'
-                }}
-                title={`Dispatches live Leegality package (Workflow: KKliSJp) to ${pendingESignSales[0].clientName}`}
-              >
-                <Zap size={16} />
-                {isDispatching ? 'Dispatching Leegality Gateway...' : `Trigger Leegality E-Sign (${pendingESignSales[0].clientName})`}
-              </button>
-            ) : (
+            {/* Header 'Trigger Leegality E-Sign' button hidden on request; dispatch stays available in the pending banner below. */}
+            {pendingESignSales.length === 0 && (
               <div style={{
                 fontSize: '0.78rem',
                 color: 'var(--text-muted, #94a3b8)',
