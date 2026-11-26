@@ -32,12 +32,12 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
   { id: 'extended-service', label: 'Extended Service Block', icon: PackagePlus },
   { id: 'kra-block', label: 'KRA Block', icon: ShieldCheck },
   { id: 'telegram-control', label: 'Telegram Control Block', icon: Send },
-  { id: 'research-reports', label: 'Research Reports', icon: FileText },
   {
     group: 'reports', label: 'Reports', icon: BarChart3,
     children: [
       { id: 'salary-block', label: 'Salary Block', icon: Wallet },
       { id: 'client-master', label: 'Client MASTER', icon: Contact },
+      { id: 'research-reports', label: 'Research Reports', icon: FileText },
       { id: 'research-recommendations', label: 'Records for Research Recommendations', icon: NotebookPen },
       { id: 'running-account', label: 'Running Account Statement', icon: BookOpen }
     ]

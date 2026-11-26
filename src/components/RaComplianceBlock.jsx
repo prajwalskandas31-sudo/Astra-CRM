@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { reportSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { loadComplianceMonth, loadComplianceMonths, saveComplianceSheet } from '../services/raComplianceService';
+import { loadComplianceMonth, loadComplianceMonths, loadRecoFromReports, saveComplianceSheet } from '../services/raComplianceService';
 import {
   SHEETS, SHEET_BY_KEY, SUB_BLOCKS, DETAIL_FIELDS, COMPLIANT, NON_COMPLIANT, PENDING, NA,
   blank, newId, fmtDate, monthLabel, currentMonth, shiftMonth, buildContext, displayRows, rowStatus,
@@ -147,7 +147,10 @@ const SectionTable = ({ sheet, section, rows, ctx, showExample, onRowChange, onD
               const st = hasStatus ? rowStatus(section, row, ctx, fixed) : '';
               return (
                 <tr key={row.id}>
-                  <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>
+                    {i + 1}
+                    {row.reportId && <div title="Filled in from the Research Reports block" style={{ fontSize: '0.66rem', color: 'var(--accent-primary, var(--accent))', fontWeight: 600 }}>Auto</div>}
+                  </td>
                   {section.labelColumn && (
                     <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>
                       {fixed?.renamable && !readOnly ? (
@@ -167,7 +170,7 @@ const SectionTable = ({ sheet, section, rows, ctx, showExample, onRowChange, onD
                   {hasStatus && <td>{st === NA ? <StatusPill status="NA" /> : <StatusPill status={st} />}</td>}
                   {list && (
                     <td>
-                      {!readOnly && <button type="button" style={iconBtn} title="Delete row" aria-label="Delete row" onClick={() => onDelete(row.id)}><Trash2 size={14} /></button>}
+                      {!readOnly && !row.reportId && <button type="button" style={iconBtn} title="Delete row" aria-label="Delete row" onClick={() => onDelete(row.id)}><Trash2 size={14} /></button>}
                     </td>
                   )}
                 </tr>
@@ -327,12 +330,18 @@ export const RaComplianceBlock = () => {
   const [error, setError] = useState('');
   const [showExample, setShowExample] = useState(true);
   const loadedMonth = useRef(null);
+  // Reco Register lines built from the Research Reports block for this month; not stored, refreshed on every load
+  const [recoAuto, setRecoAuto] = useState([]);
 
   const dataOf = useCallback((sheet) => drafts[sheet] ?? server[sheet]?.data ?? {}, [drafts, server]);
   const rowsOf = useCallback((sheet, section = 'rows') => {
-    const rows = dataOf(sheet)[section];
-    return Array.isArray(rows) ? rows : [];
-  }, [dataOf]);
+    const rows = Array.isArray(dataOf(sheet)[section]) ? dataOf(sheet)[section] : [];
+    if (sheet !== 'recoRegister' || section !== 'rows' || !recoAuto.length) return rows;
+    // Auto lines first (oldest call first); a value the user changed on one is stored under the same id and wins
+    const stored = Object.fromEntries(rows.map(r => [r.id, r]));
+    const autoIds = new Set(recoAuto.map(r => r.id));
+    return [...recoAuto.map(r => ({ ...r, ...stored[r.id], reportId: r.reportId })), ...rows.filter(r => !autoIds.has(r.id))];
+  }, [dataOf, recoAuto]);
   const ctx = useMemo(() => buildContext(month, rowsOf), [month, rowsOf]);
   const summary = useMemo(() => summarize(ctx), [ctx]);
   const dirtySheets = Object.keys(drafts).filter(k => !sameJson(drafts[k], server[k]?.data ?? {}));
@@ -342,12 +351,17 @@ export const RaComplianceBlock = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await loadComplianceMonth(m);
+      const [res, auto] = await Promise.all([
+        loadComplianceMonth(m),
+        loadRecoFromReports(m).catch(() => ({ rows: [] }))
+      ]);
+      setRecoAuto(Array.isArray(auto.rows) ? auto.rows : []);
       setServer(res.sheets || {});
       setDrafts({});
       loadedMonth.current = m;
     } catch (err) {
       setError(err.message);
+      setRecoAuto([]);
       setServer({});
       setDrafts({});
     } finally {

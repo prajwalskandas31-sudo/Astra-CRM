@@ -136,6 +136,12 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     employeeId: userToEdit ? userToEdit.employeeId : '',
     officeNumber: userToEdit ? (userToEdit.officeNumber || '') : '',
     officialEmail: userToEdit ? (userToEdit.officialEmail || '') : '',
+    dateOfBirth: userToEdit ? (userToEdit.dateOfBirth || '') : '',
+    dateOfJoining: userToEdit ? (userToEdit.dateOfJoining || '') : '',
+    aadhaarNumber: userToEdit ? (userToEdit.aadhaarNumber || '') : '',
+    panNumber: userToEdit ? (userToEdit.panNumber || '') : '',
+    currentAddress: userToEdit ? (userToEdit.currentAddress || '') : '',
+    correspondenceAddress: userToEdit ? (userToEdit.correspondenceAddress || '') : '',
     bankAccountNumber: userToEdit ? (userToEdit.bankAccountNumber || '') : '',
     ifscCode: userToEdit ? (userToEdit.ifscCode || '') : '',
     bankNameAndBranch: userToEdit ? (userToEdit.bankNameAndBranch || '') : '',
@@ -201,6 +207,12 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           employeeId: userToEdit.employeeId || '',
           officeNumber: userToEdit.officeNumber || '',
           officialEmail: userToEdit.officialEmail || '',
+          dateOfBirth: userToEdit.dateOfBirth || '',
+          dateOfJoining: userToEdit.dateOfJoining || '',
+          aadhaarNumber: userToEdit.aadhaarNumber || '',
+          panNumber: userToEdit.panNumber || '',
+          currentAddress: userToEdit.currentAddress || '',
+          correspondenceAddress: userToEdit.correspondenceAddress || '',
           bankAccountNumber: userToEdit.bankAccountNumber || '',
           ifscCode: userToEdit.ifscCode || '',
           bankNameAndBranch: userToEdit.bankNameAndBranch || '',
@@ -226,6 +238,12 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           employeeId: '',
           officeNumber: '',
           officialEmail: '',
+          dateOfBirth: '',
+          dateOfJoining: '',
+          aadhaarNumber: '',
+          panNumber: '',
+          currentAddress: '',
+          correspondenceAddress: '',
           bankAccountNumber: '',
           ifscCode: '',
           bankNameAndBranch: '',
@@ -901,6 +919,75 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     value={formData.officialEmail}
                     onChange={handleChange}
                     placeholder="e.g. name@unitetech.trade"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} max={new Date().toISOString().slice(0, 10)} />
+                </div>
+
+                <div className="form-group">
+                  <label>Date of Joining</label>
+                  <input type="date" name="dateOfJoining" value={formData.dateOfJoining} onChange={handleChange} />
+                </div>
+
+                <div className="form-group">
+                  <label>Aadhaar Number</label>
+                  <input
+                    type="text"
+                    name="aadhaarNumber"
+                    value={formData.aadhaarNumber}
+                    onChange={e => setFormData(prev => ({ ...prev, aadhaarNumber: e.target.value.replace(/[^0-9 ]/g, '').slice(0, 14) }))}
+                    placeholder="e.g. 1234 5678 9012"
+                    inputMode="numeric"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>PAN Number</label>
+                  <input
+                    type="text"
+                    name="panNumber"
+                    value={formData.panNumber}
+                    onChange={e => setFormData(prev => ({ ...prev, panNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) }))}
+                    placeholder="e.g. ABCDE1234F"
+                    maxLength={10}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Current Residential Address</label>
+                  <textarea
+                    name="currentAddress"
+                    value={formData.currentAddress}
+                    onChange={handleChange}
+                    rows={2}
+                    maxLength={500}
+                    placeholder="House no., street, area, city, state, PIN"
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <span>Correspondence Address <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: '2px 8px', fontSize: '0.72rem' }}
+                      onClick={() => setFormData(prev => ({ ...prev, correspondenceAddress: prev.currentAddress }))}
+                      disabled={!formData.currentAddress}
+                    >
+                      Same as current
+                    </button>
+                  </label>
+                  <textarea
+                    name="correspondenceAddress"
+                    value={formData.correspondenceAddress}
+                    onChange={handleChange}
+                    rows={2}
+                    maxLength={500}
+                    placeholder="Leave blank if same as current address"
                   />
                 </div>
 

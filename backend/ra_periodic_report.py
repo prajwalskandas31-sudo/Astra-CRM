@@ -7,7 +7,8 @@ Sub-blocks (one sheet each in the Excel download, laid out as in RA_Periodic_Rep
 
 Periods are the halves of the financial year, as in the Audit Report Blocks: "2025-26-H2" is the half
 year ended 31 March 2026. For the chosen half the CRM fills in what it already knows (the "auto" values:
-Company Profile, Branch Profiles, company bank accounts / UPI IDs, active users, Ready research reports
+Company Profile, Branch Profiles, company bank accounts / UPI IDs, active users (and their NISM Exam Details),
+the RA Compliance Tracker's social media accounts, Ready research reports
 and the Audit Report's Client and Fee Details); the user types the rest and can type over any auto value.
 
 What the user typed is kept per half under "raPeriodicReport":
@@ -127,6 +128,62 @@ def _in_period(stamp, start, end) -> bool:
     return bool(day and start <= day <= end)
 
 
+# RA Compliance Tracker (backend/ra_compliance.py): its "Social Media and Bio" sheet lists every account, per month
+COMPLIANCE = "raCompliance"
+SOCIAL_SHEET = "socialBio"
+
+
+def _social_rows(end) -> list:
+    """The social media accounts of the latest month (up to the half's end) saved in the RA Compliance Tracker."""
+    months = []
+    for doc in store.all(COMPLIANCE):
+        month, _, sheet = _text(doc.get("id")).partition(":")
+        rows = [r for r in ((doc.get("data") or {}).get("rows") or []) if isinstance(r, dict)]
+        if sheet == SOCIAL_SHEET and rows:
+            months.append((month, rows))
+    if not months:
+        return []
+    months.sort(key=lambda m: m[0], reverse=True)
+    last = end.strftime("%Y-%m")
+    rows = next((r for m, r in months if m <= last), months[-1][1])  # the closest month not after the half, else the earliest
+    out = []
+    for r in rows:
+        link = _text(r.get("url")) or _text(r.get("handle"))
+        platform = _text(r.get("platform"))
+        if link or platform:
+            out.append({"platform": platform, "link": link})
+    return out
+
+
+def _cert_type(series: str) -> str:
+    """NISM Exam Details' free-text series -> the report's Type of Certification."""
+    s = f" {re.sub(r'[^a-z0-9]+', ' ', _text(series).lower()).strip()} "  # whole words, space-padded
+    if " xv b " in s or " xvb " in s:
+        return "NISM XV-B"
+    if " xv " in s or " 15 " in s or "research analyst" in s:
+        return "NISM XV"
+    if any(w in s for w in (" iii a ", " iiia ", " 3 a ", " 3a ")):
+        return "NISM III A"
+    if " cfp " in s:
+        return "CFP"
+    return "Other" if s.strip() else ""
+
+
+def _nism_rows(users: list) -> list:
+    """One NISM Certification row per active user with NISM Exam Details (User Directory)."""
+    out = []
+    for u in users:
+        n = u.get("nism") if isinstance(u.get("nism"), dict) else {}
+        if not any(_text(n.get(k)) for k in ("series", "registrationNumber", "enrollmentNumber", "clearedDate", "validUpto")):
+            continue
+        cert = _cert_type(n.get("series"))
+        dates = ("iiiaFrom", "iiiaTo") if cert == "NISM III A" else ("xvFrom", "xvTo")
+        out.append({"personType": "", "name": _text(n.get("name")) or _text(u.get("name")),
+                    "email": _text(u.get("officialEmail")) or _text(u.get("email")), "dob": "", "pan": "",
+                    "certType": cert, dates[0]: _text(n.get("clearedDate")), dates[1]: _text(n.get("validUpto"))})
+    return out
+
+
 def auto_values(period: str) -> dict:
     """The CRM's own values for every sub-block of the half."""
     start, end, _ = audit_report.period_range(period)
@@ -173,13 +230,13 @@ def auto_values(period: str) -> dict:
         "clientsFees": clients_fees,
         "branches": [_branch_address(b) for b in branches],
         "websites": [{"url": _text(profile.get("website"))}] if _text(profile.get("website")) else [],
-        "social": [],
+        "social": _social_rows(end),
         "banks": [{"holderName": company, "accountNo": _text(a.get("accountNumber")), "accountType": _text(a.get("accountType")).upper(),
                    "ifsc": _text(a.get("ifscCode")).upper(), "bankName": _text(a.get("bankName")), "branch": _text(a.get("bankBranch"))}
                   for a in accounts if _text(a.get("accountNumber"))],
         "directors": [],
         "shareholding": [],
-        "nism": [],
+        "nism": _nism_rows(users),
         "upi": [{"upiId": _text(a.get("upiId"))} for a in accounts if _text(a.get("upiId"))],
     }
 

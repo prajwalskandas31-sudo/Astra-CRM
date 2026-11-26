@@ -160,8 +160,62 @@ const num = (v) => { const n = Number(String(v ?? '').replace(/,/g, '')); return
 const r2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 const hasRow = (row) => Object.values(row || {}).some(v => String(v ?? '').trim() !== '');
 
+const sameName = (a, b) => String(a || '').trim().toLowerCase().replace(/\s+/g, ' ') === String(b || '').trim().toLowerCase().replace(/\s+/g, ' ');
+/** Adds a row, or fills the blanks of the row already there for the same person. */
+const addPerson = (rows, row) => {
+  if (!String(row.name || '').trim()) return rows;
+  const i = rows.findIndex(r => sameName(r.name, row.name));
+  if (i < 0) return [...rows, row];
+  const merged = { ...rows[i] };
+  Object.entries(row).forEach(([k, v]) => { if (String(merged[k] ?? '').trim() === '' && String(v ?? '').trim() !== '') merged[k] = v; });
+  return rows.map((r, j) => (j === i ? merged : r));
+};
+
+/**
+ * The CRM's rows for a list sub-block: the server's (Company Profile, Branch Profiles, User Directory NISM details,
+ * RA Compliance Tracker social media), plus what General Details holds (typed or the CRM's), worked out here so
+ * a change typed in General Details shows straight away.
+ */
+export const crmRows = (data, draft, id) => {
+  const server = data.auto[id] || [];
+  const g = (key) => generalValue(data, draft, { key }).trim();
+  const indian = (pan) => (pan ? 'Indian' : '');
+  const md = g('mdExists') !== 'No' && g('mdName')
+    ? { name: g('mdName'), residentialStatus: indian(g('mdPan')), pan: g('mdPan'), foreignId: '', dob: g('mdDob'), din: g('mdDin') } : null;
+  const poIsDirector = /director|partner|chairman/i.test(g('poDesignation'));
+  const po = g('poName') ? { name: g('poName'), residentialStatus: indian(g('poPan')), pan: g('poPan'), foreignId: '', dob: g('poDob'), din: '' } : null;
+  if (id === 'banks') {
+    const holder = g('registeredName');
+    return holder ? server.map(r => ({ ...r, holderName: holder })) : server;
+  }
+  if (id === 'directors') {
+    let rows = server;
+    if (md) rows = addPerson(rows, md);
+    if (po && poIsDirector) rows = addPerson(rows, po);
+    return rows;
+  }
+  if (id === 'shareholding') {
+    if (server.length) return server;
+    if (g('legalStructure') === 'Individual' && g('registeredName')) return [{ name: g('registeredName'), shares: '', percent: '100' }];
+    return tableRows(data, draft, 'directors').filter(d => String(d.name || '').trim()).map(d => ({ name: d.name, shares: '', percent: '' }));
+  }
+  if (id === 'nism') {
+    let rows = [];
+    if (po) rows = addPerson(rows, { personType: 'Principle Officer', name: po.name, email: g('poEmail'), dob: po.dob, pan: po.pan });
+    if (g('coName')) rows = addPerson(rows, { personType: 'Compliance Officer', name: g('coName'), email: g('coEmail'), dob: g('coDob'), pan: '' });
+    // then everyone with NISM Exam Details in the User Directory; the MD's details fill their row's blanks
+    rows = server.filter(r => String(r.name || '').trim()).reduce(addPerson, rows);
+    if (md) {
+      const partner = /Partnership|LLP/.test(g('legalStructure')) ? 'Partner' : '';
+      rows = rows.map(r => (sameName(r.name, md.name) ? addPerson([r], { name: r.name, personType: partner, email: g('mdEmail'), dob: md.dob, pan: md.pan })[0] : r));
+    }
+    return rows;
+  }
+  return server;
+};
+
 /** The rows a list sub-block shows: what was typed, else the CRM's rows. */
-export const tableRows = (data, draft, id) => (Array.isArray(draft[id]) ? draft[id] : (data.auto[id] || []));
+export const tableRows = (data, draft, id) => (Array.isArray(draft[id]) ? draft[id] : crmRows(data, draft, id));
 
 /** General Details value before typing: from a list sub-block, else the CRM's. */
 export const generalAuto = (data, draft, field) => {

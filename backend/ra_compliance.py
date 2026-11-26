@@ -187,6 +187,67 @@ def get_month(month: str = Query(...), current_user: dict = Depends(require_acce
     return month_data(check_month(month))
 
 
+# ==========================================
+# Reco Register lines from the Research Reports block (backend/reports.py)
+# ==========================================
+REPORTS = "researchReports"  # reports.REPORTS; read directly so this module stays light
+INSTRUMENT_NAMES = {"option": "Options", "future": "Futures", "equity": "Equity"}
+
+
+def _report_day(record: dict) -> str:
+    if record.get("day"):
+        return record["day"]
+    try:
+        return datetime.fromisoformat(record.get("callAt") or record.get("createdAt") or "").astimezone(IST).date().isoformat()
+    except ValueError:
+        return ""
+
+
+def reco_row(record: dict) -> dict:
+    """One Reco Register line for a Ready report: everything comes from the call the report was built from."""
+    d = record.get("details") or {}
+    option = d.get("instrument") == "option"
+    buy = str(d.get("side") or "").strip().lower() == "buy"
+    entry = str(d.get("entry") or "")
+    targets = " / ".join(str(t) for t in d.get("targets") or [])
+    security = " ".join(p for p in [d.get("symbol") or "", *( [d.get("strike") or "", d.get("optionType") or ""] if option else []),
+                                    "FUT" if d.get("instrument") == "future" else ""] if p)
+    expiry = record.get("expiry") or ""
+    if option:
+        call_put = {"CE": "Call", "PE": "Put"}.get(d.get("optionType") or "", "")
+    else:
+        call_put = "Call" if buy else ("Put" if d.get("side") else "")
+    row = {
+        "id": f"rep-{record['id']}",
+        "reportId": record["id"],
+        "date": _report_day(record),
+        "nature": " ".join(p for p in [INSTRUMENT_NAMES.get(d.get("instrument"), ""), f"({record['segment']})" if record.get("segment") else ""] if p),
+        "security": f"{security} (expiry {expiry})" if security and expiry else security,
+        "strike": str(d.get("strike") or "") if option else entry,
+        "period": f"Till expiry ({expiry})" if expiry else "",
+        "callPut": call_put,
+        "buyRate": entry if buy else targets,
+        "sellRate": targets if buy else entry,
+        "sl": str(d.get("stopLoss") or ""),
+        "rationale": "Yes",
+        "reportFile": record.get("fileName") or "",
+    }
+    return {k: v for k, v in row.items() if v not in (None, "")}
+
+
+def reco_rows_for(month: str) -> list:
+    ready = [r for r in store.all(REPORTS)
+             if r.get("status") == "Ready" and not r.get("test") and r.get("details") and _report_day(r).startswith(month)]
+    ready.sort(key=lambda r: (_report_day(r), r.get("callAt") or r.get("createdAt") or "", r.get("callNumber") or 0))
+    return [reco_row(r) for r in ready]
+
+
+@router.get("/reco-from-reports")
+def reco_from_reports(month: str = Query(...), current_user: dict = Depends(require_access)):
+    """The month's Reco Register lines, one per Ready research report (test reports left out), oldest first."""
+    return {"month": month, "rows": reco_rows_for(check_month(month))}
+
+
 @router.get("/months")
 def list_months(current_user: dict = Depends(require_access)):
     """{month: [sheets with data]}, newest month first; used to copy lists from an earlier month."""

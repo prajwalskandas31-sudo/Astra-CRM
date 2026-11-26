@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -144,6 +145,12 @@ class UserCreate(BaseModel):
     employeeId: Optional[str] = None
     officeNumber: Optional[str] = ""
     officialEmail: Optional[str] = ""
+    dateOfBirth: Optional[str] = ""
+    dateOfJoining: Optional[str] = ""
+    aadhaarNumber: Optional[str] = ""
+    panNumber: Optional[str] = ""
+    currentAddress: Optional[str] = ""
+    correspondenceAddress: Optional[str] = ""
     bankAccountNumber: Optional[str] = ""
     ifscCode: Optional[str] = ""
     bankNameAndBranch: Optional[str] = ""
@@ -165,6 +172,12 @@ class UserUpdate(BaseModel):
     reportingTo: Optional[str] = None
     officeNumber: Optional[str] = None
     officialEmail: Optional[str] = None
+    dateOfBirth: Optional[str] = None
+    dateOfJoining: Optional[str] = None
+    aadhaarNumber: Optional[str] = None
+    panNumber: Optional[str] = None
+    currentAddress: Optional[str] = None
+    correspondenceAddress: Optional[str] = None
     bankAccountNumber: Optional[str] = None
     ifscCode: Optional[str] = None
     bankNameAndBranch: Optional[str] = None
@@ -385,6 +398,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
         "employeeId": req.employeeId or f"EMP-{store.count('users') + 100}",
         "officeNumber": (req.officeNumber or "").strip(),
         "officialEmail": (req.officialEmail or "").strip().lower(),
+        **_clean_personal_details(req),
         "status": "Active",
         "expiryDate": "27-07-2027",
         "bankAccountNumber": req.bankAccountNumber or "",
@@ -403,6 +417,42 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     set_user_password(new_user, req.password)
     _save_user(new_user)
     return public_user(new_user)
+
+# Personal details captured on the Add / Edit User form
+PERSONAL_DETAIL_FIELDS = ("dateOfBirth", "dateOfJoining", "aadhaarNumber", "panNumber", "currentAddress", "correspondenceAddress")
+_PAN_RE = re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]")
+
+def _clean_personal_details(req, only_given: bool = False) -> dict:
+    """Validated personal details from a create/update request. With only_given, fields left as None are skipped."""
+    clean = {}
+    for key in PERSONAL_DETAIL_FIELDS:
+        raw = getattr(req, key, None)
+        if raw is None and only_given:
+            continue
+        value = " ".join(str(raw or "").split()) if key.endswith("Address") else str(raw or "").strip()
+        if not value:
+            clean[key] = ""
+            continue
+        if key in ("dateOfBirth", "dateOfJoining"):
+            label = "Date of Birth" if key == "dateOfBirth" else "Date of Joining"
+            try:
+                day = datetime.strptime(value, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"{label} must be a valid date (YYYY-MM-DD).")
+            if key == "dateOfBirth" and day >= datetime.now().date():
+                raise HTTPException(status_code=400, detail="Date of Birth must be in the past.")
+        elif key == "aadhaarNumber":
+            value = re.sub(r"[\s-]", "", value)
+            if not re.fullmatch(r"[2-9][0-9]{11}", value):
+                raise HTTPException(status_code=400, detail="Aadhaar Number must be 12 digits (cannot start with 0 or 1).")
+        elif key == "panNumber":
+            value = value.upper()
+            if not _PAN_RE.fullmatch(value):
+                raise HTTPException(status_code=400, detail="PAN Number must look like ABCDE1234F.")
+        elif len(value) > 500:
+            raise HTTPException(status_code=400, detail="Address must be 500 characters or fewer.")
+        clean[key] = value
+    return clean
 
 PAY_TYPES = ("Commission", "Salary", "Salary plus Incentives")
 EDUCATION_LEVELS = ("Graduate", "Non-Graduate")  # kept in step with EDUCATION_LEVELS in UserModal.jsx
@@ -469,7 +519,9 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         raise HTTPException(status_code=404, detail="User not found")
 
     # Only fields whose value actually changes count (the edit form resends unchanged role/email).
-    changed = {k for k, v in req.model_dump().items() if v is not None and v != user.get(k)}
+    # A blank sent for a field the user never had (e.g. new personal details on older users) is no change either.
+    changed = {k for k, v in req.model_dump().items()
+               if v is not None and v != user.get(k) and not (v == "" and user.get(k) is None)}
     is_self = user["id"] == current_user["id"]
     if current_user["role"] == "Super Admin":
         if is_self and req.role is not None and req.role != "Super Admin":
@@ -478,7 +530,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
         # Admins manage lower-ranked staff, but cannot touch identity/role fields.
         if role_rank(user["role"]) >= role_rank("Admin"):
             raise HTTPException(status_code=403, detail="Access Denied: Admins cannot edit Admin or Super Admin accounts.")
-        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "education", "nism", "officeNumber", "officialEmail", "companyAssets"}:
+        if changed - _SELF_EDITABLE_FIELDS - {"name", "reportingTo", "branchId", "payType", "payDetails", "education", "nism", "officeNumber", "officialEmail", "companyAssets", *PERSONAL_DETAIL_FIELDS}:
             raise HTTPException(status_code=403, detail="Access Denied: Only Super Admin can change role, email or documents.")
     elif is_self:
         if changed - _SELF_EDITABLE_FIELDS:
@@ -501,6 +553,7 @@ def update_user(user_id: str, req: UserUpdate, current_user: dict = Depends(get_
     if req.reportingTo is not None: user["reportingTo"] = req.reportingTo
     if req.officeNumber is not None: user["officeNumber"] = req.officeNumber.strip()
     if req.officialEmail is not None: user["officialEmail"] = req.officialEmail.strip().lower()
+    user.update(_clean_personal_details(req, only_given=True))
     if req.bankAccountNumber is not None: user["bankAccountNumber"] = req.bankAccountNumber
     if req.ifscCode is not None: user["ifscCode"] = req.ifscCode
     if req.bankNameAndBranch is not None: user["bankNameAndBranch"] = req.bankNameAndBranch

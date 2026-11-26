@@ -248,7 +248,7 @@ export const SHEETS = [
   },
   {
     key: 'recoRegister', no: '2', short: 'Reco Register', title: 'Records of research recommendations made during the year', kind: 'list',
-    intro: 'One line per research recommendation / call. "Research report on file" turns Yes once the Research Reports tab has a maintained report for that call.',
+    intro: 'One line per research recommendation / call. Every call with a ready report in the Research Reports block is filled in here automatically (marked "Auto"); a value you change is kept. Add other calls with "Add row". "Research report on file" is Yes for those auto lines, and for other calls once the Research Reports tab has a maintained report.',
     sections: [{
       key: 'rows', kind: 'list', numbered: true,
       columns: [
@@ -260,13 +260,14 @@ export const SHEETS = [
         { key: 'callPut', label: 'Call / Put / Hold', type: 'select', options: ['Call', 'Put', 'Hold'] },
         { key: 'buyRate', label: 'Buy Rate', type: 'text', width: 90 },
         { key: 'sellRate', label: 'Sell Rate', type: 'text', width: 90 },
+        { key: 'sl', label: 'SL', type: 'text', width: 90 },
         { key: 'rationale', label: 'Whether Rationale for Research Recommendation is maintained (Yes/No)', type: 'yn' },
-        { key: 'reportOnFile', label: 'Research report on file? (auto from Research Reports)', type: 'auto', value: (r, ctx) => (ctx.reportOnFile(r.id) ? 'Yes' : 'No') }
+        { key: 'reportOnFile', label: 'Research report on file? (auto from Research Reports)', type: 'auto', value: (r, ctx) => (r.reportId || ctx.reportOnFile(r.id) ? 'Yes' : 'No') }
       ],
-      example: { date: '2026-10-05', nature: 'Positional call', security: 'ABC Ltd (NSE: ABC)', strike: '250 (trigger)', period: '2 months', callPut: 'Call', buyRate: '250', rationale: 'Yes', reportOnFile: 'Yes' },
+      example: { date: '2026-10-05', nature: 'Positional call', security: 'ABC Ltd (NSE: ABC)', strike: '250 (trigger)', period: '2 months', callPut: 'Call', buyRate: '250', sellRate: '280', sl: '235', rationale: 'Yes', reportOnFile: 'Yes' },
       status: (r, ctx) => {
-        if (allBlank(r, ['date', 'nature', 'security', 'strike', 'period', 'callPut', 'buyRate', 'sellRate', 'rationale'])) return '';
-        if (r.rationale === 'No' || !ctx.reportOnFile(r.id)) return NON_COMPLIANT;
+        if (allBlank(r, ['date', 'nature', 'security', 'strike', 'period', 'callPut', 'buyRate', 'sellRate', 'sl', 'rationale'])) return '';
+        if (r.rationale === 'No' || !(r.reportId || ctx.reportOnFile(r.id))) return NON_COMPLIANT;
         return blank(r.rationale) ? PENDING : COMPLIANT;
       }
     }]

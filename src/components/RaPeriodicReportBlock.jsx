@@ -5,7 +5,7 @@ import { useToast } from './ToastNotification';
 import { loadRaPeriodicReport, saveRaPeriodicReport } from '../services/raPeriodicReportService';
 import {
   GENERAL, YES_NO, COMPLAINT_ROWS, COMPLAINT_SOURCES, FEE_ROWS, FEE_COLUMNS, TABLES, TABLE_IDS, SUB_BLOCKS,
-  tableRows, generalAuto, generalValue, complaintCells, feeAuto, feeValue, feeCells, buildWorkbook, fileName
+  tableRows, crmRows, generalAuto, generalValue, complaintCells, feeAuto, feeValue, feeCells, buildWorkbook, fileName
 } from './raPeriodicReport';
 import { ScrollText, RefreshCw, FileSpreadsheet, Loader2, Save, RotateCcw, AlertTriangle, Plus, Trash2, Copy, Database } from 'lucide-react';
 
@@ -201,7 +201,7 @@ const TableTab = ({ id, data, draft, setDraft }) => {
   const t = TABLES[id];
   const rows = tableRows(data, draft, id);
   const fromCrm = !Array.isArray(draft[id]);
-  const crmRows = data.auto[id] || [];
+  const crm = crmRows(data, draft, id);
   const setRows = (next) => setDraft(d => ({ ...d, [id]: next }));
   const setCell = (i, key, v) => setRows(rows.map((r, j) => (j === i ? { ...r, [key]: v } : r)));
   const totalPct = id === 'shareholding' ? rows.filter(hasRow).reduce((s, r) => s + (Number(r.percent) || 0), 0) : null;
@@ -209,11 +209,11 @@ const TableTab = ({ id, data, draft, setDraft }) => {
     <>
       <div style={{ margin: '0 20px 10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
         <span style={{ flex: 1, minWidth: '200px' }}>{t.title}</span>
-        {fromCrm && crmRows.length > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent)' }}><Database size={13} /> Filled from the CRM</span>}
-        {!fromCrm && crmRows.length > 0 && (
+        {fromCrm && crm.length > 0 && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent)' }}><Database size={13} /> Filled from the CRM</span>}
+        {!fromCrm && crm.length > 0 && (
           <button type="button" className="btn-secondary" style={{ ...btn, height: '30px' }} onClick={() => setDraft(d => { const n = { ...d }; delete n[id]; return n; })}
             title="Replace these rows with the CRM's current values">
-            <RotateCcw size={13} /> Use CRM values ({crmRows.length})
+            <RotateCcw size={13} /> Use CRM values ({crm.length})
           </button>
         )}
         <button type="button" className="btn-secondary" style={{ ...btn, height: '30px' }} onClick={() => setRows([...rows, {}])}><Plus size={13} /> Add row</button>
@@ -252,8 +252,12 @@ const AUTO_NOTES = {
   complaints: 'Type the counts for SCORES and other sources; (d), the ageing total and the Total column are calculated.',
   clientsFees: 'From the Audit Report Blocks -> Client and Fee Details for the same half (including values typed there). (iv) and the totals are calculated; type over any value here.',
   branches: 'From Settings -> Branch Profiles: Address Line 1 / 2, State, City, District, Pincode and Country of every branch. A branch saved before these fields existed fills from its one-line address; edit it there to complete the rest.',
-  websites: 'From the Company Profile website.',
-  banks: 'From the Company Profile bank accounts.',
+  websites: 'From the Company Profile website. Add any other website (or app) with Add row; every cell can be edited.',
+  social: 'From the RA Compliance Tracker -> Social Media and Bio (the latest month up to the end of this half). Add or edit rows here as needed.',
+  banks: 'From the Company Profile bank accounts; the account holder is the Registered Name from General Details. Add or edit rows here as needed.',
+  directors: 'From General Details: the Managing Director / Managing Partner (point 26), and the Principal Officer (point 25) when the designation is a director / partner. Add the other directors / partners with Add row.',
+  shareholding: 'From General Details: an Individual RA holds 100%; otherwise one row per director / partner from List of Directors & Partners, with the shares and % to fill in.',
+  nism: 'From General Details (Principal Officer and Compliance Officer: name, email, date of birth, PAN) and the NISM Exam Details of each active user in the User Directory (certificate type and validity dates). Edit or add rows as needed.',
   upi: 'From the UPI IDs of the Company Profile bank accounts.'
 };
 
