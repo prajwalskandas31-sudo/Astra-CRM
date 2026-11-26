@@ -556,29 +556,6 @@ export const ESignManagementBlock = () => {
                 </span>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                onClick={() => handleTriggerRealLeegality(pendingESignSales[0])}
-                disabled={isDispatching}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 14px',
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  cursor: isDispatching ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 2px 10px rgba(6, 182, 212, 0.35)'
-                }}
-                title={`Executes live Leegality API dispatch (Workflow: KKliSJp) for ${pendingESignSales[0].clientName}`}
-              >
-                <Zap size={14} /> {isDispatching ? 'Dispatching...' : `⚡ 1-Click Live Leegality Dispatch (${pendingESignSales[0].clientName})`}
-              </button>
-            </div>
           </div>
         )}
 
