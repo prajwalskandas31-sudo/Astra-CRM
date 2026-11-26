@@ -3,6 +3,7 @@
 Shows what was entered on the Client Information Page (every submission, newest first), when the
 Leegality agreement was signed, the invoices emailed to the client (downloadable), and the client's
 grievance files: up to 10 uploads per client per day, renamable, filterable by upload date.
+A submission's details can be edited here once the user re-enters their own login password.
 
 The search runs here, over every team's records, because a browser only holds its own team's.
 Who may use it is the "client-master" feature in the Feature Access Block (Super Admin and Admin by
@@ -20,13 +21,15 @@ from pydantic import BaseModel
 
 try:
     from backend import store, invoice
-    from backend.auth import get_current_user
+    from backend.auth import get_current_user, verify_password, check_not_locked, record_failure, clear_failures
     from backend.old_client_review import REVIEWS, INVOICE_PDFS
+    from backend.sync import INDIAN_STATES
 except ImportError:
     import store
     import invoice
-    from auth import get_current_user
+    from auth import get_current_user, verify_password, check_not_locked, record_failure, clear_failures
     from old_client_review import REVIEWS, INVOICE_PDFS
+    from sync import INDIAN_STATES
 
 
 FEATURE_ID = "client-master"
@@ -134,6 +137,14 @@ def _sale_day(sale: dict) -> str:
     return str(info.get("submissionDate") or sale.get("date") or "")
 
 
+def _last_edit(doc: dict) -> Optional[dict]:
+    edits = doc.get(EDITS_FIELD)
+    if not isinstance(edits, list) or not edits or not isinstance(edits[-1], dict):
+        return None
+    last = edits[-1]
+    return {"at": last.get("at") or "", "by": last.get("by") or "", "fields": sorted((last.get("changes") or {}).keys())}
+
+
 def _submissions(sales: list, leads: list) -> list:
     """Every Client Information Page submission, newest first: one per sale, plus leads whose
     submission has no sale on file."""
@@ -143,13 +154,14 @@ def _submissions(sales: list, leads: list) -> list:
         sale_leads.add(s.get("leadId"))
         out.append({"saleId": s.get("id"), "leadId": s.get("leadId"), "date": _sale_day(s),
                     "submittedBy": s.get("employeeName") or "", "status": s.get("status") or "",
+                    "lastEdit": _last_edit(s),
                     "details": {**_clean(info), "clientType": s.get("clientType") or info.get("clientType") or ""}})
     for lead in leads:
         info = lead.get("clientInfo")
         if isinstance(info, dict) and info and lead.get("id") not in sale_leads:
             out.append({"saleId": None, "leadId": lead.get("id"), "date": str(info.get("submissionDate") or ""),
                         "submittedBy": lead.get("assignedToName") or "", "status": lead.get("disposition") or "",
-                        "details": _clean(info)})
+                        "lastEdit": _last_edit(lead), "details": _clean(info)})
     out.sort(key=lambda x: x["date"], reverse=True)
     return out
 
@@ -297,6 +309,336 @@ def search(q: str = Query(..., max_length=30), current_user: dict = Depends(requ
         label = "PAN" if kind == "PAN" else "mobile number"
         raise HTTPException(status_code=404, detail=f"No client with {label} {value} is on file.")
     return found
+
+
+
+# ==========================================
+# Editing a submission (password protected)
+# ==========================================
+EDITS_FIELD = "clientMasterEdits"  # on the sale / lead: who changed what, newest last
+MAX_EDITS_KEPT = 50
+MAX_TEXT = 200
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+GSTIN_RE = re.compile(r"[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]")
+CATEGORIES = ("Individual", "Non-Individual")
+PREFIXES = ("Mr.", "Miss", "Mrs.")
+SHARING_MODES = ("fixed", "percentage")
+TEXT_FIELDS = ("clientName", "firmName", "serviceName", "serviceTenure")
+AMOUNT_FIELDS = ("grossSales", "netSales", "gst")
+DATE_FIELDS = ("paymentDate", "serviceEndDate")
+LABELS = {"clientCategory": "Client Category", "clientPrefix": "Title", "clientName": "Client Name", "firmName": "Firm Name",
+          "gstin": "GSTIN", "panNumber": "PAN Number", "email": "Email", "phone1": "Phone 1", "phone2": "Phone 2",
+          "clientState": "State", "paymentDate": "Payment Date", "serviceName": "Service Name",
+          "serviceTenure": "Service Tenure", "serviceEndDate": "Service End Date", "transactionNumbers": "Transaction No(s).",
+          "paymentModes": "Mode(s) of Payment", "grossSales": "Gross Sales", "netSales": "Net Sales", "gst": "GST",
+          "employeeSharing": "Sharing"}
+# Every Client Information Page field this block can change. Client Type is left out: it decides the
+# sale's workflow (New Client e-sign vs Old Client invoice), so it is not just data.
+EDITABLE = tuple(LABELS)
+
+
+class ClientUnlock(BaseModel):
+    password: str
+
+
+class ClientEdit(BaseModel):
+    saleId: Optional[str] = None
+    leadId: Optional[str] = None
+    password: str
+    changes: dict
+
+
+def _check_password(user: dict, password: str) -> None:
+    """The caller re-enters their own password. Failures share the login lockout counter, so this
+    cannot be used to guess passwords faster than the login page."""
+    key = f"acct:{user['id']}"
+    check_not_locked(key)
+    if not verify_password(password or "", user.get("passwordHash")):
+        record_failure(key)
+        raise HTTPException(status_code=401, detail="Incorrect password. Enter your own login password to edit client details.")
+    clear_failures(key)
+
+
+def _bad(field: str, message: str):
+    raise HTTPException(status_code=400, detail=f"{LABELS.get(field, field)}: {message}")
+
+
+def _amount(field: str, value) -> str:
+    text = str(value if value is not None else "").replace(",", "").replace("₹", "").strip()
+    try:
+        number = float(text)
+    except ValueError:
+        _bad(field, "enter a number.")
+    if not (0 <= number <= 1e10):
+        _bad(field, "enter an amount of 0 or more.")
+    return f"{number:.2f}"
+
+
+def _text(field: str, value, required: bool = False) -> str:
+    text = " ".join(str(value if value is not None else "").split())
+    if required and not text:
+        _bad(field, "this cannot be empty.")
+    if len(text) > MAX_TEXT:
+        _bad(field, f"at most {MAX_TEXT} characters.")
+    return text
+
+
+def _valid_date(text: str) -> bool:
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def _normalise(field: str, value, current: dict):
+    """The value to store for `field`, or a 400 explaining what is wrong with it."""
+    if field in TEXT_FIELDS:
+        return _text(field, value, required=field in ("clientName", "serviceName"))
+    if field in AMOUNT_FIELDS:
+        return _amount(field, value)
+    if field in DATE_FIELDS:
+        text = str(value or "").strip()
+        if text and not (DATE_RE.fullmatch(text) and _valid_date(text)):
+            _bad(field, "use a date (YYYY-MM-DD).")
+        if field == "paymentDate" and not text:
+            _bad(field, "this cannot be empty.")
+        return text
+    if field == "clientCategory":
+        if value not in CATEGORIES:
+            _bad(field, "choose Individual or Non-Individual.")
+        return value
+    if field == "clientPrefix":
+        if value not in PREFIXES:
+            _bad(field, "choose Mr., Miss or Mrs.")
+        return value
+    if field == "clientState":
+        if value not in INDIAN_STATES:
+            _bad(field, "choose a state from the list.")
+        return value
+    if field == "panNumber":
+        pan = _pan(value)
+        if not PAN_RE.fullmatch(pan):
+            _bad(field, "enter a 10-character PAN (e.g. ABCDE1234F).")
+        return pan
+    if field == "gstin":
+        gstin = str(value or "").replace(" ", "").upper()
+        if gstin and not GSTIN_RE.fullmatch(gstin):
+            _bad(field, "enter a valid 15-character GSTIN or leave it empty.")
+        return gstin
+    if field == "email":
+        email = str(value or "").strip()
+        if not EMAIL_RE.fullmatch(email) or len(email) > MAX_TEXT:
+            _bad(field, "enter a valid email address.")
+        return email
+    if field in ("phone1", "phone2"):
+        text = str(value or "").strip()
+        if not text and field == "phone2":
+            return ""
+        mobile = _mobile(text)
+        if not mobile:
+            _bad(field, "enter a 10-digit mobile number.")
+        return mobile
+    if field == "transactionNumbers":
+        items = value if isinstance(value, list) else str(value or "").split(",")
+        numbers = [n for n in (_text(field, v) for v in items) if n]
+        if not numbers:
+            _bad(field, "enter at least one transaction number.")
+        if len(numbers) > 20:
+            _bad(field, "at most 20 numbers.")
+        return numbers
+    if field == "paymentModes":
+        if not isinstance(value, list) or not value:
+            _bad(field, "add at least one mode of payment.")
+        if len(value) > 10:
+            _bad(field, "up to 10 modes of payment.")
+        rows, seen = [], set()
+        for row in value:
+            if not isinstance(row, dict):
+                _bad(field, "each row needs a mode and an amount.")
+            mode = _text(field, row.get("mode"), required=True)
+            if mode.lower() in seen:
+                _bad(field, f'"{mode}" is listed twice.')
+            seen.add(mode.lower())
+            amount = _amount(field, row.get("amount"))
+            if float(amount) <= 0:
+                _bad(field, "each amount must be above 0.")
+            rows.append({"mode": mode, "amount": amount})
+        return rows
+    if field == "employeeSharing":
+        # Only the mode and the share values change here; who shares the sale stays as submitted
+        old = current.get("employeeSharing")
+        if not isinstance(old, dict) or not old.get("present"):
+            _bad(field, "this submission has no employee sharing to edit.")
+        if not isinstance(value, dict) or value.get("mode") not in SHARING_MODES:
+            _bad(field, "choose fixed amount or percentage.")
+        values = value.get("values")
+        shares = [s for s in old.get("shares") or [] if isinstance(s, dict)]
+        if not isinstance(values, list) or len(values) != len(shares):
+            _bad(field, "give one value per sharing employee.")
+        new_shares = []
+        for share, v in zip(shares, values):
+            amount = float(_amount(field, v))
+            if value["mode"] == "percentage" and amount > 100:
+                _bad(field, "a percentage cannot be above 100.")
+            new_shares.append({**share, "value": f"{amount:g}"})
+        if value["mode"] == "percentage" and sum(float(s["value"]) for s in new_shares) > 100:
+            _bad(field, "the percentages add up to more than 100.")
+        return {**old, "mode": value["mode"], "shares": new_shares}
+    _bad(field, "this field cannot be edited.")
+
+
+def _comparable(field: str, value):
+    if field == "employeeSharing":
+        value = value if isinstance(value, dict) else {}
+        return (value.get("mode"), [_comparable("gst", s.get("value")) for s in value.get("shares") or [] if isinstance(s, dict)])
+    if field == "transactionNumbers":
+        return [str(v) for v in (value if isinstance(value, list) else [value]) if v not in (None, "")]
+    if field == "paymentModes":
+        return [(str(r.get("mode") or ""), _comparable("gst", r.get("amount"))) for r in value or [] if isinstance(r, dict)]
+    if field in AMOUNT_FIELDS:
+        try:
+            return round(float(str(value).replace(",", "").replace("₹", "")), 2)
+        except ValueError:
+            return str(value or "")
+    if field in ("phone1", "phone2"):
+        return _mobile(value) or str(value or "")
+    return str(value if value is not None else "")
+
+
+def _audit_value(field: str, value):
+    if field == "employeeSharing":
+        value = value if isinstance(value, dict) else {}
+        return {"mode": value.get("mode"), "values": [s.get("value") for s in value.get("shares") or [] if isinstance(s, dict)]}
+    return value
+
+
+def _rupees(value) -> str:
+    """₹ with Indian digit grouping, as the Client Information Page writes it (₹1,18,000)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value or "")
+    whole, frac = f"{number:.2f}".split(".")
+    head, tail = whole[:-3], whole[-3:]
+    groups = []
+    while len(head) > 2:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    if head:
+        groups.insert(0, head)
+    return "₹" + ",".join(groups + [tail]) + ("" if frac == "00" else f".{frac}")
+
+
+def _mirror_sale(sale: dict, info: dict, changed: set) -> None:
+    """The copies of client details a sale keeps outside fullClientInfo (lists and reports read them)."""
+    for field in ("grossSales", "netSales", "gst", "panNumber", "serviceTenure", "transactionNumbers", "paymentModes",
+                  "clientCategory", "clientState", "phone1", "phone2", "email", "employeeSharing"):
+        if field in changed:
+            sale[field] = info[field]
+    if changed & {"clientName", "firmName"}:
+        sale["clientName"] = info.get("firmName") or info.get("clientName")
+        sale["contactPerson"] = info.get("clientName")
+    if "serviceName" in changed:
+        sale["serviceOpted"] = info["serviceName"]
+    if "grossSales" in changed:
+        sale["amount"] = _rupees(info["grossSales"])
+
+
+def _mirror_lead(lead: dict, info: dict, changed: set) -> None:
+    lead["clientInfo"] = {**(lead.get("clientInfo") or {}), **{f: info[f] for f in changed}}
+    if changed & {"clientName", "firmName"}:
+        lead["clientName"] = info.get("firmName") or info.get("clientName") or lead.get("clientName")
+        lead["contactPerson"] = info.get("clientName") or lead.get("contactPerson")
+    if "phone1" in changed:
+        lead["phone"] = info["phone1"]
+    if "email" in changed:
+        lead["email"] = info["email"]
+    if "grossSales" in changed:
+        lead["value"] = _rupees(info["grossSales"])
+
+
+# Client Information field -> the paid-client record's copy of it (src/services/serviceTenure.js buildPaidClient)
+PAID_FIELDS = {"clientPrefix": "clientPrefix", "clientName": "clientName", "firmName": "firmName", "phone1": "phone",
+               "email": "email", "panNumber": "panNumber", "clientState": "clientState", "paymentDate": "paymentDate",
+               "grossSales": "grossSales"}
+
+
+def _audit(doc: dict, entry: dict) -> None:
+    doc[EDITS_FIELD] = [*(doc.get(EDITS_FIELD) or []), entry][-MAX_EDITS_KEPT:]
+
+
+@router.post("/unlock")
+def unlock_editing(req: ClientUnlock, current_user: dict = Depends(require_access)):
+    """Checks the password before the edit form opens; the save checks it again."""
+    _check_password(current_user, req.password)
+    return {"unlocked": True}
+
+
+@router.put("/details")
+def edit_details(req: ClientEdit, current_user: dict = Depends(require_access)):
+    _check_password(current_user, req.password)
+    if not isinstance(req.changes, dict) or not req.changes:
+        raise HTTPException(status_code=400, detail="Nothing to save.")
+    unknown = [f for f in req.changes if f not in EDITABLE]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"These fields cannot be edited here: {', '.join(unknown)}.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    who = current_user.get("name") or ""
+    gone = HTTPException(status_code=404, detail="That submission is no longer on file. Search for the client again.")
+    with store.transaction():
+        sale = store.get("sales", req.saleId) if req.saleId else None
+        if req.saleId and not sale:
+            raise gone
+        lead_id = (sale or {}).get("leadId") or (None if sale else req.leadId)
+        lead = store.get("leads", lead_id) if lead_id else None
+        if not sale and not (lead and isinstance(lead.get("clientInfo"), dict) and lead["clientInfo"]):
+            raise gone
+        if sale:
+            info = dict(sale["fullClientInfo"]) if isinstance(sale.get("fullClientInfo"), dict) else {}
+            # Older sales keep some fields only at the top level
+            for field in EDITABLE:
+                if field not in info and field in sale:
+                    info[field] = sale[field]
+        else:
+            info = dict(lead["clientInfo"])
+
+        diff = {}
+        for field, raw in req.changes.items():
+            value = _normalise(field, raw, info)
+            if _comparable(field, value) != _comparable(field, info.get(field)):
+                diff[field] = {"from": _audit_value(field, info.get(field)), "to": _audit_value(field, value)}
+                info[field] = value
+        if not diff:
+            raise HTTPException(status_code=400, detail="Nothing was changed.")
+        changed = set(diff)
+        entry = {"at": now, "by": who, "byId": current_user["id"], "changes": diff}
+
+        if sale:
+            sale["fullClientInfo"] = info
+            _mirror_sale(sale, info, changed)
+            _audit(sale, entry)
+            store.put("sales", sale["id"], sale)
+            # The paid-client record built from this sale keeps its own copy of who the client is
+            if changed & set(PAID_FIELDS):
+                for paid in [p for p in store.containing("paidClients", sale["id"]) if p.get("saleId") == sale["id"]]:
+                    for field in changed & set(PAID_FIELDS):
+                        paid[PAID_FIELDS[field]] = info[field]
+                    store.put("paidClients", paid["id"], paid)
+        # The lead's Client Information follows its latest submission only
+        later = sale and lead and any(s.get("id") != sale["id"] and _sale_day(s) > _sale_day(sale)
+                                      for s in store.containing("sales", lead["id"]) if s.get("leadId") == lead["id"])
+        if lead and isinstance(lead.get("clientInfo"), dict) and not later:
+            _mirror_lead(lead, info, changed)
+            if not sale:
+                _audit(lead, entry)
+            lead["history"] = [*(lead.get("history") or []), {
+                "date": datetime.now(IST).strftime("%Y-%m-%d"),
+                "text": f"Client details edited in Client MASTER by {who or 'a user'}: "
+                        f"{', '.join(LABELS[f] for f in sorted(changed))}."}]
+            store.put("leads", lead["id"], lead)
+    return {"saved": sorted(changed), "at": now, "by": who}
 
 
 # ==========================================
