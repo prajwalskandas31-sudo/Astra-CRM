@@ -3,15 +3,15 @@ import * as XLSX from 'xlsx';
 import { reportSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
-import { loadComplianceMonth, loadComplianceMonths, loadRecoFromReports, saveComplianceSheet } from '../services/raComplianceService';
+import { loadComplianceMonth, loadComplianceMonths, loadCrmClients, loadRecoFromReports, saveComplianceSheet } from '../services/raComplianceService';
 import {
   SHEETS, SHEET_BY_KEY, SUB_BLOCKS, DETAIL_FIELDS, COMPLIANT, NON_COMPLIANT, PENDING, NA,
   blank, newId, fmtDate, monthLabel, currentMonth, shiftMonth, buildContext, displayRows, rowStatus,
-  summarize, cellText, recoLabel, carryRows
+  summarize, cellText, recoLabel, carryRows, mergeAuto
 } from '../lib/raCompliance';
 import {
   ShieldCheck, Save, RefreshCw, FileSpreadsheet, Plus, Trash2, ChevronLeft, ChevronRight, Loader2,
-  AlertTriangle, Download, Copy, Building2, Eye, EyeOff
+  AlertTriangle, Copy, Eye, EyeOff
 } from 'lucide-react';
 import { confirmAsync } from './ConfirmDialog';
 
@@ -47,6 +47,11 @@ const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 
 const btn = { display: 'inline-flex', alignItems: 'center', gap: '6px', height: '34px' };
 
 const OPTIONS = { yn: ['Yes', 'No'], ynna: ['Yes', 'No', 'NA'] };
+
+/** Where a line that fills itself in comes from (shown on its "Auto" mark), or '' for a line typed in. */
+const autoSource = (row) => (row.reportId ? 'Filled in from the Research Reports block'
+  : row.crm ? `Filled in from the CRM (${row.crm === 'renewed' ? 'Old Client renewal' : 'e-signed this month'})`
+    : row.profile ? 'Filled in from the Company Profile' : '');
 
 /** One editable cell. */
 const CellInput = ({ col, row, ctx, fixed, onChange }) => {
@@ -150,12 +155,12 @@ const SectionTable = ({ sheet, section, rows, ctx, showExample, onRowChange, onD
                 <tr key={row.id}>
                   <td style={{ color: 'var(--text-muted)' }}>
                     {i + 1}
-                    {row.reportId && <div title="Filled in from the Research Reports block" style={{ fontSize: '0.66rem', color: 'var(--accent-primary, var(--accent))', fontWeight: 600 }}>Auto</div>}
+                    {autoSource(row) && <div title={autoSource(row)} style={{ fontSize: '0.66rem', color: 'var(--accent-primary, var(--accent))', fontWeight: 600 }}>Auto</div>}
                   </td>
                   {section.labelColumn && (
                     <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>
                       {fixed?.renamable && !readOnly ? (
-                        <input aria-label="Policy name" value={row.label || ''} placeholder="Other (specify)" style={inputBase}
+                        <input type="text" aria-label="Policy name" value={row.label || ''} placeholder="Other (specify)" title="Type the name of the policy" maxLength={200} style={{ ...inputBase, fontWeight: 500 }}
                           onChange={e => onRowChange(row.id, 'label', e.target.value)} />
                       ) : (row.label || fixed?.label)}
                     </td>
@@ -171,7 +176,7 @@ const SectionTable = ({ sheet, section, rows, ctx, showExample, onRowChange, onD
                   {hasStatus && <td>{st === NA ? <StatusPill status="NA" /> : <StatusPill status={st} />}</td>}
                   {list && (
                     <td>
-                      {!readOnly && !row.reportId && <button type="button" style={iconBtn} title="Delete row" aria-label="Delete row" onClick={() => onDelete(row.id)}><Trash2 size={14} /></button>}
+                      {!readOnly && !autoSource(row) && <button type="button" style={iconBtn} title="Delete row" aria-label="Delete row" onClick={() => onDelete(row.id)}><Trash2 size={14} /></button>}
                     </td>
                   )}
                 </tr>
@@ -243,6 +248,7 @@ const Dashboard = ({ month, details, profile, onDetail, summary, clientCount, on
   const tiles = [
     ['Overall compliance', pct(t.pct), t.overall],
     ['Items checked', t.items],
+    ['Compliant', t.ok],
     ['Non-compliant', t.nc],
     ['Pending', t.pending],
     ['Clients in register', clientCount]
@@ -253,7 +259,7 @@ const Dashboard = ({ month, details, profile, onDetail, summary, clientCount, on
         {tiles.map(([label, value, status]) => (
           <div key={label} style={{ border: '1px solid var(--border-color)', borderRadius: '10px', padding: '12px 14px' }}>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{label}</div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px' }}>{value}</div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '2px', color: label === 'Compliant' && value ? 'var(--status-success)' : label === 'Non-compliant' && value ? 'var(--status-danger)' : undefined }}>{value}</div>
             {status && <div style={{ marginTop: '4px' }}><StatusPill status={status === 'No data' ? '' : status} /></div>}
           </div>
         ))}
@@ -308,8 +314,9 @@ const Dashboard = ({ month, details, profile, onDetail, summary, clientCount, on
 
       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
         <strong style={{ color: 'var(--text-primary)' }}>How to use:</strong> pick the month, then go sheet by sheet and fill in the white cells;
-        grey cells work themselves out. Every row ends in a Status: Compliant, Non-compliant or Pending. Add clients only in the Client Register:
-        MITC, KYC, Invoices and Client Documents pick them up automatically. Research Reports link to a call in the Reco Register.
+        grey cells work themselves out. Every row ends in a Status: Compliant, or Non-compliant when anything in it is missing or No.
+        The Client Register fills itself from the CRM (this month's e-signed clients and Old Client renewals), and MITC, KYC, Invoices
+        and Client Documents pick every client up automatically; lines marked "Auto" can still be changed. Research Reports link to a call in the Reco Register.
         Italic "Ex." rows show the expected format and are not counted. Save stores the changed sheets for this month.
         Based on the SEBI (Research Analysts) Regulations, 2014; a self-check aid — confirm requirements against the latest SEBI circulars.
       </div>
@@ -320,7 +327,7 @@ const Dashboard = ({ month, details, profile, onDetail, summary, clientCount, on
 // ─── The block ────────────────────────────────────────────────────────────────
 
 export const RaComplianceBlock = () => {
-  const { companyProfile, paidClients = [] } = useCRM();
+  const { companyProfile } = useCRM();
   const { showToast } = useToast();
   const [month, setMonth] = useState(currentMonth);
   const [server, setServer] = useState({});   // sheet -> {data, updatedBy, updatedAt}
@@ -333,16 +340,41 @@ export const RaComplianceBlock = () => {
   const loadedMonth = useRef(null);
   // Reco Register lines built from the Research Reports block for this month; not stored, refreshed on every load
   const [recoAuto, setRecoAuto] = useState([]);
+  // Client Register lines built from the CRM for this month (new e-signs, Old Client renewals); not stored either
+  const [clientAuto, setClientAuto] = useState([]);
+  // UPI and Bank lines from the Company Profile's bank accounts (account holder = company name)
+  const bankAuto = useMemo(() => (Array.isArray(companyProfile?.bankAccounts) ? companyProfile.bankAccounts : [])
+    .filter(a => a && (a.bankName || a.accountNumber))
+    .map((a, i) => ({
+      id: `bank-${a.id || i + 1}`,
+      profile: true,
+      bankName: a.bankName || '',
+      holder: companyProfile?.companyName || '',
+      last4: String(a.accountNumber || '').replace(/\D/g, '').slice(-4),
+      type: ['Current', 'Savings'].includes(a.accountType) ? a.accountType : (a.accountType ? 'Other' : ''),
+      upiId: a.upiId || '',
+      upiEnabled: 'Yes',
+      remarks: '-'
+    })), [companyProfile]);
 
   const dataOf = useCallback((sheet) => drafts[sheet] ?? server[sheet]?.data ?? {}, [drafts, server]);
   const rowsOf = useCallback((sheet, section = 'rows') => {
     const rows = Array.isArray(dataOf(sheet)[section]) ? dataOf(sheet)[section] : [];
+    if (sheet === 'clientRegister' && section === 'rows') {
+      // A client typed in (or brought in by the old "Add CRM clients") who is now an Auto line is not listed twice
+      const pans = new Set(clientAuto.map(r => r.pan).filter(Boolean));
+      return mergeAuto(clientAuto, rows, r => !blank(r.pan) && pans.has(String(r.pan).toUpperCase()));
+    }
+    if (sheet === 'upiBank' && section === 'rows') {
+      const accounts = new Set(bankAuto.map(r => `${r.bankName}|${r.last4}`));
+      return mergeAuto(bankAuto, rows, r => accounts.has(`${r.bankName}|${r.last4}`));
+    }
     if (sheet !== 'recoRegister' || section !== 'rows' || !recoAuto.length) return rows;
     // Auto lines first (oldest call first); a value the user changed on one is stored under the same id and wins
     const stored = Object.fromEntries(rows.map(r => [r.id, r]));
     const autoIds = new Set(recoAuto.map(r => r.id));
     return [...recoAuto.map(r => ({ ...r, ...stored[r.id], reportId: r.reportId })), ...rows.filter(r => !autoIds.has(r.id))];
-  }, [dataOf, recoAuto]);
+  }, [dataOf, recoAuto, clientAuto, bankAuto]);
   const ctx = useMemo(() => buildContext(month, rowsOf), [month, rowsOf]);
   const summary = useMemo(() => summarize(ctx), [ctx]);
   const dirtySheets = Object.keys(drafts).filter(k => !sameJson(drafts[k], server[k]?.data ?? {}));
@@ -352,17 +384,21 @@ export const RaComplianceBlock = () => {
     setLoading(true);
     setError('');
     try {
-      const [res, auto] = await Promise.all([
+      const [res, auto, clients] = await Promise.all([
         loadComplianceMonth(m),
-        loadRecoFromReports(m).catch(() => ({ rows: [] }))
+        loadRecoFromReports(m).catch(() => ({ rows: [] })),
+        loadCrmClients(m).catch(err => ({ rows: [], error: err.message }))
       ]);
       setRecoAuto(Array.isArray(auto.rows) ? auto.rows : []);
+      setClientAuto(Array.isArray(clients.rows) ? clients.rows : []);
+      if (clients.error) setError(`Could not load this month's clients from the CRM: ${clients.error}`);
       setServer(res.sheets || {});
       setDrafts({});
       loadedMonth.current = m;
     } catch (err) {
       setError(err.message);
       setRecoAuto([]);
+      setClientAuto([]);
       setServer({});
       setDrafts({});
     } finally {
@@ -459,56 +495,7 @@ export const RaComplianceBlock = () => {
     }
   };
 
-  // ── imports ──
-  const importCrmClients = () => {
-    const existing = rowsOf('clientRegister');
-    const seenPaid = new Set(existing.map(r => r.crmPaidId).filter(Boolean));
-    const seenPan = new Set(existing.map(r => r.pan).filter(Boolean));
-    const dmy = (k) => { const m = String(k || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
-    const fresh = paidClients
-      .filter(p => String(p.serviceStartDate || '').startsWith(month))
-      .filter(p => !seenPaid.has(p.id) && !(p.panNumber && seenPan.has(String(p.panNumber).toUpperCase())))
-      .sort((a, b) => String(a.serviceStartDate).localeCompare(String(b.serviceStartDate)))
-      .map(p => ({
-        id: newId(),
-        crmPaidId: p.id,
-        joinDate: String(p.serviceStartDate).slice(0, 10),
-        name: p.clientName || '',
-        products: p.serviceName || '',
-        pan: String(p.panNumber || '').toUpperCase(),
-        tenure: [p.serviceTenure, p.serviceEndDate ? `(${dmy(p.serviceStartDate)} to ${dmy(p.serviceEndDate)})` : ''].filter(Boolean).join(' '),
-        feeDate: /^\d{4}-\d{2}-\d{2}/.test(p.paymentDate || '') ? p.paymentDate.slice(0, 10) : '',
-        fees: Number(p.grossSales) || ''
-      }));
-    if (!fresh.length) {
-      showToast(`No new e-signed clients in the Paid block for ${monthLabel(month)}.`, 'info');
-      return;
-    }
-    setRows('clientRegister', 'rows', rows => [...rows, ...fresh]);
-    showToast(`Added ${fresh.length} client${fresh.length === 1 ? '' : 's'} from the CRM. Check the details and Save.`, 'success');
-  };
-
-  const importBankAccounts = () => {
-    const accounts = companyProfile?.bankAccounts || [];
-    const existing = rowsOf('upiBank');
-    const fresh = accounts
-      .filter(a => !existing.some(r => r.last4 === String(a.accountNumber || '').slice(-4) && r.bankName === a.bankName))
-      .map(a => ({
-        id: newId(),
-        bankName: a.bankName || '',
-        holder: companyProfile?.companyName || '',
-        last4: String(a.accountNumber || '').replace(/\D/g, '').slice(-4),
-        type: ['Current', 'Savings'].includes(a.accountType) ? a.accountType : (a.accountType ? 'Other' : ''),
-        upiId: a.upiId || ''
-      }));
-    if (!fresh.length) {
-      showToast(accounts.length ? 'All Company Profile bank accounts are already listed.' : 'No bank accounts in the Company Profile yet.', 'info');
-      return;
-    }
-    setRows('upiBank', 'rows', rows => [...rows, ...fresh]);
-    showToast(`Added ${fresh.length} bank account${fresh.length === 1 ? '' : 's'}. Fill in the checks and Save.`, 'success');
-  };
-
+  // ── copying ──
   const copyFromEarlier = async (sheet) => {
     try {
       const { months } = await loadComplianceMonths();
@@ -638,14 +625,6 @@ export const RaComplianceBlock = () => {
               <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sheet.intro}</p>
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {sheet.key === 'clientRegister' && (
-                <button type="button" className="btn-secondary" style={btn} onClick={importCrmClients} title="E-signed clients whose service started this month (Paid block)">
-                  <Download size={14} /> Add CRM clients
-                </button>
-              )}
-              {sheet.key === 'upiBank' && (
-                <button type="button" className="btn-secondary" style={btn} onClick={importBankAccounts}><Building2 size={14} /> Add from Company Profile</button>
-              )}
               {sheet.carry && (
                 <button type="button" className="btn-secondary" style={btn} onClick={() => copyFromEarlier(sheet.key)}><Copy size={14} /> Copy from earlier month</button>
               )}

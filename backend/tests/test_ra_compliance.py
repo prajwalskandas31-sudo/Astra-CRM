@@ -123,3 +123,80 @@ def test_reco_register_from_research_reports(crm_clean):
 
     assert crm.client.get(f"{URL}/reco-from-reports", params={"month": "2026-11"}, headers=bearer(crm.token(ADMIN))).status_code == 403
     s.delete_many("researchReports", ["rr-opt", "rr-eq", "rr-held", "rr-test", "rr-oct"])
+
+
+def test_client_register_from_the_crm(crm_clean):
+    """New clients e-signed in the month and Old Client renewals paid in it, one line per PAN with every service,
+    plus the MITC / KYC / Invoices / Client Documents defaults (KRA record first, else the e-sign)."""
+    crm = crm_clean
+    s = crm.store
+    made = {"sales": ["s-new1", "s-new2", "s-old", "s-ren", "s-oct", "s-pend"], "eSignRecords": ["e-new1"],
+            "kraRecords": ["k-new"], "clientInvoices": ["s-new1"], "oldClientReviews": ["rv-ren"]}
+    info = lambda **kw: {"clientPrefix": "Mr", "grossSales": "5900", "serviceTenure": "3 Months", **kw}
+    # Asha: two services e-signed in November, a KRA record, an invoice and a Welcome Kit
+    s.put("sales", "s-new1", {"id": "s-new1", "clientType": "New Client", "eSignStatus": "Completed",
+          "fullClientInfo": info(clientName="Asha Rao", panNumber="ABCDE1234F", serviceName="Stock Cash",
+                                 paymentDate="2026-11-02", serviceEndDate="2027-02-04")})
+    s.put("eSignRecords", "e-new1", {"id": "e-new1", "saleId": "s-new1", "confirmedAt": "2026-11-04T20:00:00+00:00"})  # 5 Nov IST
+    s.put("sales", "s-new2", {"id": "s-new2", "clientType": "New Client", "eSignStatus": "Completed", "eSignedAt": "2026-11-10T06:00:00+00:00",
+          "fullClientInfo": info(clientName="Asha Rao", panNumber="ABCDE1234F", serviceName="Options", grossSales="3000",
+                                 paymentDate="2026-11-09")})
+    s.put("kraRecords", "k-new", {"id": "k-new", "pan": "ABCDE1234F", "fetchedAt": "2026-11-06T05:00:00+00:00", "fileName": "KRA_Asha.pdf"})
+    s.put("clientInvoices", "s-new1", {"id": "s-new1", "number": "INV/BLR/2026-27/0001", "issuedAt": "2026-11-07T05:00:00+00:00"})
+    # Ravi: e-signed in September, renewed (Old Client, approved) with a payment in November
+    s.put("sales", "s-old", {"id": "s-old", "clientType": "New Client", "eSignStatus": "Completed", "eSignedAt": "2026-09-01T05:00:00+00:00",
+          "fullClientInfo": info(clientName="Ravi Kumar", panNumber="PQRSX6789K", serviceName="Stock Cash")})
+    s.put("sales", "s-ren", {"id": "s-ren", "clientType": "Old Client", "status": "Old Client - Approved",
+          "fullClientInfo": info(clientName="Ravi Kumar", panNumber="PQRSX6789K", serviceName="Stock Cash", paymentDate="2026-11-12")})
+    s.put("oldClientReviews", "rv-ren", {"id": "rv-ren", "saleId": "s-ren", "status": "approved", "invoiceNumber": "INV/BLR/2026-27/0002",
+          "decidedAt": "2026-11-13T05:00:00+00:00", "details": {}})
+    # Not in November: an October e-sign and a renewal still under review
+    s.put("sales", "s-oct", {"id": "s-oct", "eSignStatus": "Completed", "eSignedAt": "2026-10-30T05:00:00+00:00",
+          "fullClientInfo": info(clientName="Old Oct", panNumber="ZZZZZ9999Z")})
+    s.put("sales", "s-pend", {"id": "s-pend", "clientType": "Old Client", "status": "Old Client - Pending Review",
+          "fullClientInfo": info(clientName="Pending P", panNumber="YYYYY8888Y", paymentDate="2026-11-15")})
+    kit_log = s.get_value("welcomeKitLog", [])
+    s.set_value("welcomeKitLog", kit_log + [{"saleId": "s-new1", "sentAt": "2026-11-08T05:00:00+00:00",
+                                             "attachments": ["Charter.pdf", "Signed Agreement - Mr Asha Rao.pdf"]}])
+    try:
+        r = crm.client.get(f"{URL}/crm-clients", params={"month": "2026-11"}, headers=bearer(crm.token(SA)))
+        assert r.status_code == 200, r.text
+        rows = r.json()["rows"]
+        assert [x["name"] for x in rows] == ["Mr Asha Rao", "Mr Ravi Kumar"]
+        asha, ravi = rows
+
+        assert asha["crm"] == "new" and asha["joinDate"] == "2026-11-05"   # the e-sign date (IST)
+        assert asha["renewedName"] == "NA" and "renewalDate" not in asha
+        assert asha["products"] == "Equity Cash & Derivatives"
+        assert asha["natureOfAdvice"] == "Positional Calls / Intraday Calls"
+        assert asha["tenure"] == "Stock Cash: 3 Months (05/11/2026 to 04/02/2027); Options: 3 Months"
+        assert asha["feeDate"] == "02-Nov-2026 (Stock Cash); 09-Nov-2026 (Options)"
+        assert asha["fees"] == "5900 (Stock Cash); 3000 (Options)" and asha["feesTotal"] == 8900
+        assert asha["kyc"] == "Yes"
+        d = asha["defaults"]
+        assert d["mitc"] == {"joinDate": "2026-11-06", "sent": "Yes", "dateSent": "2026-11-08", "mode": "Email", "signed": "Yes",
+                             "dateSigned": "2026-11-10", "ref": "KRA_Asha.pdf", "remarks": "-"}
+        assert d["kyc"] == {"done": "Yes", "date": "2026-11-06", "through": "SEBI Registered KRA", "docs": "Yes", "remarks": "-"}
+        assert d["invoices"] == {"issued": "Yes", "sentToClient": "Yes", "invoiceNo": "INV/BLR/2026-27/0001", "invoiceDate": "2026-11-07",
+                                 "amount": 8900, "viaBank": "Yes", "remarks": "-"}
+        assert d["clientDocuments"]["proof"] == "08-Nov-2026, by Email"
+        assert all(d["clientDocuments"][f"doc{i}"] == "Yes" for i in range(1, 8))
+
+        # The renewal: joins on its Date of Payment; no KRA, so KYC and MITC fall back to the September e-sign
+        assert ravi["crm"] == "renewed" and ravi["joinDate"] == "2026-11-12"
+        assert ravi["renewalDate"] == "2026-11-12" and ravi["renewedName"] == "Mr Ravi Kumar"
+        assert ravi["fees"] == "5900" and ravi["feesTotal"] == 5900
+        rd = ravi["defaults"]
+        assert rd["kyc"]["done"] == "Yes" and rd["kyc"]["date"] == "2026-09-01"
+        assert rd["mitc"]["dateSigned"] == "2026-09-01" and rd["mitc"]["ref"] == "Signed Agreement - Mr Ravi Kumar.pdf"
+        assert (rd["mitc"]["sent"], rd["mitc"]["dateSent"]) == ("No", "")  # no Welcome Kit for a renewal
+        # its invoice was emailed on approval
+        assert (rd["invoices"]["invoiceNo"], rd["invoices"]["invoiceDate"], rd["invoices"]["issued"]) == ("INV/BLR/2026-27/0002", "2026-11-13", "Yes")
+        assert rd["clientDocuments"]["proof"] == ""
+
+        assert crm.client.get(f"{URL}/crm-clients", params={"month": "2026-12"}, headers=bearer(crm.token(SA))).json()["rows"] == []
+        assert crm.client.get(f"{URL}/crm-clients", params={"month": "2026-11"}, headers=bearer(crm.token(ADMIN))).status_code == 403
+    finally:
+        s.set_value("welcomeKitLog", kit_log)
+        for collection, ids in made.items():
+            s.delete_many(collection, ids)
