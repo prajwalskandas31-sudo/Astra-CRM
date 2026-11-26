@@ -41,6 +41,8 @@ export const CRMDashboard = () => {
   const { showToast } = useToast();
 
   const [selectedDispFilter, setSelectedDispFilter] = useState('All');
+  // Which dashboard sub-block is open: 'shortcuts' | 'pipeline' | 'history'
+  const [activeSubBlock, setActiveSubBlock] = useState('pipeline');
   const [activeCallLead, setActiveCallLead] = useState(null);
   const [callNotes, setCallNotes] = useState('');
   const [selectedOutcomeDisp, setSelectedOutcomeDisp] = useState('');
@@ -293,7 +295,31 @@ export const CRMDashboard = () => {
         </div>
       </div>
 
+      {/* Sub-block switcher: one button per dashboard sub-block */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+        {[
+          { id: 'shortcuts', label: 'Dynamic Disposition Shortcut Bar', icon: Sparkles, show: true },
+          { id: 'pipeline', label: 'Assigned Leads Pipeline', icon: Layers, show: true },
+          { id: 'history', label: 'Lead Assignment History', icon: History, show: hasPermission('lead-history') }
+        ].filter(t => t.show).map(({ id, label, icon: Icon }) => {
+          const isActive = activeSubBlock === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              className={isActive ? 'btn-primary' : 'btn-secondary'}
+              onClick={() => setActiveSubBlock(id)}
+              aria-pressed={isActive}
+              style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: 'var(--radius-md)' }}
+            >
+              <Icon size={16} /> {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Dynamic Disposition Shortcut Buttons Bar */}
+      {activeSubBlock === 'shortcuts' && (
       <div className="directory-card" style={{ padding: '16px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
           <div>
@@ -332,7 +358,7 @@ export const CRMDashboard = () => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           <button
             className={`btn-secondary ${selectedDispFilter === 'All' ? 'active' : ''}`}
-            onClick={() => setSelectedDispFilter('All')}
+            onClick={() => { setSelectedDispFilter('All'); setActiveSubBlock('pipeline'); }}
             style={{ borderRadius: 'var(--radius-full)', padding: '5px 12px', fontSize: '0.8rem' }}
           >
             All Dispositions ({scopedLeads.length})
@@ -346,7 +372,7 @@ export const CRMDashboard = () => {
               <button
                 key={disp.id}
                 className={`btn-secondary ${isSelected ? 'active' : ''}`}
-                onClick={() => setSelectedDispFilter(disp.name)}
+                onClick={() => { setSelectedDispFilter(disp.name); setActiveSubBlock('pipeline'); }}
                 style={{
                   borderRadius: 'var(--radius-full)',
                   padding: '5px 12px',
@@ -368,7 +394,10 @@ export const CRMDashboard = () => {
           )}
         </div>
       </div>
+      )}
 
+      {activeSubBlock === 'pipeline' && (
+      <>
       {/* Post-Call Workflow Alert Banner */}
       <div className="alert-box alert-info" style={{ margin: 0, padding: '12px 16px', alignItems: 'center' }}>
         <PhoneOff size={18} style={{ flexShrink: 0 }} />
@@ -395,26 +424,6 @@ export const CRMDashboard = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            {hasPermission('lead-history') && (
-              <a
-                href="#lead-history-block"
-                className="btn-secondary"
-                style={{
-                  textDecoration: 'none',
-                  fontSize: '0.78rem',
-                  padding: '6px 12px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--text-primary)'
-                }}
-                title="Scroll down to Lead Assignment History (Block 5)"
-              >
-                <History size={13} color="var(--accent-primary)" />
-                Lead History (Block 5) ↓
-              </a>
-            )}
 
             {isSuperAdmin && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -563,11 +572,13 @@ export const CRMDashboard = () => {
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* ============================================================ */}
       {/* HISTORY BLOCK — Lead Assignment History (All Roles)         */}
       {/* ============================================================ */}
-      {hasPermission('lead-history') && <LeadHistoryBlock />}
+      {activeSubBlock === 'history' && hasPermission('lead-history') && <LeadHistoryBlock />}
 
       {/* Post-Call Disconnect Modal */}
       {activeCallLead && (
