@@ -114,3 +114,42 @@ def test_only_super_admin_can_change_signature_types(crm):
     res = crm.client.put("/api/leegality/signature-types", headers=bearer(crm.token(other)),
                          json={"aadhaar": True, "virtualSign": True, "workflows": {}})
     assert res.status_code == 403
+
+
+# ─── Per-client choice from the Sale Approval queue (exactly one type, never both) ───
+def _dispatch_for_sale(monkeypatch, leegality, cfg, allowed, signature_type):
+    sent, _ = _dispatch(monkeypatch, leegality, cfg, allowed)
+    req = leegality.ESignDispatchRequest(saleId="S1", clientName=CLIENT["name"], email=CLIENT["email"],
+                                         phone=CLIENT["phone"], serviceTenure="3 Months", signatureType=signature_type)
+    return sent, lambda: leegality.dispatch_esign(req, current_user={"name": "SA"})
+
+
+@pytest.mark.parametrize("signature_type, workflow, allowed", [
+    ("aadhaar", "WF_A", ["AADHAAR"]),
+    ("virtualSign", "KKliSJp", ["VIRTUAL_SIGN"]),
+])
+def test_sale_choice_overrides_the_block_default(monkeypatch, crm, signature_type, workflow, allowed):
+    # The E-Sign Block default is "both"; the sale's own choice wins and is only ever one type
+    sent, run = _dispatch_for_sale(monkeypatch, crm.leegality, _cfg(True, True), allowed, signature_type)
+    record = run()
+    assert sent["payload"]["profileId"] == workflow
+    assert record["signatureTypes"]["combo"] == signature_type
+    assert record["signatureTypes"]["source"] == "sale"
+    assert record["signatureTypes"]["check"] == "matched"
+
+
+def test_sale_choice_without_its_workflow_is_refused(monkeypatch, crm):
+    cfg = {"aadhaar": False, "virtualSign": True, "workflows": {"aadhaar": "", "virtualSign": "KKliSJp", "both": ""}}
+    sent, run = _dispatch_for_sale(monkeypatch, crm.leegality, cfg, ["AADHAAR"], "aadhaar")
+    with pytest.raises(HTTPException) as exc:
+        run()
+    assert exc.value.status_code == 400 and "Aadhaar only" in exc.value.detail
+    assert "payload" not in sent
+
+
+def test_unknown_sale_choice_is_refused(monkeypatch, crm):
+    sent, run = _dispatch_for_sale(monkeypatch, crm.leegality, _cfg(False, True), ["VIRTUAL_SIGN"], "both")
+    with pytest.raises(HTTPException) as exc:
+        run()
+    assert exc.value.status_code == 400
+    assert "payload" not in sent

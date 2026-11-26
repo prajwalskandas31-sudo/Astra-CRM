@@ -3156,7 +3156,14 @@ export const CRMProvider = ({ children }) => {
   };
 
   // ─── e-KYC & E-Sign Trigger via Leegality (Workflow KKliSJp, through the CRM backend) ───
-  const triggerEKycAndESign = async (saleId) => {
+  // Per-client signature type for Leegality, chosen in the Sale Approval queue: exactly one of
+  // 'aadhaar' | 'virtualSign', never both. Only changeable until the agreement is sent.
+  const setSaleSignatureType = (saleId, signatureType) => {
+    if (!['aadhaar', 'virtualSign'].includes(signatureType)) throw new Error(`Unknown signature type '${signatureType}'`);
+    setSales(prev => prev.map(s => s.id === saleId ? { ...s, signatureType } : s));
+  };
+
+  const triggerEKycAndESign = async (saleId, signatureTypeOverride) => {
     const sale = sales.find(s => s.id === saleId);
     if (!sale) throw new Error(`Sale with ID '${saleId}' not found`);
     // One Leegality document per sale: re-sending would create a duplicate document and spend another credit
@@ -3177,7 +3184,8 @@ export const CRMProvider = ({ children }) => {
     if (!tenure) throw new Error('Service Tenure is missing on the Client Information Page.');
     if (!email || !phone) throw new Error('Email ID and Phone Number 1 are both required on the Client Information Page.');
 
-    const apiResult = await dispatchLeegalitySignRequest({ saleId, clientName, email, phone, serviceTenure: tenure });
+    const signatureType = signatureTypeOverride || sale.signatureType || null;
+    const apiResult = await dispatchLeegalitySignRequest({ saleId, clientName, email, phone, serviceTenure: tenure, signatureType });
 
     const docId = apiResult.documentId;
     const signUrl = apiResult.invitees?.[0]?.signUrl || '';
@@ -3188,6 +3196,7 @@ export const CRMProvider = ({ children }) => {
       status: 'e-KYC & E-Sign Dispatched',
       stage: 'Awaiting Client E-Sign',
       eSignStatus: 'Dispatched',
+      ...(apiResult.signatureTypes?.combo && apiResult.signatureTypes.combo !== 'both' ? { signatureType: apiResult.signatureTypes.combo } : {}),
       eSignDocumentId: docId,
       eSignUrl: signUrl,
       eSignDetails: apiResult
@@ -3849,6 +3858,7 @@ export const CRMProvider = ({ children }) => {
       telegramSaleReview,
       superAdminApproveSale,
       triggerEKycAndESign,
+      setSaleSignatureType,
       deleteESignLink,
       refreshESignStatus,
       completeVoiceCallVerification,
