@@ -7,13 +7,15 @@ import {
   RotateCcw, X, BookmarkCheck, FileSpreadsheet, Download, Printer, 
   Copy, Check, BarChart3, TrendingUp, Users, DollarSign, Clock, ShieldCheck, 
   Activity, Eye, ExternalLink, RefreshCw, ChevronRight, Sparkles, Building2,
-  Minus, Plus
+  Minus, Plus, History
 } from 'lucide-react';
 
 export const LeadReassignmentView = () => {
   const { users, leads, dispositions, reassignLeadsFiltered, simulatedRole, hasPermission } = useCRM();
   const { showToast } = useToast();
 
+  // Which sub-block is open: 'protocol' (Lead Reassignment Protocol) or 'directory' (Active Lead Directory & History Logs)
+  const [activeSubBlock, setActiveSubBlock] = useState('protocol');
   const [fromUser, setFromUser] = useState('');
   const [toUser, setToUser] = useState('');
   const [reassignQty, setReassignQty] = useState('');
@@ -536,7 +538,30 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Sub-block switcher */}
+      <div className="no-print" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={activeSubBlock === 'protocol' ? 'btn-primary' : 'btn-secondary'}
+          onClick={() => setActiveSubBlock('protocol')}
+          aria-pressed={activeSubBlock === 'protocol'}
+          style={{ fontSize: '0.85rem', padding: '8px 14px' }}
+        >
+          <Layers size={14} /> Lead Reassignment Protocol
+        </button>
+        <button
+          type="button"
+          className={activeSubBlock === 'directory' ? 'btn-primary' : 'btn-secondary'}
+          onClick={() => setActiveSubBlock('directory')}
+          aria-pressed={activeSubBlock === 'directory'}
+          style={{ fontSize: '0.85rem', padding: '8px 14px' }}
+        >
+          <History size={14} /> Active Lead Directory &amp; History Logs
+        </button>
+      </div>
+
       {/* Reassignment Panel */}
+      {activeSubBlock === 'protocol' && (
       <div className="directory-card" style={{ padding: '20px 24px' }}>
         <h3 style={{ fontSize: '1.05rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Layers size={18} color="var(--accent-primary)" /> Lead Reassignment Protocol
@@ -966,8 +991,10 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
           </div>
         )}
       </div>
+      )}
 
       {/* Active Leads Directory & Audit Logs Table */}
+      {activeSubBlock === 'directory' && (
       <div className="directory-card eod-printable-report">
         <div className="directory-toolbar no-print" style={{ flexWrap: 'wrap', gap: '12px' }}>
           <div className="directory-title-area">
@@ -1709,6 +1736,7 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
