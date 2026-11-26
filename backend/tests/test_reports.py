@@ -165,12 +165,14 @@ def test_report_is_held_until_the_company_profile_is_complete(crm, reports, monk
 def test_report_created_named_by_date_and_rotates_templates(crm, reports, monkeypatch):
     fake_pipeline(reports, monkeypatch)
     set_profile(crm, PROFILE)
+    crm.store.set_value(reports.REF_COUNTERS, {})
     crm.store.set_value(reports.NEXT_TEMPLATE, 15)
     record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"})
     assert record["status"] == "Ready", record.get("reason")
     assert record["templateNumber"] == 15 and crm.store.get_value(reports.NEXT_TEMPLATE) == 1
     today = datetime.now(reports.IST).strftime("%d-%m-%Y")
-    assert record["fileName"] == f"{today} NIFTY 24500 CE.pdf" and record["expiry"]
+    fy = reports.financial_year(datetime.now(reports.IST).date())
+    assert record["refNo"] == f"RR/{fy}/001" and record["fileName"] == f"RR_{fy}_001.pdf" and record["expiry"]
     pdf = base64.b64decode(crm.store.get(reports.REPORT_FILES, record["id"])["pdf"])
     assert pdf.startswith(b"%PDF")
 
@@ -178,7 +180,7 @@ def test_report_created_named_by_date_and_rotates_templates(crm, reports, monkey
     test = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", {"name": "t"}, test=True)
     assert test["status"] == "Ready" and test["templateNumber"] == 1 and crm.store.get_value(reports.NEXT_TEMPLATE) == 1
 
-    assert test["fileName"] == f"{today} test NIFTY 24500 CE.pdf"
+    assert test["refNo"] == f"RR/{fy}/002" and test["fileName"] == f"RR_{fy}_002.pdf"
 
     # The PDF downloads under its name
     res = crm.client.get(f"/api/reports/{record['id']}/pdf", headers=bearer(crm.token(SA)))
@@ -206,6 +208,32 @@ def test_value_not_in_post_is_rejected(crm, reports, monkeypatch):
     set_profile(crm, PROFILE)
     record = build(reports, "NSE DERIVATIVES", "NIFTY 24500 CE Buy 120 SL 100 Tgt 150", {"name": "t"})
     assert record["status"] == "Held" and "entry" in record["reason"]
+
+
+def test_ref_no_counts_per_financial_year(crm, reports):
+    crm.store.set_value(reports.REF_COUNTERS, {})
+    from datetime import date
+    assert reports.financial_year(date(2026, 4, 1)) == "2026-27" and reports.financial_year(date(2027, 3, 31)) == "2026-27"
+    assert reports.financial_year(date(2026, 3, 31)) == "2025-26" and reports.financial_year(date(2099, 12, 1)) == "2099-00"
+    ist = reports.IST
+    assert reports.next_ref_no(datetime(2027, 3, 31, 23, 0, tzinfo=ist)) == "RR/2026-27/001"
+    assert reports.next_ref_no(datetime(2027, 4, 1, 9, 0, tzinfo=ist)) == "RR/2027-28/001"
+    assert reports.next_ref_no(datetime(2027, 3, 1, 9, 0, tzinfo=ist)) == "RR/2026-27/002"
+
+
+def test_reports_made_before_numbering_get_ref_nos_oldest_first(crm, reports):
+    crm.store.set_value(reports.REF_COUNTERS, {})
+    def old(rid, made, status="Ready"):
+        crm.store.put(reports.REPORTS, rid, {"id": rid, "status": status, "createdAt": made, "createdReportAt": made,
+                                             "details": {"symbol": "NIFTY"}, "fileName": "12-11-2026 NIFTY.pdf"})
+    old("rr-b", "2026-11-12T14:16:00+00:00")
+    old("rr-a", "2026-11-12T08:29:00+00:00")
+    old("rr-h", "2026-11-12T09:00:00+00:00", status="Held")
+    assert reports.number_old_reports() == 2 and reports.number_old_reports() == 0
+    a, b, h = (crm.store.get(reports.REPORTS, i) for i in ("rr-a", "rr-b", "rr-h"))
+    assert (a["refNo"], a["fileName"]) == ("RR/2026-27/001", "RR_2026-27_001.pdf")
+    assert (b["refNo"], b["fileName"]) == ("RR/2026-27/002", "RR_2026-27_002.pdf")
+    assert "refNo" not in h
 
 
 # ---------- Upstox daily login ----------
@@ -287,6 +315,7 @@ def test_button_builds_todays_calls_into_a_dated_folder(crm, reports, monkeypatc
     # Build synchronously in the test instead of in a background thread
     monkeypatch.setattr(reports, "ensure_processing", reports._process)
     crm.store.set_value(reports.NEXT_TEMPLATE, 4)
+    crm.store.set_value(reports.REF_COUNTERS, {})
     now = datetime.now(reports.IST).replace(hour=12, minute=0, second=0, microsecond=0)
     first = log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(hours=2))
     second = log_call(crm, reports, "NIFTY 24500 CE Buy 120 SL 100 Tgt 150/180", now - timedelta(hours=1))
@@ -302,7 +331,9 @@ def test_button_builds_todays_calls_into_a_dated_folder(crm, reports, monkeypatc
     a, b = today[first["id"]], today[second["id"]]
     # Numbered and templated in the order the calls were posted
     assert (a["callNumber"], a["templateNumber"], b["callNumber"], b["templateNumber"]) == (1, 4, 2, 5)
-    assert a["fileName"] == f"{date} (1) NIFTY 24500 CE.pdf" and b["fileName"] == f"{date} (2) NIFTY 24500 CE.pdf"
+    fy = reports.financial_year(now.date())
+    assert (a["refNo"], b["refNo"]) == (f"RR/{fy}/001", f"RR/{fy}/002")
+    assert a["fileName"] == f"RR_{fy}_001.pdf" and b["fileName"] == f"RR_{fy}_002.pdf"
 
     # Pressing again later makes nothing twice
     again = crm.client.post("/api/reports/generate-today", headers=sa).json()
@@ -311,7 +342,7 @@ def test_button_builds_todays_calls_into_a_dated_folder(crm, reports, monkeypatc
     res = crm.client.get("/api/reports/folder", headers=sa)
     assert res.status_code == 200 and f"{date}_report.zip" in res.headers["content-disposition"]
     names = zipfile.ZipFile(io.BytesIO(res.content)).namelist()
-    assert names == [f"{date}_report/{date} (1) NIFTY 24500 CE.pdf", f"{date}_report/{date} (2) NIFTY 24500 CE.pdf"]
+    assert names == [f"{date}_report/RR_{fy}_001.pdf", f"{date}_report/RR_{fy}_002.pdf"]
     assert crm.client.get("/api/reports/folder", headers=bearer(crm.token(EXEC))).status_code == 403
 
 
