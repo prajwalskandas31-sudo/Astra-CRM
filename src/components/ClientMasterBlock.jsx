@@ -5,9 +5,10 @@ import { sendWelcomeKit, describeSend } from '../services/emailService';
 import {
   searchClient, listGrievances, uploadGrievance, renameGrievance, downloadGrievance, downloadInvoice
 } from '../services/clientMasterService';
+import { ClientMasterEditor } from './ClientMasterEditor';
 import {
   Contact, Search, X, FileSignature, Receipt, Download, MessageSquareWarning, Upload, Pencil, Check, CalendarRange, Loader2,
-  CheckCircle2, XCircle, Send
+  CheckCircle2, XCircle, Send, Lock
 } from 'lucide-react';
 
 // Client Master: look a client up by PAN or mobile number (backend/client_master.py).
@@ -358,6 +359,7 @@ export const ClientMasterBlock = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [searching, setSearching] = useState(false);
+  const [editing, setEditing] = useState(null); // the submission being edited
 
   const runSearch = async (e) => {
     e.preventDefault();
@@ -383,6 +385,20 @@ export const ClientMasterBlock = () => {
       setResult(await searchClient(result.query.value));
     } catch { /* keep what is shown */ }
   };
+  // After an edit, look the client up again by the details just saved (the PAN or phone may have changed)
+  const afterEdit = async (saved) => {
+    setEditing(null);
+    const pan = String(saved.panNumber || '').trim().toUpperCase();
+    const phone = String(saved.phone1 || '').replace(/\D/g, '').slice(-10);
+    for (const q of [/^[A-Z]{5}\d{4}[A-Z]$/.test(pan) && pan, phone.length === 10 && phone, result?.query?.value].filter(Boolean)) {
+      try {
+        setResult(await searchClient(q));
+        setQuery(q);
+        return;
+      } catch { /* try the next key */ }
+    }
+  };
+  const lastEdit = result?.submissions?.[0]?.lastEdit;
   const getInvoice = (inv) => downloadInvoice(inv).catch(err => showToast(err.message, 'error'));
   const name = result && ([result.client.clientPrefix, result.client.clientName].filter(Boolean).join(' ') || result.client.firmName || 'Client');
 
@@ -417,12 +433,22 @@ export const ClientMasterBlock = () => {
 
       {result && (
         <>
-          <Section icon={Contact} title={name} subtitle={`Client Information Page details (latest submission${result.submissions.length > 1 ? ` of ${result.submissions.length}` : ''}).`}>
+          <Section
+            icon={Contact}
+            title={name}
+            subtitle={`Client Information Page details (latest submission${result.submissions.length > 1 ? ` of ${result.submissions.length}` : ''}).${lastEdit ? ` Last edited by ${lastEdit.by || 'a user'} on ${formatMoment(lastEdit.at)}.` : ''}`}
+            actions={result.submissions.length > 0 && (
+              <button type="button" className="btn-primary" onClick={() => setEditing(result.submissions[0])}
+                title="Edit this client's details (password required)" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Lock size={14} /> Edit Details
+              </button>
+            )}
+          >
             <ClientDetails details={result.client} />
             {result.submissions.length > 1 && (
               <div className="table-responsive">
                 <table className="crm-table">
-                  <thead><tr><th>Submitted On</th><th>Client Type</th><th>Service</th><th>Tenure</th><th>Gross Sales</th><th>Submitted By</th><th>Status</th></tr></thead>
+                  <thead><tr><th>Submitted On</th><th>Client Type</th><th>Service</th><th>Tenure</th><th>Gross Sales</th><th>Submitted By</th><th>Status</th><th aria-label="Edit" /></tr></thead>
                   <tbody>
                     {result.submissions.map((s, i) => (
                       <tr key={s.saleId || s.leadId || i}>
@@ -433,6 +459,10 @@ export const ClientMasterBlock = () => {
                         <td style={{ fontSize: '0.8rem' }}>{s.details.grossSales ? rupees(s.details.grossSales) : '—'}</td>
                         <td style={{ fontSize: '0.8rem' }}>{s.submittedBy || '—'}</td>
                         <td style={{ fontSize: '0.8rem' }}>{s.status || '—'}</td>
+                        <td>
+                          <button type="button" className="btn-secondary" onClick={() => setEditing(s)} title="Edit this submission (password required)"
+                            aria-label={`Edit submission of ${formatDay(s.date) || 'unknown date'}`} style={{ padding: '4px 8px' }}><Pencil size={13} /></button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -491,6 +521,7 @@ export const ClientMasterBlock = () => {
           <Grievances key={result.clientKey} clientKey={result.clientKey} />
         </>
       )}
+      {editing && <ClientMasterEditor submission={editing} onClose={() => setEditing(null)} onSaved={afterEdit} />}
     </div>
   );
 };

@@ -137,3 +137,97 @@ def test_grievance_needs_a_client_on_file_and_a_sane_file(crm, tok):
     assert post({"clientKey": "MOBILE:9876543210", "fileName": "a.txt", "dataBase64": "not base64!"}).status_code == 400
     too_big = b64(b"x" * (crm.client_master.MAX_FILE_BYTES + 1))
     assert post({"clientKey": "MOBILE:9876543210", "fileName": "a.txt", "dataBase64": too_big}).status_code == 413
+
+
+# ==========================================
+# Editing (password protected)
+# ==========================================
+EDIT_PAN = "EDTCL4321M"
+
+
+@pytest.fixture(scope="module")
+def edit_client(crm, tok):
+    info = {"panNumber": EDIT_PAN, "clientName": "Old Name", "clientPrefix": "Mr.", "email": "old@example.com",
+            "phone1": "9123456780", "clientCategory": "Individual", "clientState": "Karnataka", "paymentDate": "2026-11-10",
+            "serviceName": "Energy", "serviceTenure": "1 Month", "transactionNumbers": ["123456"], "grossSales": "2000",
+            "netSales": "1694.92", "gst": "305.08", "paymentModes": [{"mode": "NEFT", "amount": "2000"}],
+            "employeeSharing": {"present": True, "mode": "fixed", "shares": [{"userId": "usr-3", "name": "Ajay", "value": "500"}]},
+            "submissionDate": "2026-11-10"}
+    res = crm.client.post("/api/sync", headers=bearer(tok["sa"]), json={"collections": {
+        "leads": {"upserts": [{"id": "ed-lead", "assignedToId": "usr-6", "assigned_user_id": "usr-6", "history": [],
+                               "phone": info["phone1"], "clientName": "Old Name", "clientInfo": info}]},
+        "sales": {"upserts": [{"id": "ed-sale", "leadId": "ed-lead", "submittedByUserId": "usr-6", "employeeName": "ANITHA",
+                               "date": "2026-11-10", "panNumber": EDIT_PAN, "phone1": info["phone1"], "clientName": "Old Name",
+                               "status": "E-Signed & Converted", "clientType": "New Client", "grossSales": "2000",
+                               "amount": "₹2,000", "serviceOpted": "Energy", "fullClientInfo": info}]},
+        "paidClients": {"upserts": [{"id": "paid-ed-sale", "saleId": "ed-sale", "clientName": "Old Name", "phone": info["phone1"],
+                                     "panNumber": EDIT_PAN, "serviceName": "Energy", "serviceEndDate": "2026-12-10"}]},
+    }})
+    assert res.status_code == 200 and not any(res.json()["rejected"].values()), res.text
+    return info
+
+
+def edit(crm, token, body):
+    return crm.client.put("/api/client-master/details", headers=bearer(token), json=body)
+
+
+def test_unlock_needs_the_users_own_password(crm, tok, edit_client):
+    url = "/api/client-master/unlock"
+    assert crm.client.post(url, headers=bearer(tok["sa"]), json={"password": "wrong"}).status_code == 401
+    # Another user's password does not unlock it
+    assert crm.client.post(url, headers=bearer(tok["sa"]), json={"password": crm.creds[ADMIN]}).status_code == 401
+    assert crm.client.post(url, headers=bearer(tok["sa"]), json={"password": crm.creds[SA]}).status_code == 200
+    assert crm.client.post(url, headers=bearer(tok["exec"]), json={"password": crm.creds[EXEC]}).status_code == 403
+
+
+def test_edit_rejects_a_wrong_password_and_changes_nothing(crm, tok, edit_client):
+    res = edit(crm, tok["sa"], {"saleId": "ed-sale", "password": "nope", "changes": {"clientName": "Hacked"}})
+    assert res.status_code == 401
+    assert crm.store.get("sales", "ed-sale")["fullClientInfo"]["clientName"] == "Old Name"
+
+
+def test_edit_updates_sale_lead_paid_client_and_keeps_an_audit(crm, tok, edit_client):
+    res = edit(crm, tok["admin"], {"saleId": "ed-sale", "password": crm.creds[ADMIN], "changes": {
+        "clientName": "  New   Name ", "phone1": "+91 99887 76655", "email": "new@example.com", "grossSales": "118000",
+        "netSales": "100000", "gst": "18000", "serviceName": "Stock Cash", "transactionNumbers": "TX1, TX2",
+        "paymentModes": [{"mode": "UPI", "amount": "118000"}], "clientState": "Kerala",
+        "employeeSharing": {"mode": "percentage", "values": ["25"]},
+        "serviceTenure": "1 Month"}})  # unchanged: not recorded
+    assert res.status_code == 200, res.text
+    assert "serviceTenure" not in res.json()["saved"] and "clientName" in res.json()["saved"]
+
+    sale = crm.store.get("sales", "ed-sale")
+    info = sale["fullClientInfo"]
+    assert info["clientName"] == "New Name" and info["phone1"] == "9988776655" and info["transactionNumbers"] == ["TX1", "TX2"]
+    assert sale["clientName"] == "New Name" and sale["contactPerson"] == "New Name" and sale["phone1"] == "9988776655"
+    assert sale["amount"] == "₹1,18,000" and sale["serviceOpted"] == "Stock Cash" and sale["clientState"] == "Kerala"
+    assert info["employeeSharing"]["mode"] == "percentage" and info["employeeSharing"]["shares"][0] == {"userId": "usr-3", "name": "Ajay", "value": "25"}
+    audit = sale["clientMasterEdits"][-1]
+    assert audit["changes"]["clientName"] == {"from": "Old Name", "to": "New Name"} and audit["byId"] == "usr-11"
+
+    lead = crm.store.get("leads", "ed-lead")
+    assert lead["clientInfo"]["clientName"] == "New Name" and lead["phone"] == "9988776655" and lead["email"] == "new@example.com"
+    assert "Client MASTER" in lead["history"][-1]["text"]
+    paid = crm.store.get("paidClients", "paid-ed-sale")
+    assert paid["clientName"] == "New Name" and paid["phone"] == "9988776655" and paid["serviceEndDate"] == "2026-12-10"
+
+    # The search shows the new details, found by the new mobile number, with the last edit
+    body = search(crm, tok["sa"], "9988776655").json()
+    assert body["client"]["clientName"] == "New Name"
+    assert body["submissions"][0]["lastEdit"]["by"] and "clientName" in body["submissions"][0]["lastEdit"]["fields"]
+
+
+def test_edit_validates_fields(crm, tok, edit_client):
+    pw = crm.creds[SA]
+    for changes, needle in (({"panNumber": "BAD"}, "PAN"), ({"phone1": "123"}, "Phone 1"), ({"email": "x"}, "Email"),
+                            ({"grossSales": "abc"}, "Gross Sales"), ({"clientState": "Atlantis"}, "State"),
+                            ({"paymentDate": "2026-02-30"}, "Payment Date"), ({"clientName": " "}, "Client Name"),
+                            ({"clientType": "Old Client"}, "cannot be edited"),
+                            ({"paymentModes": [{"mode": "UPI", "amount": "1"}, {"mode": "upi", "amount": "2"}]}, "twice"),
+                            ({"employeeSharing": {"mode": "percentage", "values": ["150"]}}, "100")):
+        res = edit(crm, tok["sa"], {"saleId": "ed-sale", "password": pw, "changes": changes})
+        assert res.status_code == 400 and needle in res.json()["detail"], (changes, res.text)
+    same = edit(crm, tok["sa"], {"saleId": "ed-sale", "password": pw, "changes": {"serviceTenure": "1 Month"}})
+    assert same.status_code == 400 and "Nothing" in same.json()["detail"]
+    assert edit(crm, tok["sa"], {"saleId": "nope", "password": pw, "changes": {"clientName": "X"}}).status_code == 404
+    assert edit(crm, tok["exec"], {"saleId": "ed-sale", "password": crm.creds[EXEC], "changes": {"clientName": "X"}}).status_code == 403

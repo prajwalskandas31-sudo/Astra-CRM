@@ -49,3 +49,14 @@ export const downloadGrievance = (file) =>
 export const downloadInvoice = (inv) =>
   saveBlob(`/client-master/invoices/${encodeURIComponent(inv.id)}/pdf`,
     inv.fileName || `Invoice ${inv.invoiceNumber.replace(/\//g, '-')}.pdf`);
+
+// Editing a submission: the user's own password unlocks the form and is checked again on save.
+// A wrong password is a 401, which backendFetch words as "sign in again"; keep the server's own message.
+const withPassword = (path, method, body) => json(path, { method, body: JSON.stringify(body) }).catch(err => {
+  throw new Error(err.message.startsWith('Incorrect password') ? err.message.split(' — ')[0] : err.message);
+});
+
+export const unlockClientEditing = (password) => withPassword('/client-master/unlock', 'POST', { password });
+
+export const saveClientDetails = ({ saleId, leadId, password, changes }) =>
+  withPassword('/client-master/details', 'PUT', { saleId: saleId || null, leadId: leadId || null, password, changes });
