@@ -28,6 +28,12 @@ _WRITE_LOCK_KEY = 7_340_001  # any constant; identifies the CRM's advisory lock 
 # loading every lead. Registered by the modules that define the collections.
 _owner_fns: dict[str, Callable[[dict], Optional[str]]] = {}
 
+# Lookup keys of a record per collection (e.g. ("pan", "ABCDE1234F")), kept in `record_keys` so exact
+# lookups such as the PAN duplicate check use an index instead of scanning every record's JSON.
+# Registered with a version: changing what a function returns needs a new version, which rebuilds the keys.
+_key_fns: dict[str, tuple[str, Callable[[dict], Iterable[tuple[str, str]]]]] = {}
+_keys_ready: set = set()
+
 _current: contextvars.ContextVar = contextvars.ContextVar("crm_store_tx", default=None)
 _init_lock = threading.Lock()
 _backend = None
@@ -44,6 +50,18 @@ def has_owner(collection: str) -> bool:
 def owner_of(collection: str, data: Optional[dict]) -> Optional[str]:
     fn = _owner_fns.get(collection)
     return fn(data) if fn and data else None
+
+
+def register_keys(collection: str, version: str, fn: Callable[[dict], Iterable[tuple[str, str]]]) -> None:
+    _key_fns[collection] = (version, fn)
+    _keys_ready.discard(collection)
+
+
+def _keys_of(collection: str, rid: str, data: Optional[dict]) -> list:
+    entry = _key_fns.get(collection)
+    if not entry or not data:
+        return []
+    return [(kind, value, collection, rid) for kind, value in dict.fromkeys(entry[1](data))]
 
 
 def _now() -> str:
@@ -103,6 +121,11 @@ class _Postgres:
             conn.execute("""CREATE TABLE IF NOT EXISTS record_moves (
                 seq BIGINT NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL, old_owner TEXT)""")
             conn.execute("CREATE INDEX IF NOT EXISTS record_moves_by_seq ON record_moves (seq)")
+            conn.execute("""CREATE TABLE IF NOT EXISTS record_keys (
+                kind TEXT NOT NULL, value TEXT NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL)""")
+            conn.execute("CREATE INDEX IF NOT EXISTS record_keys_lookup ON record_keys (kind, value, collection)")
+            conn.execute("CREATE INDEX IF NOT EXISTS record_keys_by_record ON record_keys (collection, id)")
+            conn.execute("CREATE TABLE IF NOT EXISTS record_keys_built (collection TEXT PRIMARY KEY, version TEXT NOT NULL)")
 
 
 class _SQLite:
@@ -167,6 +190,11 @@ class _SQLite:
             conn.execute("""CREATE TABLE IF NOT EXISTS record_moves (
                 seq INTEGER NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL, old_owner TEXT)""")
             conn.execute("CREATE INDEX IF NOT EXISTS record_moves_by_seq ON record_moves (seq)")
+            conn.execute("""CREATE TABLE IF NOT EXISTS record_keys (
+                kind TEXT NOT NULL, value TEXT NOT NULL, collection TEXT NOT NULL, id TEXT NOT NULL)""")
+            conn.execute("CREATE INDEX IF NOT EXISTS record_keys_lookup ON record_keys (kind, value, collection)")
+            conn.execute("CREATE INDEX IF NOT EXISTS record_keys_by_record ON record_keys (collection, id)")
+            conn.execute("CREATE TABLE IF NOT EXISTS record_keys_built (collection TEXT PRIMARY KEY, version TEXT NOT NULL)")
 
 
 def backend():
@@ -187,6 +215,7 @@ def reset_backend() -> None:
     if isinstance(_backend, _Postgres):
         _backend.pool.close()
     _backend = None
+    _keys_ready.clear()
 
 
 # ==========================================
@@ -269,6 +298,48 @@ def containing(collection: str, text: str) -> list:
     rows = _rows(f"SELECT {db.text_column} FROM records WHERE collection = ? AND deleted = ? AND UPPER({db.text_column}) LIKE ?",
                  (collection, False, f"%{text.upper()}%"))
     return [db.load(r[0]) for r in rows]
+
+
+def _ensure_keys(collection: str) -> None:
+    """Build `record_keys` for a collection the first time it is used with this key version (records
+    written before the keys existed). Runs under the write lock, so no write can slip in between."""
+    if collection in _keys_ready or collection not in _key_fns:
+        return
+    version = _key_fns[collection][0]
+    db = backend()
+    with transaction():
+        with _conn() as conn:
+            row = conn.execute(db.sql("SELECT version FROM record_keys_built WHERE collection = ?"), (collection,)).fetchone()
+            if not row or row[0] != version:
+                conn.execute(db.sql("DELETE FROM record_keys WHERE collection = ?"), (collection,))
+                live = conn.execute(db.sql(f"SELECT id, {db.text_column} FROM records WHERE collection = ? AND deleted = ?"),
+                                    (collection, False)).fetchall()
+                keys = [k for rid, text in live for k in _keys_of(collection, rid, db.load(text))]
+                if keys:
+                    conn.cursor().executemany(db.sql("INSERT INTO record_keys (kind, value, collection, id) VALUES (?, ?, ?, ?)"), keys)
+                conn.execute(db.sql("""INSERT INTO record_keys_built (collection, version) VALUES (?, ?)
+                                       ON CONFLICT (collection) DO UPDATE SET version = excluded.version"""), (collection, version))
+    _keys_ready.add(collection)
+
+
+def find_by_key(collection: str, kind: str, value: str) -> list:
+    """Live records of a collection holding the lookup key (kind, value); see register_keys."""
+    if collection not in _key_fns:
+        raise ValueError(f"no lookup keys registered for {collection}")
+    _ensure_keys(collection)
+    db = backend()
+    rows = _rows(f"""SELECT r.{db.text_column} FROM record_keys k
+                     JOIN records r ON r.collection = k.collection AND r.id = k.id
+                     WHERE k.kind = ? AND k.value = ? AND k.collection = ? AND r.deleted = ?""",
+                 (kind, value, collection, False))
+    return [db.load(r[0]) for r in rows]
+
+
+def _drop_keys(conn, collection: str, ids: list) -> None:
+    db = backend()
+    for chunk in _chunks(ids):
+        conn.execute(db.sql(f"DELETE FROM record_keys WHERE collection = ? AND id IN ({', '.join('?' for _ in chunk)})"),
+                     tuple([collection, *chunk]))
 
 
 def get_many(collection: str, record_ids: Iterable[str]) -> dict:
@@ -357,6 +428,12 @@ def put_pairs(collection: str, pairs: list) -> int:
                         seq = excluded.seq, deleted = excluded.deleted, updated_at = excluded.updated_at"""), rows)
             if moves:
                 cur.executemany(db.sql("INSERT INTO record_moves (seq, collection, id, old_owner) VALUES (?, ?, ?, ?)"), moves)
+            if collection in _key_fns:
+                _drop_keys(conn, collection, list(dict.fromkeys(rid for rid, _ in pairs)))
+                latest = dict(pairs)  # the last write of an id wins, as in the records table
+                keys = [k for rid, data in latest.items() for k in _keys_of(collection, rid, data)]
+                if keys:
+                    cur.executemany(db.sql("INSERT INTO record_keys (kind, value, collection, id) VALUES (?, ?, ?, ?)"), keys)
     return len(pairs)
 
 
@@ -387,6 +464,8 @@ def delete_many(collection: str, record_ids: Iterable[str]) -> list:
                 conn.cursor().executemany(
                     db.sql("UPDATE records SET deleted = ?, data = NULL, seq = ?, updated_at = ? WHERE collection = ? AND id = ?"),
                     [(True, seq, now, collection, rid) for rid, seq in zip(live, db.next_seqs(conn, len(live)))])
+                if collection in _key_fns:
+                    _drop_keys(conn, collection, live)
     return live
 
 

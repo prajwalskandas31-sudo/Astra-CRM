@@ -636,6 +636,11 @@ def _pans_of(doc: dict) -> set:
     return {str(p).replace(" ", "").upper() for p in found if p}
 
 
+# Every PAN a record holds is indexed, so the check below is an index lookup, not a scan of each record's JSON
+for _collection, _label in PAN_SOURCES:
+    store.register_keys(_collection, "pan-v1", lambda doc: [("pan", p) for p in _pans_of(doc)])
+
+
 def _counts_as_on_file(collection: str, doc: dict) -> bool:
     # A sale turned down in review never made the PAN a client's
     if collection == "sales":
@@ -654,7 +659,7 @@ def pan_check(pan: str = Query(..., max_length=20), leadId: str = Query("", max_
     if not PAN_PATTERN.fullmatch(pan):
         raise HTTPException(status_code=400, detail="Enter a valid 10-character PAN (e.g. ABCDE1234F).")
     for collection, label in PAN_SOURCES:
-        for doc in store.containing(collection, pan):
+        for doc in store.find_by_key(collection, "pan", pan):
             own = doc.get("id") if collection == "leads" else doc.get("leadId")
             if leadId and own == leadId:
                 continue

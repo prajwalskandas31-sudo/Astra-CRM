@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useShowMore, ShowMoreRow } from '../lib/useShowMore';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import {
@@ -331,6 +332,7 @@ export const LeadSummarySuperAdmin = () => {
 
     return { total, dialed, uncontacted, instLeads, dispositionBreakdown };
   }, [activeInstanceModal, assignmentInstances, leads, dispositions]);
+  const instanceRows = useShowMore(instanceStats?.instLeads);
 
   return (
     <div className="lead-summary-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -1256,7 +1258,7 @@ export const LeadSummarySuperAdmin = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {instanceStats.instLeads.map(l => (
+                  {instanceRows.visible.map(l => (
                     <tr key={l.id} style={{ transition: 'background 0.15s ease' }}>
                       <td style={{ textAlign: 'center', padding: '0.8rem 0.5rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1278,6 +1280,7 @@ export const LeadSummarySuperAdmin = () => {
                       </td>
                     </tr>
                   ))}
+                  <ShowMoreRow more={instanceRows} />
                 </tbody>
               </table>
             </div>

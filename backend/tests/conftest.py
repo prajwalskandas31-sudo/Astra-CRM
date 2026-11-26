@@ -23,7 +23,7 @@ def crm(tmp_path_factory):
     if pg_url:
         import psycopg
         with psycopg.connect(pg_url, autocommit=True) as conn:
-            conn.execute("DROP TABLE IF EXISTS records, record_moves; DROP SEQUENCE IF EXISTS records_seq_counter")
+            conn.execute("DROP TABLE IF EXISTS records, record_moves, record_keys, record_keys_built; DROP SEQUENCE IF EXISTS records_seq_counter")
         os.environ["DATABASE_URL"] = pg_url
     else:
         os.environ.pop("DATABASE_URL", None)

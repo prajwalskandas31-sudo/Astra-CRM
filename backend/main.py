@@ -257,6 +257,13 @@ class UserDocumentUpload(BaseModel):
     fileData: str
 
 # Health Check
+@app.get("/api/client-ip")
+def client_ip(request: Request):
+    """The caller's IP address as this server sees it (nginx passes it in X-Real-IP), so the browser's
+    IP-restriction check needs no third-party lookup service."""
+    return {"ip": request.headers.get("x-real-ip") or (request.client.host if request.client else None)}
+
+
 @app.get("/api/health")
 def health_check():
     store.cursor()  # fails (500) when the database is unreachable
