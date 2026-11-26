@@ -203,7 +203,7 @@ const AppContent = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <CRMDashboard />;
+        return <CRMDashboard onOpenBlock={setActiveTab} />;
       case 'lead-history':
         return <LeadHistoryBlock />;
       case 'directory':
@@ -271,7 +271,7 @@ const AppContent = () => {
       case 'feature-access':
         return <FeatureAccessBlock />;
       default:
-        return <CRMDashboard />;
+        return <CRMDashboard onOpenBlock={setActiveTab} />;
     }
   };
 

@@ -19,12 +19,14 @@ import {
   ShieldCheck,
   FileText,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ArrowRightLeft
 } from 'lucide-react';
 import { LeadHistoryBlock } from './LeadHistoryBlock';
 import { ClientInformationModal } from './ClientInformationModal';
+import { DASHBOARD_SUB_BLOCKS } from './Sidebar';
 
-export const CRMDashboard = () => {
+export const CRMDashboard = ({ onOpenBlock }) => {
   const { 
     leads, 
     dispositions, 
@@ -254,8 +256,30 @@ export const CRMDashboard = () => {
   // User-level shortcuts filter (User_Shortcut_Settings)
   const visibleDispositions = dispositions.filter(d => isShortcutEnabled(currentUser?.id, d.id));
 
+  // Separate blocks listed under the CRM Dashboard that this user may open
+  const switchableBlocks = DASHBOARD_SUB_BLOCKS.filter(b => hasPermission(b.id));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Switch to a block listed under the CRM Dashboard (Team Monitoring / Team Performance Tracking) */}
+      {onOpenBlock && switchableBlocks.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <ArrowRightLeft size={15} /> Switch to
+            <select
+              className="select-filter"
+              value=""
+              onChange={e => e.target.value && onOpenBlock(e.target.value)}
+              style={{ minWidth: '240px' }}
+              aria-label="Open a block listed under the CRM Dashboard"
+            >
+              <option value="">Select a block…</option>
+              {switchableBlocks.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+
       {/* Report Counter Sync Banner (Block 2 & Block 3 Integration) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         <div className="directory-card" style={{ padding: '16px 20px', borderLeft: '4px solid #3b82f6' }}>
