@@ -141,6 +141,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
     dateOfJoining: userToEdit ? (userToEdit.dateOfJoining || '') : '',
     aadhaarNumber: userToEdit ? (userToEdit.aadhaarNumber || '') : '',
     panNumber: userToEdit ? (userToEdit.panNumber || '') : '',
+    uanNumber: userToEdit ? (userToEdit.uanNumber || '') : '',
     currentAddress: userToEdit ? (userToEdit.currentAddress || '') : '',
     correspondenceAddress: userToEdit ? (userToEdit.correspondenceAddress || '') : '',
     bankAccountNumber: userToEdit ? (userToEdit.bankAccountNumber || '') : '',
@@ -212,6 +213,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           dateOfJoining: userToEdit.dateOfJoining || '',
           aadhaarNumber: userToEdit.aadhaarNumber || '',
           panNumber: userToEdit.panNumber || '',
+          uanNumber: userToEdit.uanNumber || '',
           currentAddress: userToEdit.currentAddress || '',
           correspondenceAddress: userToEdit.correspondenceAddress || '',
           bankAccountNumber: userToEdit.bankAccountNumber || '',
@@ -243,6 +245,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
           dateOfJoining: '',
           aadhaarNumber: '',
           panNumber: '',
+          uanNumber: '',
           currentAddress: '',
           correspondenceAddress: '',
           bankAccountNumber: '',
@@ -954,6 +957,19 @@ RAHUL SHARMA, +91 98765 43230, rahul.s@company.com, Executive, Priya Nair, EXEC-
                     onChange={e => setFormData(prev => ({ ...prev, panNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) }))}
                     placeholder="e.g. ABCDE1234F"
                     maxLength={10}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>UAN Number</label>
+                  <input
+                    type="text"
+                    name="uanNumber"
+                    value={formData.uanNumber}
+                    onChange={e => setFormData(prev => ({ ...prev, uanNumber: e.target.value.replace(/\D/g, '').slice(0, 12) }))}
+                    placeholder="12-digit UAN (printed on payslips)"
+                    inputMode="numeric"
+                    maxLength={12}
                   />
                 </div>
 

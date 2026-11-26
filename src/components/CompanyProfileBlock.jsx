@@ -18,6 +18,7 @@ const BUSINESS_TYPES = [
 
 const FIELDS = [
   { key: 'companyName', label: 'Company Name', type: 'text', placeholder: 'e.g. Astra Research Pvt. Ltd.', autoComplete: 'organization' },
+  { key: 'brandName', label: 'Brand Name', type: 'text', placeholder: 'e.g. InvestEQ (printed as "Brand by Company Name")', maxLength: 100 },
   { key: 'natureOfBusiness', label: 'Nature of Business', type: 'text', placeholder: 'Type or pick, e.g. Research Analyst', list: 'company-business-types', maxLength: 150 },
   { key: 'sebiRegistrationNumber', label: 'SEBI Registration Number', type: 'text', placeholder: 'e.g. INH000000000' },
   { key: 'gstin', label: 'GSTIN (printed on invoices)', type: 'text', placeholder: 'e.g. 29ABCDE1234F1Z5' },

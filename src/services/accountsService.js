@@ -44,3 +44,12 @@ export const saveClientFee = (period, values) =>
 
 export const downloadClientFeePdf = (period, rows, filename) =>
   download(`/audit-reports/client-fee/pdf?${new URLSearchParams({ period, rows: rows.join(',') })}`, filename);
+
+// ---------------- Pay Slip Block (backend/payslip.py) ----------------
+export const loadPayslipEmployees = () => json('/payslip/employees');
+
+export const loadPayslip = (userId, month, payDate) =>
+  json(`/payslip?${new URLSearchParams({ userId, month, payDate })}`);
+
+export const downloadPayslipPdf = (userId, month, payDate, filename) =>
+  download(`/payslip/pdf?${new URLSearchParams({ userId, month, payDate })}`, filename);
