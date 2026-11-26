@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import { FileSpreadsheet, Download, RefreshCw, Search, AlertCircle } from 'lucide-react';
 import { getEmailDeliveryReport } from '../services/emailService';
@@ -38,10 +39,11 @@ export const buildDeliveryWorkbook = (rows) => {
     summary.push([c.client, [...c.emails].join(', '), c.sent, c.failed, c.sent + c.failed, when(c.lastSent || null), when(c.lastFailed || null)]));
 
   const wb = XLSX.utils.book_new();
-  const allSheet = XLSX.utils.aoa_to_sheet(all);
-  allSheet['!cols'] = [{ wch: 24 }, { wch: 24 }, { wch: 8 }, { wch: 22 }, { wch: 28 }, { wch: 26 }, { wch: 18 }, { wch: 60 }, { wch: 30 }, { wch: 18 }];
-  const sumSheet = XLSX.utils.aoa_to_sheet(summary);
-  sumSheet['!cols'] = [{ wch: 24 }, { wch: 34 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 22 }];
+  const generated = `Generated on ${when(new Date().toISOString())}`;
+  const allSheet = tableSheet({ title: 'Email Delivery Report - All Emails', subtitle: generated, header: all[0], rows: all.slice(1),
+    cols: [24, 24, 10, 22, 28, 26, 18, 60, 30, 18] });
+  const sumSheet = tableSheet({ title: 'Email Delivery Report - By Client', subtitle: generated, header: summary[0], rows: summary.slice(1),
+    cols: [24, 34, 12, 12, 12, 22, 22] });
   XLSX.utils.book_append_sheet(wb, allSheet, 'All Emails');
   XLSX.utils.book_append_sheet(wb, sumSheet, 'By Client');
   return wb;
@@ -82,7 +84,7 @@ export const EmailDeliveryReport = () => {
 
   const exportExcel = () => {
     const all = data?.rows || [];
-    XLSX.writeFile(buildDeliveryWorkbook(all), `Email Delivery Report ${new Date().toISOString().slice(0, 10)}.xlsx`);
+    writeReport(buildDeliveryWorkbook(all), `Email Delivery Report ${new Date().toISOString().slice(0, 10)}.xlsx`);
     showToast(`Exported ${all.length} emails.`, 'success');
   };
 

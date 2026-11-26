@@ -28,6 +28,7 @@ import {
   Check
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { styleHeaderRow, writeReport } from '../lib/reportExcel';
 
 // How a user is paid; must match PAY_TYPES in backend/main.py
 const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
@@ -617,8 +618,9 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
         { wch: 22 }
       ];
       const wb = XLSX.utils.book_new();
+      styleHeaderRow(ws);
       XLSX.utils.book_append_sheet(wb, ws, 'Bulk_Users_Template');
-      XLSX.writeFile(wb, 'Bulk_Users_Upload_Template.xlsx');
+      writeReport(wb, 'Bulk_Users_Upload_Template.xlsx');
       showToast('Excel template downloaded successfully.', 'info');
     } catch (err) {
       console.error('Template download error:', err);

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { CalendarClock, Download, Search } from 'lucide-react';
 import { parseSignDate, daysBetween, todayKey, toDateKey } from '../services/serviceTenure';
@@ -105,8 +106,9 @@ export const ExpiredClientData = () => {
     rows.forEach(r => aoa.push([r.clientName, r.panNumber || '', r.phone || '', r.email || '', r.serviceName || '', r.serviceTenure || '',
       r.eSignDate, r.elapsed, Math.max(0, r.remaining), r.completesOn, statusOf(r).label]));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Expired Client Data');
-    XLSX.writeFile(wb, `Expired Client Data ${todayKey()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, tableSheet({ title: 'Expired Client Data', subtitle: `As on ${todayKey()}`, header: aoa[0], rows: aoa.slice(1),
+      cols: [26, 13, 15, 28, 26, 12, 13, 12, 14, 16, 16] }), 'Expired Client Data');
+    writeReport(wb, `Expired Client Data ${todayKey()}.xlsx`);
   };
 
   return (

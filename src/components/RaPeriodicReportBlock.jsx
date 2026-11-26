@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import { loadRaPeriodicReport, saveRaPeriodicReport } from '../services/raPeriodicReportService';
 import {
@@ -308,7 +309,7 @@ export const RaPeriodicReportBlock = () => {
 
   const excel = async (ids) => {
     if (dirty && !(await save())) return;
-    XLSX.writeFile(buildWorkbook(XLSX, data, draft, ids), fileName(data, ids));
+    writeReport(buildWorkbook(XLSX, data, draft, ids), fileName(data, ids));
   };
 
   const copyPrevious = () => {

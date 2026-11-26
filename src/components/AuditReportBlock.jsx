@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { reportSheet, tableSheet, writeReport } from '../lib/reportExcel';
 import { useToast } from './ToastNotification';
 import { loadClientFee, saveClientFee, downloadClientFeePdf } from '../services/accountsService';
 import { ClipboardList, RefreshCw, FileSpreadsheet, FileText, Loader2, Save, RotateCcw, AlertTriangle } from 'lucide-react';
@@ -64,40 +65,39 @@ const cellExcel = (row, v) => (row.kind === 'text' ? String(v ?? '') : Number(v)
 
 const exportExcel = (data, rows, keys) => {
   const wb = XLSX.utils.book_new();
-  const aoa = [
-    ['Client and Fee Details'], [data.label], [],
-    ['Sr. No.', 'Particulars', 'Details of Individual clients', '', '', 'Details of Non-Individual clients', '', '', 'Total (A+B+C+D+E+F)'],
-    ['', '', 'Resident (A)', 'Non-Resident (B)', 'FPI (C)', 'Resident (D)', 'Non-Resident (E)', 'FPI (F)', '']
-  ];
-  const merges = [{ s: { r: 3, c: 2 }, e: { r: 3, c: 4 } }, { s: { r: 3, c: 5 }, e: { r: 3, c: 7 } },
-    { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }, { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } }, { s: { r: 3, c: 8 }, e: { r: 4, c: 8 } }];
+  const b = reportSheet().title('Client and Fee Details').subtitle(data.label);
+  const h = b.row;
+  b.header(['Sr. No.', 'Particulars', 'Details of Individual clients', '', '', 'Details of Non-Individual clients', '', '', 'Total (A+B+C+D+E+F)'])
+    .header(['', '', 'Resident (A)', 'Non-Resident (B)', 'FPI (C)', 'Resident (D)', 'Non-Resident (E)', 'FPI (F)', '']);
+  const merges = [{ s: { r: h, c: 2 }, e: { r: h, c: 4 } }, { s: { r: h, c: 5 }, e: { r: h, c: 7 } },
+    { s: { r: h, c: 0 }, e: { r: h + 1, c: 0 } }, { s: { r: h, c: 1 }, e: { r: h + 1, c: 1 } }, { s: { r: h, c: 8 }, e: { r: h + 1, c: 8 } }];
   rows.filter(r => keys.includes(r.key)).forEach(r => {
     if (r.kind === 'columns') {
-      aoa.push([r.srNo, r.particulars, ...COLUMNS.map(c => r.cells[c]), r.total]);
+      b.body([r.srNo, r.particulars, ...COLUMNS.map(c => r.cells[c]), r.total]);
     } else {
       const note = r.key === 'r5' && r.day && !r.edited ? ` (on ${dmy(r.day)})` : '';
-      aoa.push([r.srNo, r.particulars, r.kind === 'text' ? r.value : (note ? `${r.value}${note}` : cellExcel(r, r.value)), '', '', '', '', '', cellExcel(r, r.total)]);
-      merges.push({ s: { r: aoa.length - 1, c: 2 }, e: { r: aoa.length - 1, c: 7 } });
+      merges.push({ s: { r: b.row, c: 2 }, e: { r: b.row, c: 7 } });
+      b.body([r.srNo, r.particulars, r.kind === 'text' ? r.value : (note ? `${r.value}${note}` : cellExcel(r, r.value)), '', '', '', '', '', cellExcel(r, r.total)]);
     }
   });
-  const sheet = XLSX.utils.aoa_to_sheet(aoa);
-  sheet['!merges'] = merges;
-  sheet['!cols'] = [{ wch: 8 }, { wch: 62 }, ...COLUMNS.map(() => ({ wch: 16 })), { wch: 20 }];
+  const sheet = b.build({ cols: [8, 62, ...COLUMNS.map(() => 16), 20], merges });
   XLSX.utils.book_append_sheet(wb, sheet, 'Client and Fee Details');
   keys.forEach(k => {
     const cols = DETAIL_COLUMNS[k];
     const items = data.details[k] || [];
     if (!cols || !items.length) return;
     const row = rows.find(r => r.key === k);
-    const s = XLSX.utils.aoa_to_sheet([
-      [`${row.srNo}. ${row.particulars}`], ['Clients counted by the CRM (values typed into the report are not reflected here)'], [],
-      cols.map(([, t]) => t), ...items.map(d => cols.map(([key]) => d[key] ?? ''))
-    ]);
-    s['!cols'] = cols.map(([key]) => ({ wch: key === 'clientName' || key === 'service' ? 28 : 14 }));
+    const s = tableSheet({
+      title: `${row.srNo}. ${row.particulars}`,
+      subtitle: 'Clients counted by the CRM (values typed into the report are not reflected here)',
+      header: cols.map(([, t]) => t),
+      rows: items.map(d => cols.map(([key]) => d[key] ?? '')),
+      cols: cols.map(([key]) => (key === 'clientName' || key === 'service' ? 28 : 14))
+    });
     XLSX.utils.book_append_sheet(wb, s, `Row ${row.srNo} clients`);
   });
   const suffix = keys.length === rows.length ? '' : ` Row ${keys.map(k => rows.find(r => r.key === k).srNo).join('-')}`;
-  XLSX.writeFile(wb, `Client and Fee Details ${data.period}${suffix}.xlsx`);
+  writeReport(wb, `Client and Fee Details ${data.period}${suffix}.xlsx`);
 };
 
 const inputStyle = { width: '100%', minWidth: '56px', height: '30px', fontSize: '0.8rem', textAlign: 'right', boxSizing: 'border-box', padding: '0 6px' };
