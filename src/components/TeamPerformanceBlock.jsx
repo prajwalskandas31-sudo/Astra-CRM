@@ -516,7 +516,16 @@ const AttendancePanel = ({ people, attendanceIndex, markAttendance, title, subti
 
 /* ─── The block ────────────────────────────────────────────────────────── */
 
-export const TeamPerformanceBlock = () => {
+/** What each sidebar sub-block button opens (null = the whole block). */
+const SECTION_TITLES = {
+  teams: 'Teams',
+  executives: 'All Executives',
+  leads: 'Leads by Data Set & Disposition',
+  calls: 'Calls by Outcome',
+  attendance: 'Attendance'
+};
+
+export const TeamPerformanceBlock = ({ section = null }) => {
   const {
     users = [], leads = [], sales = [], paidClients = [], dispositions = [],
     callStats = [], attendance = [], markAttendance, currentUser, simulatedRole
@@ -633,6 +642,15 @@ export const TeamPerformanceBlock = () => {
     return [...people].sort((a, b) => a.name.localeCompare(b.name));
   }, [isSuperAdmin, activeUsers, below, me?.id]);
 
+  // Opened from a sidebar sub-block button: show just that sub-block (null shows everything)
+  const showing = (key) => !SECTION_TITLES[section] || section === key;
+  const onlySection = SECTION_TITLES[section] ? section : null;
+  const notHere = (text) => (
+    <Section title={SECTION_TITLES[onlySection]}>
+      <Empty>{text}</Empty>
+    </Section>
+  );
+
   const attendancePanel = attendancePeople.length > 0 && typeof markAttendance === 'function' && (
     <AttendancePanel
       people={attendancePeople}
@@ -659,10 +677,12 @@ export const TeamPerformanceBlock = () => {
           </span>
         </Header>
         {dateBar}
-        {kpis(mine, 'You')}
-        <CallsByOutcome stats={mine} />
-        <DataSetTable leads={leads} ownerIds={ownIds} dispositions={dispositions} />
-        {attendancePanel}
+        {!onlySection && kpis(mine, 'You')}
+        {showing('calls') && <CallsByOutcome stats={mine} />}
+        {showing('leads') && <DataSetTable leads={leads} ownerIds={ownIds} dispositions={dispositions} />}
+        {showing('attendance') && attendancePanel}
+        {(onlySection === 'teams' || onlySection === 'executives') && notHere('Teams and executives are shown to Team Leaders, Managers, Admins and Super Admins. Your own numbers are under Calls by Outcome and Leads by Data Set & Disposition.')}
+        {onlySection === 'attendance' && !attendancePanel && notHere('Nobody reports to you, so there is no attendance to mark here. Your own attendance for today is shown above.')}
       </div>
     );
   }
@@ -676,11 +696,13 @@ export const TeamPerformanceBlock = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <Header icon={Users} title="My Team's Performance" text={`${members.length} executive${members.length === 1 ? '' : 's'} under ${me?.name || 'you'}, added up.`} />
         {dateBar}
-        {kpis(totals, `${members.length} executive${members.length === 1 ? '' : 's'}`)}
-        <PeopleTable title="Executives" subtitle="Each executive's numbers for the period." people={members} statsFor={statsFor} singleDay={singleDay} />
-        <DataSetTable leads={leads} ownerIds={new Set(ids)} dispositions={dispositions} />
-        <CallsByOutcome stats={totals} />
-        {attendancePanel}
+        {!onlySection && kpis(totals, `${members.length} executive${members.length === 1 ? '' : 's'}`)}
+        {showing('executives') && <PeopleTable title="Executives" subtitle="Each executive's numbers for the period." people={members} statsFor={statsFor} singleDay={singleDay} />}
+        {showing('leads') && <DataSetTable leads={leads} ownerIds={new Set(ids)} dispositions={dispositions} />}
+        {showing('calls') && <CallsByOutcome stats={totals} />}
+        {showing('attendance') && attendancePanel}
+        {onlySection === 'teams' && notHere("The team comparison is shown to Admins and Super Admins. Your team's executives are under All Executives.")}
+        {onlySection === 'attendance' && !attendancePanel && notHere('Nobody is assigned to you yet, so there is no attendance to mark.')}
       </div>
     );
   }
@@ -724,8 +746,8 @@ export const TeamPerformanceBlock = () => {
         )}
       </Header>
       {dateBar}
-      {kpis(scopeTotals, scopeName)}
-      {isSuperAdmin && scope === 'all' && (
+      {!onlySection && kpis(scopeTotals, scopeName)}
+      {isSuperAdmin && scope === 'all' && showing('attendance') && (
         <div className="directory-card" style={{ padding: '14px 18px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
             <CalendarCheck size={15} /> Attendance today, company-wide
@@ -738,8 +760,9 @@ export const TeamPerformanceBlock = () => {
           </span>
         </div>
       )}
-      {scope === 'all' && <TeamComparison teams={teams} sumStats={sumStats} onOpen={setScope} />}
-      {!selectedUser && (
+      {/* Opened on its own, Teams stays visible after "View team" so the chosen team's executives show below it */}
+      {(scope === 'all' || onlySection === 'teams') && showing('teams') && <TeamComparison teams={teams} sumStats={sumStats} onOpen={setScope} />}
+      {!selectedUser && (showing('executives') || (onlySection === 'teams' && selectedTeam)) && (
         <PeopleTable
           title={selectedTeam ? `${selectedTeam.label}: Executives` : 'All Executives'}
           subtitle="Each executive's numbers for the period."
@@ -748,9 +771,11 @@ export const TeamPerformanceBlock = () => {
           singleDay={singleDay}
         />
       )}
-      <DataSetTable leads={leads} ownerIds={new Set(scopeIds)} dispositions={dispositions} />
-      <CallsByOutcome stats={scopeTotals} />
-      {attendancePanel}
+      {onlySection === 'executives' && selectedUser && notHere(`${selectedUser.name} is selected. Pick a team or "${isSuperAdmin ? 'Whole company' : 'All teams'}" under Show to list executives.`)}
+      {showing('leads') && <DataSetTable leads={leads} ownerIds={new Set(scopeIds)} dispositions={dispositions} />}
+      {showing('calls') && <CallsByOutcome stats={scopeTotals} />}
+      {showing('attendance') && attendancePanel}
+      {onlySection === 'attendance' && !attendancePanel && notHere('There is nobody to mark attendance for yet.')}
     </div>
   );
 };

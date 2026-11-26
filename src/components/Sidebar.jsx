@@ -4,8 +4,17 @@ import {
   LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History,
   FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet,
   Tags, Receipt, BookOpen, ClipboardList, ScrollText, Cloud, ShieldAlert, NotebookPen, Settings, BarChart3, Scale,
-  ChevronDown, ChevronRight, Shuffle, PackagePlus, MailCheck
+  ChevronDown, ChevronRight, Shuffle, PackagePlus, MailCheck, PhoneCall, CalendarCheck
 } from 'lucide-react';
+
+/** The sub-blocks of Team Performance Tracking, each opened on its own from the sidebar. */
+export const TEAM_PERFORMANCE_SECTIONS = [
+  { section: 'teams', label: 'Teams', icon: Users },
+  { section: 'executives', label: 'All Executives', icon: Contact },
+  { section: 'leads', label: 'Leads by Data Set & Disposition', icon: Layers },
+  { section: 'calls', label: 'Calls by Outcome', icon: PhoneCall },
+  { section: 'attendance', label: 'Attendance', icon: CalendarCheck }
+];
 
 /**
  * The sidebar: stand-alone blocks plus four parent blocks (Leads, Reports, Compliance, Settings).
@@ -18,7 +27,11 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
     // Separate blocks listed under the CRM Dashboard (the dashboard's "Switch to" dropdown opens them too)
     subItems: [
       { id: 'team-monitoring', label: 'Team Monitoring', icon: TrendingUp },
-      { id: 'team-performance', label: 'Team Performance Tracking', icon: Activity }
+      {
+        id: 'team-performance', label: 'Team Performance Tracking', icon: Activity,
+        // Buttons that open one sub-block of Team Performance Tracking (same page, same Feature Access id)
+        sections: TEAM_PERFORMANCE_SECTIONS
+      }
     ]
   },
   { id: 'lead-history', label: 'Lead History (Block 5)', icon: History },
@@ -92,7 +105,7 @@ const readOpenGroups = () => {
   }
 };
 
-export const Sidebar = ({ activeTab, setActiveTab }) => {
+export const Sidebar = ({ activeTab, activeSection = null, setActiveTab }) => {
   const { simulatedRole, sales, leadRequests, eSignRecords = [], hasPermission } = useCRM();
 
   const tree = buildNavTree({
@@ -124,16 +137,38 @@ export const Sidebar = ({ activeTab, setActiveTab }) => {
 
   const renderItem = (item, nested = false) => {
     const Icon = item.icon;
-    return (
+    const button = (
       <button
         key={item.id}
-        className={`nav-item ${nested ? 'nav-item-nested' : ''} ${activeTab === item.id ? 'active' : ''}`}
+        className={`nav-item ${nested ? 'nav-item-nested' : ''} ${activeTab === item.id && !(item.sections && activeSection) ? 'active' : ''}`}
         onClick={() => setActiveTab(item.id)}
       >
         <Icon size={nested ? 14 : 16} />
         <span>{item.label}</span>
         {item.badge && <span className="nav-badge">{item.badge}</span>}
       </button>
+    );
+    if (!item.sections) return button;
+    // A block whose sub-blocks each get their own button underneath it
+    return (
+      <div key={item.id} className="nav-group">
+        {button}
+        <div className="nav-group-children nav-section-children">
+          {item.sections.map(sec => {
+            const SecIcon = sec.icon;
+            return (
+              <button
+                key={sec.section}
+                className={`nav-item nav-item-nested nav-item-section ${activeTab === item.id && activeSection === sec.section ? 'active' : ''}`}
+                onClick={() => setActiveTab(item.id, sec.section)}
+              >
+                <SecIcon size={13} />
+                <span>{sec.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   };
 

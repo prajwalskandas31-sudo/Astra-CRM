@@ -448,6 +448,16 @@ button, input, select, textarea {
   font-size: 0.82rem;
 }
 
+/* Sub-block buttons under a nested block (Team Performance Tracking) */
+.nav-section-children {
+  margin-left: 14px;
+}
+
+.nav-item-section {
+  padding: 5px 10px;
+  font-size: 0.77rem;
+}
+
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
