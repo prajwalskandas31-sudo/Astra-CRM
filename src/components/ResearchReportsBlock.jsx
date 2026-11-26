@@ -297,7 +297,7 @@ export const ResearchReportsBlock = () => {
         <div className="table-responsive">
           <table className="crm-table">
             <thead>
-              <tr><th aria-label="Details" /><th>Time</th><th>Segment</th><th>Call</th><th>Status</th><th>Template</th><th>Report</th></tr>
+              <tr><th aria-label="Details" /><th>Time</th><th>Segment</th><th>Call</th><th>Status</th><th>Template</th><th>Report Ref. No.</th></tr>
             </thead>
             <tbody>
               {reports.length === 0 && (
@@ -318,8 +318,9 @@ export const ResearchReportsBlock = () => {
                     <td onClick={e => e.stopPropagation()}>
                       {r.status === 'Ready' && (
                         <button type="button" className="btn-secondary" onClick={() => download(r)} disabled={busyId === r.id}
+                          title={`Download ${r.fileName}`}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                          <Download size={13} /> {r.fileName}
+                          <Download size={13} /> {r.refNo || r.fileName}
                         </button>
                       )}
                       {r.status === 'Held' && (

@@ -50,6 +50,7 @@ IST = broadcasts.IST
 REPORTS = "researchReports"          # one record per call: status, details, reason when held
 REPORT_FILES = "researchReportFiles"  # the PDF of each Ready report, base64, kept apart so lists stay small
 NEXT_TEMPLATE = "reportNextTemplate"  # 1..15, advanced only when a report is created
+REF_COUNTERS = "reportRefCounters"    # {"2026-27": 12}: the last Report Ref. No. given in each financial year
 UPSTOX_SESSION = "upstoxSession"
 UPSTOX_ANALYTICS = "upstoxAnalyticsToken"
 ANALYTICS_TOKEN_DAYS = 365
@@ -776,10 +777,44 @@ def name_date(day) -> str:
     return f"{day:%d-%m-%Y}"
 
 
+def financial_year(day) -> str:
+    """2026-27 for any day from 1 April 2026 to 31 March 2027."""
+    start = day.year if day.month >= 4 else day.year - 1
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
+def _made_at(record: dict) -> datetime:
+    return datetime.fromisoformat(record.get("createdReportAt") or record["createdAt"]).astimezone(IST)
+
+
+def next_ref_no(made: datetime) -> str:
+    """RR/2026-27/001: the next Report Ref. No., numbered from 001 in each financial year. Call it inside
+    store.transaction() so two workers never hand out the same number."""
+    year = financial_year(made.date())
+    counters = dict(store.get_value(REF_COUNTERS) or {})
+    counters[year] = int(counters.get(year) or 0) + 1
+    store.set_value(REF_COUNTERS, counters)
+    return f"RR/{year}/{counters[year]:03d}"
+
+
 def report_file_name(record: dict) -> str:
-    made = datetime.fromisoformat(record.get("createdReportAt") or record["createdAt"]).astimezone(IST)
+    """RR_2026-27_001.pdf: the Report Ref. No. as a file name ("/" is not allowed in file names)."""
+    if record.get("refNo"):
+        return record["refNo"].replace("/", "_") + ".pdf"
     number = f"({record['callNumber']}) " if record.get("callNumber") else ("test " if record.get("test") else "")
-    return f"{name_date(made)} {number}{file_label(record.get('details'))}.pdf"
+    return f"{name_date(_made_at(record))} {number}{file_label(record.get('details'))}.pdf"
+
+
+def number_old_reports() -> int:
+    """Give a Report Ref. No. to Ready reports made before numbering existed, oldest first."""
+    with store.transaction():
+        old = sorted((r for r in store.all(REPORTS) if r.get("status") == STATUS_READY and not r.get("refNo")),
+                     key=lambda r: r.get("createdReportAt") or r.get("createdAt") or "")
+        for record in old:
+            record["refNo"] = next_ref_no(_made_at(record))
+            record["fileName"] = report_file_name(record)
+            store.put(REPORTS, record["id"], record)
+    return len(old)
 
 
 def run(report_id: str) -> Optional[dict]:
@@ -803,8 +838,10 @@ def run(report_id: str) -> Optional[dict]:
             "reportDate": result["reportDate"], "upstoxConnected": result["upstoxConnected"],
             "createdReportAt": datetime.now(timezone.utc).isoformat(),
         })
-        record["fileName"] = report_file_name(record)
         with store.transaction():
+            if not record.get("refNo"):
+                record["refNo"] = next_ref_no(_made_at(record))
+            record["fileName"] = report_file_name(record)
             store.put(REPORT_FILES, report_id, {"id": report_id, "pdf": base64.b64encode(result["pdf"]).decode()})
             store.put(REPORTS, report_id, record)
             if not record.get("test"):
@@ -875,7 +912,11 @@ def ensure_processing() -> None:
 
 
 def start_worker() -> None:
-    """At startup: finish reports a restart left queued."""
+    """At startup: number reports made before Report Ref. Nos. existed, then finish reports a restart left queued."""
+    try:
+        number_old_reports()
+    except Exception:
+        log.exception("Could not number the older research reports")
     ensure_processing()
 
 
