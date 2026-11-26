@@ -78,7 +78,8 @@ export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignM
               backgroundColor: showNotificationBar ? 'var(--accent-soft)' : undefined,
               borderColor: showNotificationBar ? 'var(--accent)' : undefined
             }} 
-            title="System Notifications & Alerts"
+            title="Notifications"
+            aria-label={unreadCount ? `Notifications (${unreadCount} unread)` : 'Notifications'}
           >
             <Bell size={16} color={unreadCount > 0 ? 'var(--accent)' : 'currentColor'} />
             {unreadCount > 0 && (
@@ -90,15 +91,16 @@ export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignM
                 color: '#fff',
                 fontSize: '0.65rem',
                 fontWeight: 700,
-                width: '16px',
+                minWidth: '16px',
                 height: '16px',
-                borderRadius: '50%',
+                padding: '0 4px',
+                borderRadius: '9999px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 0 8px rgba(244, 63, 94, 0.6)'
               }}>
-                {unreadCount}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
@@ -113,7 +115,7 @@ export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignM
         </div>
 
         {/* Logged in User Profile Badge */}
-        <div style={{ 
+        <div className="header-user-badge" style={{ 
           display: 'flex', 
           alignItems: 'center', 
           gap: '10px', 
@@ -141,9 +143,10 @@ export const Navbar = ({ currentTabTitle, onOpenReviewModal = null, onOpenESignM
         <button
           onClick={handleLogout}
           className="btn-text-danger"
-          title="Sign out of CRM session"
+          title="Sign out"
+          aria-label="Sign out"
         >
-          <LogOut size={14} /> Sign Out
+          <LogOut size={14} /> <span className="header-signout-label">Sign Out</span>
         </button>
       </div>
     </header>

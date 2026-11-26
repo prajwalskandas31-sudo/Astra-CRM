@@ -143,8 +143,11 @@ export const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await handleLogin(identifier, password);
-    setIsSubmitting(false);
+    try {
+      await handleLogin(identifier, password);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formFields = [
@@ -152,7 +155,7 @@ export const LoginPage = () => {
       label: 'Username / Email / Mobile',
       required: true,
       type: 'text',
-      placeholder: 'superadmin@company.com or Srinivas R',
+      placeholder: 'Email, mobile number or username',
       value: identifier,
       onChange: (e) => setIdentifier(e.target.value),
     },
@@ -167,7 +170,7 @@ export const LoginPage = () => {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#090a0f] text-neutral-100 flex flex-col justify-center items-center relative overflow-hidden select-none px-4 py-8">
+    <div className="min-h-screen w-full bg-[#090a0f] text-neutral-100 flex flex-col justify-center items-center relative overflow-hidden px-4 py-8">
       {/* Background Ambient Glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -181,11 +184,11 @@ export const LoginPage = () => {
           {/* Bottom Trust Pills */}
           <div className="absolute bottom-6 flex items-center gap-4 text-[11px] text-neutral-400 font-medium z-10">
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-emerald-400" /> End-to-End Encrypted
+              <CheckCircle2 size={13} className="text-emerald-400" /> Activity is logged
             </span>
             <span className="text-neutral-700">•</span>
             <span className="flex items-center gap-1.5">
-              <ShieldCheck size={13} className="text-indigo-400" /> RBAC Enforced
+              <ShieldCheck size={13} className="text-indigo-400" /> Role-based access
             </span>
           </div>
         </div>
@@ -197,7 +200,8 @@ export const LoginPage = () => {
               header="Welcome back"
               subHeader="Sign in to your Astra CRM workspace"
               fields={formFields}
-              submitButton={isSubmitting ? "Authenticating..." : "Sign in"}
+              submitButton={isSubmitting ? "Signing in…" : "Sign in"}
+              submitting={isSubmitting}
               errorField={loginError}
               onSubmit={handleSubmit}
             >

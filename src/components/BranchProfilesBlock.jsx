@@ -3,6 +3,7 @@ import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { GitBranch, Save, RotateCcw, Plus, Edit2, Trash2, MapPin, Phone, Users, Wand2 } from 'lucide-react';
 import { INDIAN_STATES } from './ClientInformationModal';
+import { confirmAsync } from './ConfirmDialog';
 
 // Roles that can be named as a branch manager
 const MANAGER_ROLES = ['Manager', 'Admin', 'Super Admin'];
@@ -117,13 +118,13 @@ export const BranchProfilesBlock = () => {
     });
   };
 
-  const handleDelete = (branch) => {
+  const handleDelete = async (branch) => {
     const count = membersOf(branch.id);
     if (count > 0) {
       showToast(`"${branch.name}" has ${count} user${count === 1 ? '' : 's'} assigned. Move them to another branch in User Directory first.`, 'warning');
       return;
     }
-    if (!window.confirm(`Delete branch "${branch.name}"?`)) return;
+    if (!await confirmAsync(`Delete branch "${branch.name}"?`, { danger: true, confirmLabel: 'Delete' })) return;
     deleteBranch(branch.id);
     if (editingId === branch.id) resetForm();
     showToast(`Branch "${branch.name}" deleted.`, 'info');

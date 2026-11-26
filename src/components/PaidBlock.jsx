@@ -23,6 +23,7 @@ import {
   Layers,
   Trash2
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 const STATUS_FILTERS = ['All', 'Active', 'Expiring Soon', PAID_STATUS_EXPIRED];
 
@@ -144,8 +145,8 @@ export const PaidBlock = () => {
 
   const countBy = (status) => visibleClients.filter(p => p.displayStatus === status).length;
 
-  const handleDelete = (record) => {
-    if (!window.confirm(`Remove ${record.clientName} from the Paid block? Their E-Sign record is kept.`)) return;
+  const handleDelete = async (record) => {
+    if (!await confirmAsync(`Remove ${record.clientName} from the Paid block? Their E-Sign record is kept.`, { danger: true, confirmLabel: 'Remove' })) return;
     deletePaidClient(record.id);
     showToast(`${record.clientName} removed from the Paid block.`, 'info');
   };

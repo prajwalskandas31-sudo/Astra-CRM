@@ -4,6 +4,7 @@ import { useToast } from './ToastNotification';
 import {
   NISM_MAX_DOCS, NISM_MAX_FILE_BYTES, listNismDocs, uploadNismDoc, deleteNismDoc, downloadNismDoc, saveBlobAs
 } from '../services/userNismService';
+import { confirmAsync } from './ConfirmDialog';
 
 export const EMPTY_NISM = { name: '', series: '', registrationNumber: '', enrollmentNumber: '', clearedDate: '', validUpto: '' };
 
@@ -117,7 +118,7 @@ export const NismExamDetailsPage = ({ userName, details, onChange, userId, pendi
       setPendingFiles(prev => prev.filter(p => p.id !== doc.id));
       return;
     }
-    if (!window.confirm(`Delete ${doc.fileName}? This cannot be undone.`)) return;
+    if (!await confirmAsync(`Delete ${doc.fileName}? This cannot be undone.`, { danger: true, confirmLabel: 'Delete' })) return;
     setBusy(doc.id);
     try {
       await deleteNismDoc(userId, doc.id);

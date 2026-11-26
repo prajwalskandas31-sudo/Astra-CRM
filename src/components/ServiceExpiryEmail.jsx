@@ -4,6 +4,7 @@ import { CalendarX2, Save, RotateCcw, Send, RefreshCw, CheckCircle2, AlertCircle
 import {
   getServiceExpiry, saveServiceExpiry, runServiceExpiryCheck, sendServiceExpiryTest, resendServiceExpiryEmail
 } from '../services/emailService';
+import { confirmAsync } from './ConfirmDialog';
 
 const btn = { display: 'inline-flex', alignItems: 'center', gap: '6px' };
 const TEMPLATE_FIELDS = ['subject', 'body'];
@@ -65,7 +66,7 @@ export const ServiceExpiryEmail = ({ canEdit }) => {
 
   const toggle = async () => {
     const enabled = !data.enabled;
-    if (enabled && dirty && !window.confirm('Your template changes are not saved yet. Turn on automatic emails with the saved template?')) return;
+    if (enabled && dirty && !await confirmAsync('Your template changes are not saved yet. Turn on automatic emails with the saved template?', { confirmLabel: 'Turn on' })) return;
     const res = await run('toggle', () => saveServiceExpiry({ enabled }),
       () => (enabled ? 'Service Expiry Email turned on. Clients are emailed the day their service ends.' : 'Service Expiry Email turned off.'));
     // Only the switch changed on the server; an unsaved draft stays in the form
@@ -90,7 +91,7 @@ export const ServiceExpiryEmail = ({ canEdit }) => {
   };
 
   const resend = async (entry) => {
-    if (!window.confirm(`Send the Service Expiry Email to ${entry.clientName}${entry.to ? ` (${entry.to})` : ''} now?`)) return;
+    if (!await confirmAsync(`Send the Service Expiry Email to ${entry.clientName}${entry.to ? ` (${entry.to})` : ''} now?`, { confirmLabel: 'Send now' })) return;
     const res = await run(`resend-${entry.id}`, () => resendServiceExpiryEmail(entry.paidId), r => `Service Expiry Email sent to ${r.to}.`);
     if (res) load();
   };

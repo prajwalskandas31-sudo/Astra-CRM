@@ -855,7 +855,7 @@ ${dailyAuditEvents.slice(0, 10).map((ev, i) => `${i + 1}. [${ev.contactPerson} /
               <div className="form-group" style={{ gridColumn: 'span 2', background: 'var(--bg-card, rgba(255,255,255,0.02))', padding: '14px', borderRadius: 'var(--radius-md, 8px)', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
                   <label style={{ fontWeight: 700, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, color: 'var(--text-primary)' }}>
-                    <Calendar size={15} color="var(--accent-primary)" /> Date Filter (Calendar Picker)
+                    <Calendar size={15} color="var(--accent-primary)" /> Date Filter
                   </label>
                   
                   {/* Mode Selector Tabs */}

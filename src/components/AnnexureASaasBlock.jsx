@@ -10,6 +10,7 @@ import {
   Cloud, Plus, Copy, Trash2, Save, Loader2, FileText, FileSpreadsheet, FileType, AlertTriangle,
   ArrowUp, ArrowDown, RotateCcw, ListPlus, RefreshCw
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 // Annexure A for SaaS Reporting (backend/annexure_a_saas.py): a manual input sheet in the exact layout of
 // the "Annexure A" format. Nothing is fetched from the rest of the CRM; every value is typed in here,
@@ -142,15 +143,15 @@ export const AnnexureASaasBlock = () => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
-  const leaveOk = () => !dirty || window.confirm('This report has unsaved changes. Discard them?');
+  const leaveOk = async () => !dirty || confirmAsync('This report has unsaved changes. Discard them?', { confirmLabel: 'Discard changes', danger: true });
 
-  const switchTo = (reportId) => { if (leaveOk()) open(reportId); };
+  const switchTo = async (reportId) => { if (await leaveOk()) open(reportId); };
 
   const create = async (e) => {
     e.preventDefault();
     const label = newName.trim();
     if (!label) { showToast('Give the report a name.', 'error'); return; }
-    if (creating === 'new' && !leaveOk()) return;
+    if (creating === 'new' && !(await leaveOk())) return;
     setBusy('create');
     try {
       const r = await createAnnexureReport(label, creating === 'copy' ? selectedId : undefined);
@@ -188,7 +189,7 @@ export const AnnexureASaasBlock = () => {
   };
 
   const remove = async () => {
-    if (!saved || !window.confirm(`Delete the report "${saved.label}"? This cannot be undone.`)) return;
+    if (!saved || !await confirmAsync(`Delete the report "${saved.label}"? This cannot be undone.`, { danger: true, confirmLabel: 'Delete' })) return;
     setBusy('delete');
     try {
       await deleteAnnexureReport(saved.id);
@@ -226,9 +227,9 @@ export const AnnexureASaasBlock = () => {
     rows.splice(at ?? rows.length, 0, blankRow(columns));
     return { ...d, rows };
   });
-  const removeRow = (i) => {
+  const removeRow = async (i) => {
     if (draft.rows.length <= 1) { showToast('The report needs at least one row.', 'error'); return; }
-    if (isFilled(draft.rows[i], columns) && !window.confirm(`Remove SN ${i + 1}? What was typed in it will be lost.`)) return;
+    if (isFilled(draft.rows[i], columns) && !await confirmAsync(`Remove SN ${i + 1}? What was typed in it will be lost.`, { danger: true, confirmLabel: 'Remove' })) return;
     setDraft(d => ({ ...d, rows: d.rows.filter((_, j) => j !== i) }));
   };
   const moveRow = (i, by) => setDraft(d => {

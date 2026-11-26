@@ -304,7 +304,7 @@ export const FeatureAccessBlock = () => {
         <div style={{ marginTop: '16px', padding: '10px 14px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <Sparkles size={16} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
           <span>
-            <strong>Permission Engine Rule:</strong> If all features are enabled for an Executive or Team Lead, that user gains access to <strong>all CRM capabilities available to the Super Admin</strong>. If a specific feature is toggled OFF, that feature is instantly locked and hidden from that user.
+            <strong>How it works:</strong> If all features are enabled for an Executive or Team Lead, that user gains access to <strong>all CRM capabilities available to the Super Admin</strong>. If a specific feature is toggled OFF, that feature is instantly locked and hidden from that user.
           </span>
         </div>
       </div>

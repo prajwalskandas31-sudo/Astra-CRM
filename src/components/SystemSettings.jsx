@@ -13,6 +13,7 @@ import { getLeegalityBackendStatus, getLeegalityWallet } from '../services/leega
 import { DigitalSignatureVault } from './DigitalSignatureVault';
 import { LoginDisclaimerSettings } from './LoginDisclaimerSettings';
 import { isBackendAuthoritative, verifyPasswordWithServer } from '../services/backendConfig';
+import { confirmAsync } from './ConfirmDialog';
 
 export const SystemSettings = () => {
   const { 
@@ -41,7 +42,8 @@ export const SystemSettings = () => {
     financialSettings = {},
     updateFinancialSettings,
     leegalityConfig,
-    updateLeegalityConfig
+    updateLeegalityConfig,
+    purgeAllData
   } = useCRM();
   const { showToast } = useToast();
 
@@ -177,8 +179,8 @@ export const SystemSettings = () => {
     }
   };
 
-  const handleDeleteDocType = (dt) => {
-    if (window.confirm(`Delete document slot '${dt.name}'?`)) {
+  const handleDeleteDocType = async (dt) => {
+    if (await confirmAsync(`Delete document slot '${dt.name}'?`, { danger: true, confirmLabel: 'Delete' })) {
       deleteDocumentType(dt.id);
       showToast(`Document slot '${dt.name}' removed.`, 'info');
     }
@@ -218,7 +220,7 @@ export const SystemSettings = () => {
   };
 
   const handleDeleteCustomField = async (field) => {
-    if (window.confirm(`Are you sure you want to delete custom field '${field.fieldName}'?`)) {
+    if (await confirmAsync(`Are you sure you want to delete custom field '${field.fieldName}'?`, { danger: true, confirmLabel: 'Delete' })) {
       await deleteUserCustomField(field.id);
       showToast(`Custom field '${field.fieldName}' deleted.`, 'info');
     }
@@ -1400,7 +1402,6 @@ export const SystemSettings = () => {
                         setIpGuardPassword(e.target.value);
                         if (ipGuardPasswordError) setIpGuardPasswordError('');
                       }}
-                      autoFocus
                       style={{
                         width: '100%',
                         padding: '10px 42px 10px 12px',
@@ -1674,8 +1675,8 @@ export const SystemSettings = () => {
                             backgroundColor: '#ef444410', color: '#ef4444',
                             cursor: 'pointer'
                           }}
-                          onClick={() => {
-                            if (window.confirm(`Reset ALL registered IPs for ${u.name}? They will be able to log in from any IP and a new IP will be registered on their next login.`)) {
+                          onClick={async () => {
+                            if (await confirmAsync(`Reset ALL registered IPs for ${u.name}? They will be able to log in from any IP and a new IP will be registered on their next login.`, { danger: true, confirmLabel: 'Reset IPs' })) {
                               resetUserIPs(u.id);
                               showToast(`All IPs reset for ${u.name}. They can now log in from any location.`, 'info');
                               setIPForceRefresh(v => v + 1);
@@ -1692,6 +1693,35 @@ export const SystemSettings = () => {
             </div>
           </div>
         )
+      )}
+
+      {/* Danger zone: wipes the shared lead / sales data on the server for everyone */}
+      {currentUser?.role === 'Super Admin' && (
+        <div className="directory-card danger-zone-card">
+          <div>
+            <h3><AlertCircle size={16} /> Danger zone</h3>
+            <p>
+              <strong>Clear all lead &amp; sales data</strong> permanently deletes, for every user: all leads, all sales
+              (with their Client Information), assignment files, master records and lead requests. Users, settings,
+              Paid and E-Sign records are kept. This cannot be undone.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-danger"
+            onClick={async () => {
+              const ok = await confirmAsync(
+                'This permanently deletes ALL leads, ALL sales (with their Client Information), assignment files, master records and lead requests for every user. It cannot be undone.',
+                { title: 'Clear all lead & sales data?', danger: true, confirmLabel: 'Delete everything', requireText: 'DELETE ALL LEADS' }
+              );
+              if (!ok) return;
+              purgeAllData();
+              showToast('All lead and sales data has been cleared.', 'info');
+            }}
+          >
+            <Trash2 size={14} /> Clear all lead &amp; sales data
+          </button>
+        </div>
       )}
 
     </div>

@@ -18,6 +18,7 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 export const EmployeeDocumentsModal = ({ isOpen, onClose, user }) => {
   const {
@@ -102,7 +103,7 @@ export const EmployeeDocumentsModal = ({ isOpen, onClose, user }) => {
   };
 
   const handleDelete = async (doc) => {
-    if (window.confirm(`Are you sure you want to remove '${doc.documentName}' from ${user.name}'s records?`)) {
+    if (await confirmAsync(`Are you sure you want to remove '${doc.documentName}' from ${user.name}'s records?`, { danger: true, confirmLabel: 'Remove' })) {
       await deleteUserDocument(user.id, doc.id);
       showToast(`'${doc.documentName}' removed from Owner's Database.`, 'info');
       if (previewDoc?.id === doc.id) {

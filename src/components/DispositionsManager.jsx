@@ -55,7 +55,7 @@ export const DispositionsManager = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Layers size={18} color="var(--accent-primary)" /> Dispositions & Pipeline Manager (Block 2 Settings)
+              <Layers size={18} color="var(--accent-primary)" /> Dispositions
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Configure client lead stages and date/time controls. Dispositions added here generate shortcut buttons on the user CRM Dashboard.
@@ -73,7 +73,7 @@ export const DispositionsManager = () => {
       {/* Visual Pipeline Flow */}
       <div className="directory-card" style={{ padding: '20px 24px' }}>
         <h4 style={{ fontSize: '0.86rem', marginBottom: '14px', color: 'var(--text-secondary)' }}>
-          Active Pipeline Stage Flow Architecture:
+          Lead stages, in order:
         </h4>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
           {dispositions.map((d, index) => (
@@ -106,7 +106,7 @@ export const DispositionsManager = () => {
         <div className="directory-toolbar">
           <div className="directory-title-area">
             <h3>Configured Disposition List</h3>
-            <p>Super Admin authorization enabled for pipeline configuration & dynamic calendar toggles.</p>
+            <p>Every disposition, and whether it asks for a follow-up date and time.</p>
           </div>
         </div>
 

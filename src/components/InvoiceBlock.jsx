@@ -6,6 +6,7 @@ import {
 import {
   Receipt, Search, Download, FileText, Loader2, SlidersHorizontal, Sparkles, Save, AlertTriangle, RefreshCw, ChevronDown, ChevronUp
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 // Invoice Block: tax invoices for every client who has e-signed (backend/invoice_block.py).
 
@@ -238,7 +239,7 @@ const ClientRow = ({ row, onGenerated }) => {
     if (kind === 2 && !row.serviceValue) {
       return showToast(`Invoice 2 needs the Value (₹) of '${row.serviceName}' in the Service Master.`, 'error');
     }
-    if (inv && !window.confirm(`Re-issue ${inv.number} as Invoice ${kind} with the current details? The number and date stay the same.`)) return;
+    if (inv && !await confirmAsync(`Re-issue ${inv.number} as Invoice ${kind} with the current details? The number and date stay the same.`, { confirmLabel: 'Re-issue' })) return;
     setBusy(true);
     try {
       const saved = await generateInvoice(row.saleId, kind);

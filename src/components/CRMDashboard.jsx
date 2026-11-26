@@ -288,7 +288,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                Block 2 Report Counter Sync
+                New Leads Waiting
               </span>
               <h3 style={{ fontSize: '1.4rem', marginTop: '4px', color: '#3b82f6', fontWeight: 700 }}>
                 {newLeadsCount} <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>New Leads</span>
@@ -297,7 +297,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
             <UserCheck size={28} color="#3b82f6" style={{ opacity: 0.8 }} />
           </div>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Default disposition assigned on upload & pipeline assignment. Auto-synced with Block 3 Report block.
+            Leads not yet called. Every uploaded or assigned lead starts as New Lead.
           </p>
         </div>
 
@@ -426,9 +426,9 @@ export const CRMDashboard = ({ onOpenBlock }) => {
       <div className="alert-box alert-info" style={{ margin: 0, padding: '12px 16px', alignItems: 'center' }}>
         <PhoneOff size={18} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <strong style={{ fontSize: '0.86rem' }}>Post-Call Disconnect Workflow (Block 2 Core):</strong>
+          <strong style={{ fontSize: '0.86rem' }}>After each call:</strong>
           <span style={{ fontSize: '0.8rem', display: 'block', color: 'var(--text-secondary)' }}>
-            Users manually update disposition status after completing a sales call. Click "Call Disconnect" on any lead row below to trigger post-call disposition & date/time selection.
+            Click "Call Disconnect" on the lead you just called to record the outcome (and a follow-up date and time if needed).
           </span>
         </div>
       </div>
@@ -441,9 +441,9 @@ export const CRMDashboard = ({ onOpenBlock }) => {
             <p>
               {isSuperAdmin
                 ? (adminViewUserFilter === 'ALL' || adminViewUserFilter === 'AUTO'
-                    ? `Enterprise Wide Pipeline • ${scopedLeads.length} Total Assigned Leads`
-                    : `Viewing User Pipeline: ${users?.find(u => u.id === adminViewUserFilter)?.name || 'User'} (${users?.find(u => u.id === adminViewUserFilter)?.role || 'User'}) • Exactly ${scopedLeads.length} Assigned Leads`)
-                : `User Personal Pipeline: ${currentUser?.name || 'User'} (${currentUser?.role || simulatedRole}) • Exactly ${scopedLeads.length} Assigned Leads`}
+                    ? `Whole company • ${scopedLeads.length} assigned ${scopedLeads.length === 1 ? 'lead' : 'leads'}`
+                    : `${users?.find(u => u.id === adminViewUserFilter)?.name || 'User'} (${users?.find(u => u.id === adminViewUserFilter)?.role || 'User'}) • ${scopedLeads.length} assigned ${scopedLeads.length === 1 ? 'lead' : 'leads'}`)
+                : `Your leads • ${scopedLeads.length} assigned ${scopedLeads.length === 1 ? 'lead' : 'leads'}`}
             </p>
           </div>
 
@@ -451,14 +451,14 @@ export const CRMDashboard = ({ onOpenBlock }) => {
 
             {isSuperAdmin && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Inspect User Pipeline:</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Show leads of:</span>
                 <select
                   value={adminViewUserFilter}
                   onChange={(e) => setAdminViewUserFilter(e.target.value)}
                   style={{ fontSize: '0.8rem', padding: '5px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
                 >
                   <option value="ALL">All Assigned Leads ({leads.filter(l => !l.isUnassigned && l.assignedToId && l.assignedToName !== 'Unassigned').length})</option>
-                  <optgroup label="Select Specific User Pipeline (Block 1 Hierarchy)">
+                  <optgroup label="One user">
                     {users?.filter(u => u.status === 'Active').map(u => {
                       const count = leads.filter(l => !l.isUnassigned && l.assignedToId !== 'unassigned' && l.assignedToName !== 'Unassigned' && (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name)).length;
                       return (
@@ -489,7 +489,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
               {filteredLeads.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                    No leads found matching disposition filter '{selectedDispFilter}'.
+                    {selectedDispFilter === 'All' ? 'No leads assigned yet.' : `No leads with the disposition "${selectedDispFilter}".`}
                   </td>
                 </tr>
               ) : (
@@ -1003,7 +1003,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
             <form onSubmit={handleLeadRequestSubmit}>
               <div className="modal-body">
                 <div className="alert-box alert-info" style={{ marginBottom: '14px', fontSize: '0.78rem' }}>
-                  Submitting as: <strong>{currentUser?.name || 'User'}</strong> ({simulatedRole}). This sends an inbound allocation request directly to Super Admin Block 4 queue.
+                  Submitting as: <strong>{currentUser?.name || 'User'}</strong> ({simulatedRole}). The request goes to the Super Admin's Lead Summary queue.
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '12px' }}>

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { styleHeaderRow, writeReport } from '../lib/reportExcel';
+import { confirmAsync } from './ConfirmDialog';
 
 // How a user is paid; must match PAY_TYPES in backend/main.py
 const PAY_TYPES = ['Commission', 'Salary', 'Salary plus Incentives'];
@@ -402,7 +403,7 @@ export const UserModal = ({ isOpen, onClose, userToEdit = null }) => {
   };
 
   const handleDeleteCustomField = async (fieldId, fieldName) => {
-    if (window.confirm(`Are you sure you want to delete custom field '${fieldName}'?`)) {
+    if (await confirmAsync(`Are you sure you want to delete custom field '${fieldName}'?`, { danger: true, confirmLabel: 'Delete' })) {
       await deleteUserCustomField(fieldId);
       showToast(`Custom field '${fieldName}' deleted.`, 'info');
       setCustomFieldValues(prev => {

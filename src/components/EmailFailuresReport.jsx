@@ -6,6 +6,7 @@ import { MailX, RefreshCw, Download, CheckCircle2, AlertCircle, Clock, Search, U
 import {
   getEmailFailures, scanEmailBounces, markEmailFailureReviewed, unmarkEmailFailureReviewed
 } from '../services/emailService';
+import { promptAsync } from './ConfirmDialog';
 
 const btn = { display: 'inline-flex', alignItems: 'center', gap: '6px' };
 // The mailbox is re-read automatically when the last check is older than this
@@ -95,7 +96,7 @@ export const EmailFailuresReport = () => {
   const review = async (row) => {
     let note = '';
     if (!row.review) {
-      note = window.prompt(`Follow-up note for ${row.clientName || row.to} (optional):`, '');
+      note = await promptAsync(`Follow-up note for ${row.clientName || row.to} (optional):`, '');
       if (note === null) return;
     }
     setBusyId(row.id);

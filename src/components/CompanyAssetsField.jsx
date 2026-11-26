@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Package, Settings2, X, Edit2, Trash2, Check, Plus } from 'lucide-react';
 import { useCRM, MAX_COMPANY_ASSETS } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
+import { confirmAsync } from './ConfirmDialog';
 
 // "Company Assets Provided" in Add / Edit User: pick from a dropdown of up to 10 asset items.
 // A Super Admin can add, rename and remove those items from the same place.
@@ -46,8 +47,8 @@ export const CompanyAssetsField = ({ value = [], onChange }) => {
     setEditingId(null);
   };
 
-  const handleDelete = (asset) => {
-    if (!window.confirm(`Remove '${asset.name}' from the asset list? Users who already have it will show it as a removed asset.`)) return;
+  const handleDelete = async (asset) => {
+    if (!await confirmAsync(`Remove '${asset.name}' from the asset list? Users who already have it will show it as a removed asset.`, { danger: true, confirmLabel: 'Remove' })) return;
     deleteCompanyAsset(asset.id);
     if (editingId === asset.id) setEditingId(null);
   };

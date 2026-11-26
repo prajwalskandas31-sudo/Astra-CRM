@@ -4,6 +4,7 @@ import { tableSheet, writeReport } from '../lib/reportExcel';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { NotebookPen, Plus, Trash2, Download, Search } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 /*
  * Records for Research Recommendations: the register kept in the "Records for Research Recommendations"
@@ -150,9 +151,9 @@ export const ResearchRecommendationsBlock = () => {
     showToast('Recommendation saved.', 'success');
   };
 
-  const handleDelete = (record) => {
+  const handleDelete = async (record) => {
     const name = `${record.srNo ? `Sr. No ${record.srNo} - ` : ''}${record.product || 'this recommendation'}`;
-    if (!window.confirm(`Delete the recommendation "${name}" dated ${showDate(record.date)}? This cannot be undone.`)) return;
+    if (!await confirmAsync(`Delete the recommendation "${name}" dated ${showDate(record.date)}? This cannot be undone.`, { danger: true, confirmLabel: 'Delete' })) return;
     deleteResearchRecommendation(record.id);
     showToast('Recommendation deleted.', 'info');
   };

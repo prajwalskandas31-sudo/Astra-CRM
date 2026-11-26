@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useToast } from './ToastNotification';
 import { Landmark, Plus, Save, RotateCcw, Edit2, Trash2, ExternalLink } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 export const ACCOUNT_TYPES = ['Current', 'Savings', 'Cash Credit', 'Overdraft', 'Other'];
 
@@ -65,8 +66,8 @@ export const CompanyBankAccounts = ({ accounts = [], canEdit, onChange }) => {
     setForm({ ...EMPTY, ...Object.fromEntries(Object.keys(EMPTY).map(k => [k, a[k] || EMPTY[k]])) });
   };
 
-  const handleDelete = (a) => {
-    if (!window.confirm(`Delete the ${a.bankName} account ending ${String(a.accountNumber).slice(-4)}?`)) return;
+  const handleDelete = async (a) => {
+    if (!await confirmAsync(`Delete the ${a.bankName} account ending ${String(a.accountNumber).slice(-4)}?`, { danger: true, confirmLabel: 'Delete' })) return;
     onChange(accounts.filter(x => x.id !== a.id));
     if (editingId === a.id) reset();
     showToast(`${a.bankName} account deleted.`, 'info');

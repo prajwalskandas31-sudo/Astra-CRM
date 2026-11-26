@@ -29,8 +29,7 @@ export const UserDirectory = () => {
     leads,
     simulatedRole, 
     toggleUserStatus, 
-    deleteUser, 
-    purgeAllData,
+    deleteUser,
     toggleAdminAccess, 
     changeUserPassword,
     hasPermission,
@@ -61,8 +60,8 @@ export const UserDirectory = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.mobile.includes(searchTerm) ||
+      (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(user.mobile || '').includes(searchTerm) ||
       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (user.employeeId && user.employeeId.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -222,25 +221,10 @@ export const UserDirectory = () => {
               <option value="Executive">Executive</option>
             </select>
 
-            <button className="btn-secondary" onClick={() => { setSearchTerm(''); setStatusFilter('Active'); setRoleFilter('All'); }} title="Refresh Directory">
+            <button className="btn-secondary" onClick={() => { setSearchTerm(''); setStatusFilter('Active'); setRoleFilter('All'); }} title="Clear search and filters" aria-label="Clear search and filters">
               <RefreshCw size={15} />
             </button>
 
-            {isSuperAdmin && (
-              <button 
-                className="btn-danger" 
-                style={{ padding: '7px 12px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to delete ALL CRM leads and activity data now? This will reset all active leads, master records, and assignment instances.')) {
-                    purgeAllData();
-                    showToast('All CRM lead and activity data has been wiped.', 'info');
-                  }
-                }}
-                title="Wipe and reset all leads data"
-              >
-                <Trash2 size={14} /> Clear All Data
-              </button>
-            )}
             {hasPermission('user-management') && (
               <button className="btn-primary" onClick={() => { setEditingUser(null); setIsAddModalOpen(true); }}>
                 <UserPlus size={15} /> Add User

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { Tags, Plus, Trash2 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 // Limits match _service_check in backend/sync.py
 const NAME_MAX = 60;
@@ -67,12 +68,12 @@ export const ServiceMasterBlock = () => {
     showToast(`Service "${name}" saved.`, 'success');
   };
 
-  const handleDelete = (srv) => {
+  const handleDelete = async (srv) => {
     if (services.length <= 1) {
       showToast('At least one service must remain in the Service Master.', 'warning');
       return;
     }
-    if (!window.confirm(`Delete the service "${srv.name}"? Clients already saved with it keep their service.`)) return;
+    if (!await confirmAsync(`Delete the service "${srv.name}"? Clients already saved with it keep their service.`, { danger: true, confirmLabel: 'Delete' })) return;
     deleteService(srv.id);
     showToast(`Service "${srv.name}" deleted.`, 'info');
   };

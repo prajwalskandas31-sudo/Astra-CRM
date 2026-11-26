@@ -283,6 +283,8 @@ const TechOrbitDisplay = memo(function TechOrbitDisplay({
 }) {
   return (
     <section className='relative flex h-full w-full min-h-[480px] flex-col items-center justify-center overflow-hidden rounded-2xl'>
+      {/* Soft backdrop so orbiting icons pass behind the wordmark instead of over it */}
+      <div className='pointer-events-none absolute left-1/2 top-1/2 h-[130px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0c0d13] blur-2xl z-[5]' />
       <span className='pointer-events-none whitespace-pre-wrap bg-gradient-to-b from-white via-neutral-200 to-neutral-600 bg-clip-text text-center text-5xl md:text-6xl font-extrabold tracking-tight text-transparent select-none z-10'>
         {text}
       </span>
@@ -319,6 +321,7 @@ const AnimatedForm = memo(function AnimatedForm({
   textVariantButton,
   errorField,
   noticeField,
+  submitting = false,
   fieldPerRow = 1,
   onSubmit,
   goTo,
@@ -346,11 +349,9 @@ const AnimatedForm = memo(function AnimatedForm({
     event.preventDefault();
     const formErrors = validateForm(event);
 
-    if (Object.keys(formErrors).length === 0) {
-      onSubmit(event);
-    } else {
-      setErrors(formErrors);
-    }
+    if (submitting) return;
+    setErrors(formErrors);
+    if (Object.keys(formErrors).length === 0) onSubmit(event);
   };
 
   return (
@@ -402,7 +403,11 @@ const AnimatedForm = memo(function AnimatedForm({
                     name={field.label}
                     value={field.value}
                     placeholder={field.placeholder}
-                    onChange={field.onChange}
+                    onChange={(e) => {
+                      field.onChange(e);
+                      // A field's "is required" message goes away as soon as something is typed in it
+                      if (errors[field.label]) setErrors(prev => { const next = { ...prev }; delete next[field.label]; return next; });
+                    }}
                     autoComplete={field.type === 'password' ? 'current-password' : 'username'}
                   />
 
@@ -454,11 +459,13 @@ const AnimatedForm = memo(function AnimatedForm({
           overflow='visible'
         >
           <button
-            className='bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-purple-500 relative group/btn block w-full text-white rounded-lg h-11 font-semibold text-sm shadow-[0_0_20px_rgba(99,102,241,0.35)] outline-none hover:cursor-pointer transition duration-200 mt-2'
+            className='bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-purple-500 relative group/btn block w-full text-white rounded-lg h-11 font-semibold text-sm shadow-[0_0_20px_rgba(99,102,241,0.35)] outline-none hover:cursor-pointer transition duration-200 mt-2 disabled:opacity-70 disabled:cursor-wait'
             type='submit'
+            disabled={submitting}
+            aria-busy={submitting}
           >
             <span className='flex items-center justify-center gap-2'>
-              {submitButton} &rarr;
+              {submitButton}{!submitting && <> &rarr;</>}
             </span>
             <BottomGradient />
           </button>

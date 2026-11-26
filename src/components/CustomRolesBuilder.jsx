@@ -16,6 +16,7 @@ import {
   ChevronRight,
   UserCheck
 } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 export const CustomRolesBuilder = () => {
   const { 
@@ -77,7 +78,7 @@ export const CustomRolesBuilder = () => {
   };
 
   const handleDeleteRole = async (role) => {
-    if (window.confirm(`Are you sure you want to delete custom role "${role.roleName}"? This action cannot be undone.`)) {
+    if (await confirmAsync(`Are you sure you want to delete custom role "${role.roleName}"? This action cannot be undone.`, { danger: true, confirmLabel: 'Delete' })) {
       await deleteCustomRole(role.id);
       showToast(`Custom Role "${role.roleName}" deleted successfully.`, 'info');
     }
@@ -131,7 +132,7 @@ export const CustomRolesBuilder = () => {
               <Shield size={20} />
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, letterSpacing: '-0.02em' }}>
-              Custom Roles Builder (Annexure-I)
+              Custom Roles
             </h2>
             <span 
               style={{
@@ -212,7 +213,7 @@ export const CustomRolesBuilder = () => {
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
               You currently do not have administrative authorization to provision or modify custom role matrices. 
-              Contact your Super Administrator to enable the <strong>'Custom Roles Builder (Annexure-I)'</strong> permission inside the Feature Access Block.
+              Contact your Super Administrator to enable the <strong>'Custom Roles'</strong> permission inside the Feature Access Block.
             </div>
           </div>
         </div>
@@ -386,7 +387,7 @@ export const CustomRolesBuilder = () => {
                         {searchQuery ? 'No custom roles match your filter criteria.' : 'No custom roles provisioned yet.'}
                       </div>
                       <div style={{ fontSize: '0.78rem' }}>
-                        {canManageCustomRoles ? 'Use the form above to provision your first Annexure-I role.' : 'Contact administrator for access.'}
+                        {canManageCustomRoles ? 'Use the form above to add your first custom role.' : 'Contact administrator for access.'}
                       </div>
                     </div>
                   </td>

@@ -8,6 +8,7 @@ import {
   tableRows, crmRows, generalAuto, generalValue, complaintCells, feeAuto, feeValue, feeCells, buildWorkbook, fileName
 } from './raPeriodicReport';
 import { ScrollText, RefreshCw, FileSpreadsheet, Loader2, Save, RotateCcw, AlertTriangle, Plus, Trash2, Copy, Database } from 'lucide-react';
+import { confirmAsync } from './ConfirmDialog';
 
 // RA Periodic Report Block (backend/ra_periodic_report.py): the SEBI RA half-yearly periodic report in
 // 11 sub-blocks. The CRM fills in what it knows, the user types the rest (or over the CRM's values),
@@ -316,10 +317,10 @@ export const RaPeriodicReportBlock = () => {
     writeReport(buildWorkbook(XLSX, data, draft, ids), fileName(data, ids));
   };
 
-  const copyPrevious = () => {
+  const copyPrevious = async () => {
     const prev = data?.previous;
     if (!prev) return;
-    if (!window.confirm(`Copy General Details and the list sub-blocks from ${prev.label}? Complaints and Clients And Fees stay as they are for this half.`)) return;
+    if (!await confirmAsync(`Copy General Details and the list sub-blocks from ${prev.label}? Complaints and Clients And Fees stay as they are for this half.`, { confirmLabel: 'Copy' })) return;
     const { complaints, clientsFees, ...rest } = normalize(prev.data); // eslint-disable-line no-unused-vars
     setDraft(d => ({ ...normalize(rest), complaints: d.complaints, clientsFees: d.clientsFees }));
     showToast(`Copied from ${prev.label}. Check the values, then Save.`, 'info');

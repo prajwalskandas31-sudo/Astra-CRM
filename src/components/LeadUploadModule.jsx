@@ -96,7 +96,7 @@ export const LeadUploadModule = () => {
     setMasterError('');
 
     if (!masterInputText.trim()) {
-      showToast('Please paste CSV/Excel dataset or load sample data.', 'warning');
+      showToast('Paste the leads or upload a CSV / Excel file first.', 'warning');
       return;
     }
 
@@ -178,7 +178,7 @@ export const LeadUploadModule = () => {
     const lowerName = file.name.toLowerCase();
     const isValid = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlxs') || lowerName.endsWith('.xls');
     if (!isValid) {
-      showToast('Invalid file format. Please upload an Excel (.xlxs or .xlsx) file.', 'error');
+      showToast('Invalid file format. Please upload an Excel file (.xlsx or .xls).', 'error');
       e.target.value = '';
       return;
     }
@@ -225,7 +225,7 @@ export const LeadUploadModule = () => {
     setBulkError('');
 
     if (!bulkInputText.trim()) {
-      showToast('Please paste CSV dataset or click Load Sample Data.', 'warning');
+      showToast('Paste the leads or upload a CSV / Excel file first.', 'warning');
       return;
     }
 
@@ -396,7 +396,7 @@ export const LeadUploadModule = () => {
     }
 
     if (!assignTargetUserId) {
-      showToast('Validation: Please select a target user from the Block 1 Hierarchy.', 'warning');
+      showToast('Validation: Please pick the user to assign the leads to.', 'warning');
       return;
     }
 
@@ -415,12 +415,12 @@ export const LeadUploadModule = () => {
 
     // Quantity Validation: Prevent allocation if zero available or exceeds total unassigned leads
     if (availableCount === 0) {
-      showToast(`Quantity Validation: No unassigned leads available in the queue for language '${assignLang}'. Allocation strictly prevented.`, 'error');
+      showToast(`Quantity Validation: There are no unassigned ${assignLang} leads to assign.`, 'error');
       return;
     }
 
     if (qty > availableCount) {
-      showToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Requested quantity exceeds total unassigned leads (${availableCount}) available for language '${assignLang}'. Allocation strictly prevented.`, 'error');
+      showToast(`Quantity Validation: Cannot allocate ${qty} lead(s). Only ${availableCount} unassigned ${assignLang} lead(s) are available.`, 'error');
       return;
     }
 
@@ -479,7 +479,7 @@ export const LeadUploadModule = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Block 3 Lead Upload & Performance Report</title>
+        <title>Lead Upload & Performance Report</title>
         <style>
           body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 40px; margin: 0; line-height: 1.5; }
           .header { border-bottom: 3px solid #3b82f6; padding-bottom: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; }
@@ -498,7 +498,7 @@ export const LeadUploadModule = () => {
         <div class="header">
           <div>
             <h1>ASTRA CRM - BLOCK 3 REPORT</h1>
-            <p>Lead Upload Module & Block 2 Disposition Performance Metrics</p>
+            <p>Lead Upload & Disposition Performance</p>
           </div>
           <div style="text-align: right;">
             <p><strong>Generated:</strong> ${today}</p>
@@ -532,7 +532,7 @@ export const LeadUploadModule = () => {
         </div>
 
         <div class="section">
-          <div class="section-title">Page 2: User Level View - Block 2 Disposition Counter (New Lead Status)</div>
+          <div class="section-title">Page 2: New Leads per User</div>
           <p style="font-size: 13px; color: #475569;">Aggregated count of active leads with <strong>"New Lead"</strong> status assigned under each user's disposition.</p>
           <table>
             <thead>
@@ -559,7 +559,7 @@ export const LeadUploadModule = () => {
         </div>
 
         <div class="footer">
-          Report automatically compiled by Astra CRM Block 3 Module • Confidential & Proprietary
+          Report compiled by Astra CRM • Confidential & Proprietary
         </div>
 
         <script>
@@ -571,7 +571,7 @@ export const LeadUploadModule = () => {
 
     printWindow.document.write(htmlContent);
     printWindow.document.close();
-    showToast('Block 3 PDF Report window opened for instant printing/download.', 'success');
+    showToast('The PDF report opened in a new window, ready to print or save.', 'success');
   };
 
   const filteredMasterRecords = masterRecords.filter(m => 
@@ -588,10 +588,10 @@ export const LeadUploadModule = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-              <Upload size={18} color="var(--accent-primary)" /> Lead Upload Module & Block 3 Report Sync
+              <Upload size={18} color="var(--accent-primary)" /> Lead Upload & Reports
             </h3>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-              Lead management system: Bulk upload, single entry, language-based allocation engine (Block 1 hierarchy routing), and Block 3 real-time synced reports.
+              Upload leads in bulk or one at a time, and see lead reports by language and user.
             </p>
           </div>
 
@@ -622,7 +622,7 @@ export const LeadUploadModule = () => {
                 onClick={() => setActiveSubBlock('report')}
                 style={{ fontSize: '0.8rem', padding: '6px 12px' }}
               >
-                <BarChart3 size={13} /> Block 3 Reports
+                <BarChart3 size={13} /> Reports
               </button>
             )}
           </div>
@@ -674,7 +674,7 @@ export const LeadUploadModule = () => {
                 rows={4}
                 value={masterInputText}
                 onChange={(e) => setMasterInputText(e.target.value)}
-                placeholder="CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;Vikramaditya Shah, +91 99000 11111, Hindi&#10;Deepika Sen, +91 99000 22222, English&#10;Ganesh Hedge, +91 99000 33333, Kannada"
+                placeholder="Paste rows here, one record per line, in this order:&#10;CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;&#10;Example:  Full Name, 98xxxxxxxx, Hindi"
                 style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
               />
             </div>
@@ -682,13 +682,6 @@ export const LeadUploadModule = () => {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="submit" className="btn-primary">
                 Upload & Process Master Dataset
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setMasterInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nVikramaditya Shah, +91 99000 11111, Hindi\nDeepika Sen, +91 99000 22222, English\nGanesh Hedge, +91 99000 33333, Kannada\nSiddharth Malhotra, +91 99000 44444, Tamil")}
-              >
-                Load Sample Master Dataset
               </button>
             </div>
           </form>
@@ -744,7 +737,7 @@ export const LeadUploadModule = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="directory-card" style={{ padding: '20px 24px' }}>
             <h4 style={{ fontSize: '0.95rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Upload size={16} color="var(--accent-primary)" /> Sub-Block 1: Bulk Upload Option (Super Admin)
+              <Upload size={16} color="var(--accent-primary)" /> Bulk Upload (Super Admin)
             </h4>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
               Bulk lead processing engine. Compares uploaded entries against master data record database. All new successful leads initialize with default status <strong>New Lead</strong>.
@@ -799,7 +792,7 @@ export const LeadUploadModule = () => {
                     onClick={() => excelFileInputRef.current && excelFileInputRef.current.click()}
                     style={{ fontSize: '0.82rem', padding: '7px 14px', display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', borderColor: '#10b981', color: '#10b981' }}
                   >
-                    <FileSpreadsheet size={14} /> Upload .XLXS / .XLSX File
+                    <FileSpreadsheet size={14} /> Upload Excel File (.xlsx / .xls)
                   </button>
 
                   <div style={{ flex: 1, minWidth: '200px' }}>
@@ -813,7 +806,7 @@ export const LeadUploadModule = () => {
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Select a <strong>.csv</strong> or <strong>.xlsx / .xlxs</strong> file (Columns: CONTACT NAME, CONTACT NUMBER, LANGUAGE)
+                        Select a <strong>.csv</strong> or <strong>.xlsx / .xls</strong> file (Columns: CONTACT NAME, CONTACT NUMBER, LANGUAGE)
                       </span>
                     )}
                   </div>
@@ -826,7 +819,7 @@ export const LeadUploadModule = () => {
                   rows={5}
                   value={bulkInputText}
                   onChange={(e) => { setBulkInputText(e.target.value); setCsvFileName(''); setExcelFileName(''); }}
-                  placeholder="CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;Sunil Varma, +91 98888 11111, Kannada&#10;Meera Sen, +91 98888 22222, Telugu&#10;Deepak Roy, +91 98888 33333, Hindi&#10;Rohan Mehta, +91 91234 56789, Hindi&#10;Incomplete Lead, , Tamil"
+                  placeholder="Paste rows here, one lead per line, in this order:&#10;CONTACT NAME, CONTACT NUMBER, LANGUAGE&#10;&#10;Example:  Full Name, 98xxxxxxxx, Hindi"
                   style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}
                 />
               </div>
@@ -834,13 +827,6 @@ export const LeadUploadModule = () => {
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="submit" className="btn-primary">
                   Process Bulk Upload Sheet
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => { setBulkInputText("CONTACT NAME, CONTACT NUMBER, LANGUAGE\nSunil Varma, +91 98888 11111, Kannada\nMeera Sen, +91 98888 22222, Telugu\nDeepak Roy, +91 98888 33333, Hindi\nRohan Mehta, +91 91234 56789, Hindi\nIncomplete Lead, , Tamil"); setCsvFileName('Sample_Bulk_Leads.csv'); setExcelFileName(''); }}
-                >
-                  Load Sample Bulk Dataset
                 </button>
               </div>
             </form>
@@ -988,7 +974,7 @@ export const LeadUploadModule = () => {
               <div className="directory-card" style={{ padding: '22px 24px', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
                   <h4 style={{ fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 700 }}>
-                    <UserCheck size={18} color="var(--accent-primary)" /> Language-Based Lead Assignment Engine (Block 1 Routing)
+                    <UserCheck size={18} color="var(--accent-primary)" /> Assign Leads by Language
                   </h4>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="badge" style={{ backgroundColor: currentLangAvailableCount > 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.12)', color: currentLangAvailableCount > 0 ? '#3b82f6' : '#ef4444', fontWeight: 700, padding: '4px 10px', fontSize: '0.78rem' }}>
@@ -1001,7 +987,7 @@ export const LeadUploadModule = () => {
                 </div>
 
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                  Super Admin allocates uploaded leads to users in the <strong>Block 1 Hierarchy</strong>. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
+                  Super Admin allocates uploaded leads to users. The batch size is strictly limited to the exact numeric value specified in <strong>Assign Quantity</strong> and validated against available unassigned leads.
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', alignItems: 'start' }}>
@@ -1062,12 +1048,12 @@ export const LeadUploadModule = () => {
                     {/* Live Validation Guidance */}
                     {currentLangAvailableCount === 0 && (
                       <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={12} /> 0 unassigned leads in queue for {assignLang}. Allocation prevented.
+                        <AlertTriangle size={12} /> No unassigned {assignLang} leads to assign right now.
                       </div>
                     )}
                     {isQtyExceeded && (
                       <div style={{ fontSize: '0.72rem', color: '#ef4444', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <AlertTriangle size={12} /> Exceeds available leads ({currentLangAvailableCount} max). Allocation strictly prevented.
+                        <AlertTriangle size={12} /> Only {currentLangAvailableCount} {assignLang} leads are available.
                       </div>
                     )}
                     {!isQtyValid && !isQtyEmpty && (
@@ -1084,7 +1070,7 @@ export const LeadUploadModule = () => {
 
                   {/* Assign To User (Block 1 Hierarchy) */}
                   <div className="form-group">
-                    <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Assign To User (Block 1 Hierarchy):</label>
+                    <label style={{ fontWeight: 600, fontSize: '0.82rem' }}>Assign To User:</label>
                     <select value={assignTargetUserId} onChange={(e) => setAssignTargetUserId(e.target.value)}>
                       {users.filter(u => u.status === 'Active').map(u => {
                         const userNewLeadsCount = leads.filter(l => (l.assignedToId === u.id || l.assigned_user_id === u.id || l.assignedToName === u.name) && l.disposition === 'New Lead').length;
@@ -1146,7 +1132,7 @@ export const LeadUploadModule = () => {
       {activeSubBlock === 'single' && (
         <div className="directory-card" style={{ padding: '20px 24px', maxWidth: '640px' }}>
           <h4 style={{ fontSize: '0.95rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <UserPlus size={16} color="var(--accent-primary)" /> Sub-Block 2: Single Lead Upload Option (All Users)
+            <UserPlus size={16} color="var(--accent-primary)" /> Add a Single Lead
           </h4>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
             Upload an individual lead entry. Entries are automatically checked against the central master data database and initialized with <strong>New Lead</strong> status.
@@ -1218,14 +1204,14 @@ export const LeadUploadModule = () => {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <h4 style={{ fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px', margin: 0, fontWeight: 700 }}>
-                    <BarChart3 size={18} color="var(--accent-primary)" /> Block 3 Reports & Real-Time Sync Dashboard
+                    <BarChart3 size={18} color="var(--accent-primary)" /> Lead Reports
                   </h4>
                   <span className="badge badge-active" style={{ fontSize: '0.74rem', padding: '3px 8px' }}>
                     <CheckCircle size={11} /> Real-Time Synced
                   </span>
                 </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                  Central analytics aggregating unassigned lead queues by language and real-time user-level <strong>New Lead</strong> status from Block 1 Routing and Block 2.
+                  Central analytics aggregating unassigned lead queues by language and real-time user-level <strong>New Lead</strong> status from lead assignment and Block 2.
                 </p>
               </div>
 
@@ -1251,7 +1237,7 @@ export const LeadUploadModule = () => {
                 <h2 style={{ color: 'var(--accent-primary)', margin: '6px 0 0 0', fontSize: '1.6rem' }}>
                   {leads.filter(l => l.disposition === 'New Lead').length}
                 </h2>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Block 2 Current Disposition Column</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Current disposition</span>
               </div>
 
               <div style={{ padding: '14px 18px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
@@ -1306,10 +1292,10 @@ export const LeadUploadModule = () => {
           {/* PAGE / SECTION 2: USER LEVEL VIEW - INTEGRATION WITH BLOCK 2 DISPOSITION */}
           <div className="directory-card" style={{ padding: '20px 24px' }}>
             <h4 style={{ fontSize: '0.9rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-              User Level View - Integration with Block 2 (Page / Section 2): New Lead Disposition Counter
+              New Leads per User
             </h4>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-              Aggregated count of active leads with <strong>"New Lead"</strong> status within the Block 2 CURRENT DISPOSITION section for every user.
+              Aggregated count of active leads with <strong>"New Lead"</strong> status for every user.
             </p>
 
             <div className="table-responsive">
@@ -1318,7 +1304,7 @@ export const LeadUploadModule = () => {
                   <tr>
                     <th>User Name</th>
                     <th>Role</th>
-                    <th>"New Lead" Disposition Count (Block 2)</th>
+                    <th>"New Lead" Count</th>
                     <th>Total Assigned Leads</th>
                     <th>User Pipeline Share</th>
                   </tr>

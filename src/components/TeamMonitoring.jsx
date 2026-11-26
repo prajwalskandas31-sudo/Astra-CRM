@@ -17,6 +17,34 @@ import {
   Filter,
   Award
 } from 'lucide-react';
+import { getEKycLight } from '../services/leegalityService';
+
+/** e-KYC & E-Sign progress of a list of sales, counted the same way as Sale Approvals ("green" = signed). */
+const eSignProgress = (salesList) => {
+  const total = salesList.length;
+  const signed = salesList.filter(s => getEKycLight(s) === 'green').length;
+  return { total, signed, pct: total ? Math.round((signed / total) * 100) : null };
+};
+
+/** The two table cells "e-KYC & E-Sign" and "Status", from real sales (no sales → shown as such, not as compliant). */
+const ESignCells = ({ salesList }) => {
+  const { total, signed, pct } = eSignProgress(salesList);
+  const pending = total - signed;
+  const dot = !total ? 'var(--text-muted)' : pending ? 'var(--status-warning)' : 'var(--status-success)';
+  return (
+    <>
+      <td style={{ whiteSpace: 'nowrap' }}>
+        {total ? <><strong>{pct}%</strong> <span style={{ color: 'var(--text-muted)' }}>({signed} of {total})</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+      </td>
+      <td>
+        <div className="status-indicator">
+          <span className="status-dot" style={{ backgroundColor: dot, boxShadow: 'none' }} />
+          <span style={{ whiteSpace: 'nowrap' }}>{!total ? 'No sales yet' : pending ? `${pending} awaiting e-sign` : 'All e-signed'}</span>
+        </div>
+      </td>
+    </>
+  );
+};
 
 export const TeamMonitoring = () => {
   const { users = [], leads = [], sales = [], simulatedRole, currentUser } = useCRM();
@@ -173,7 +201,7 @@ export const TeamMonitoring = () => {
     return {
       teammatesCount: relevantMembers.length,
       salesCount: relevantSales.length,
-      complianceScore: relevantMembers.length > 0 ? '98%' : '100%'
+      eSign: eSignProgress(relevantSales)
     };
   }, [viewScope, selectedTeamId, activeTeam, selectedUserId, activeUserObj, individualUsers, sales]);
 
@@ -232,12 +260,12 @@ export const TeamMonitoring = () => {
 
         <div className="metric-card">
           <div className="metric-info">
-            <h4>Audit Compliance Score</h4>
-            <div className="value" style={{ color: 'var(--status-success)' }}>
-              {metrics.complianceScore}
+            <h4>e-KYC &amp; E-Sign Completed</h4>
+            <div className="value" style={{ color: metrics.eSign.total ? 'var(--status-success)' : 'var(--text-muted)' }}>
+              {metrics.eSign.pct === null ? '—' : `${metrics.eSign.pct}%`}
             </div>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              eKYC verified & compliant
+              {metrics.eSign.total ? `${metrics.eSign.signed} of ${metrics.eSign.total} sales signed` : 'No sales yet'}
             </div>
           </div>
           <div className="metric-icon" style={{ backgroundColor: 'var(--status-success-bg)', color: 'var(--status-success)', borderColor: 'var(--status-success-border)' }}>
@@ -537,16 +565,15 @@ export const TeamMonitoring = () => {
                     <th>Team Size</th>
                     <th>Total Active Leads</th>
                     <th>Total Team Sales</th>
-                    <th>eKYC Completion</th>
-                    <th>Compliance Status</th>
-                    <th>Team Grade</th>
+                    <th>e-KYC &amp; E-Sign</th>
+                    <th>Status</th>
                     <th style={{ textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayedTeams.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                         No teams match the filter criteria.
                       </td>
                     </tr>
@@ -556,9 +583,10 @@ export const TeamMonitoring = () => {
                       const memberNames = team.members.map(m => m.name);
                       
                       const teamLeadsCount = leads.filter(l => memberIds.includes(l.assignedToId)).length;
-                      const teamSalesCount = sales.filter(s => 
+                      const teamSales = sales.filter(s =>
                         memberIds.includes(s.employeeId) || memberNames.includes(s.employeeName)
-                      ).length;
+                      );
+                      const teamSalesCount = teamSales.length;
 
                       return (
                         <tr key={team.id}>
@@ -582,31 +610,7 @@ export const TeamMonitoring = () => {
                           <td>
                             <span className="badge badge-disposition">{teamSalesCount} Sales</span>
                           </td>
-                          <td>
-                            <div className="status-indicator">
-                              <span className="status-dot active" />
-                              <span>{team.members.length > 0 ? '100% Verified' : 'N/A'}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="status-indicator">
-                              <span className="status-dot active" />
-                              <span>Compliant</span>
-                            </div>
-                          </td>
-                          <td>
-                            <span style={{ 
-                              fontWeight: 600, 
-                              color: 'var(--accent)', 
-                              background: 'var(--accent-soft)', 
-                              border: '1px solid var(--accent-border)', 
-                              padding: '2px 8px', 
-                              borderRadius: 'var(--radius-sm)', 
-                              fontSize: '0.78rem' 
-                            }}>
-                              {teamSalesCount > 0 ? 'A+' : 'A'}
-                            </span>
-                          </td>
+                          <ESignCells salesList={teamSales} />
                           <td style={{ textAlign: 'center' }}>
                             <button
                               className="btn-secondary"
@@ -650,7 +654,7 @@ export const TeamMonitoring = () => {
                 : (selectedUserId === 'All' ? `Individual Teammates Directory (${displayedTeammates.length})` : `Teammate Record: ${activeUserObj?.name}`)}
             </h4>
             <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-              Real-time lead counts, registered sales & compliance audit
+              Lead counts, sales and e-sign progress
             </span>
           </div>
 
@@ -664,60 +668,35 @@ export const TeamMonitoring = () => {
                   <th>Reporting Manager / Team</th>
                   <th>Active Leads</th>
                   <th>Sales Registered</th>
-                  <th>eKYC Status</th>
-                  <th>Compliance Status</th>
-                  <th>Grade</th>
+                  <th>e-KYC &amp; E-Sign</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedTeammates.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                      No teammates found matching current selection and search filters.
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                      No teammates match the current selection and search.
                     </td>
                   </tr>
                 ) : (
                   displayedTeammates.map(tm => {
                     const teamLeadsCount = leads.filter(l => l.assignedToId === tm.id).length;
-                    const teamSalesCount = sales.filter(s => s.employeeId === tm.id || s.employeeName === tm.name).length;
+                    const tmSales = sales.filter(s => s.employeeId === tm.id || s.employeeName === tm.name);
 
                     return (
                       <tr key={tm.id}>
                         <td style={{ fontWeight: 600 }}>{tm.name}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>{tm.employeeId || 'EMP-100'}</td>
-                        <td>{tm.mobile}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{tm.employeeId || '—'}</td>
+                        <td>{tm.mobile || '—'}</td>
                         <td>
                           <span style={{ color: 'var(--text-secondary)' }}>
                             {tm.reportingTo ? `Team ${tm.reportingTo}` : 'Direct Oversight'}
                           </span>
                         </td>
                         <td><span className="badge badge-role">{teamLeadsCount} Leads</span></td>
-                        <td><span className="badge badge-disposition">{teamSalesCount} Sales</span></td>
-                        <td>
-                          <div className="status-indicator">
-                            <span className="status-dot active" />
-                            <span>Verified</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="status-indicator">
-                            <span className="status-dot active" />
-                            <span>Compliant</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ 
-                            fontWeight: 600, 
-                            color: 'var(--accent)', 
-                            background: 'var(--accent-soft)', 
-                            border: '1px solid var(--accent-border)', 
-                            padding: '2px 8px', 
-                            borderRadius: 'var(--radius-sm)', 
-                            fontSize: '0.78rem' 
-                          }}>
-                            {teamSalesCount > 0 ? 'A+' : 'A'}
-                          </span>
-                        </td>
+                        <td><span className="badge badge-disposition">{tmSales.length} Sales</span></td>
+                        <ESignCells salesList={tmSales} />
                       </tr>
                     );
                   })
