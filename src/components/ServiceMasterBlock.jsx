@@ -77,7 +77,9 @@ export const ServiceMasterBlock = () => {
     showToast(`Service "${srv.name}" deleted.`, 'info');
   };
 
-  const field = { padding: '8px 12px', fontSize: '0.84rem', boxSizing: 'border-box' };
+  // type="text" + form-control give these inputs the app's themed input colours. Without them the
+  // browser draws a white box while the text stays the light theme colour, so typed text vanishes.
+  const field = { padding: '8px 12px', fontSize: '0.86rem', lineHeight: 1.4, minHeight: '38px', boxSizing: 'border-box', minWidth: 0 };
 
   return (
     <div className="directory-card" style={{ overflow: 'hidden' }}>
@@ -101,12 +103,12 @@ export const ServiceMasterBlock = () => {
         <form onSubmit={handleAdd} style={{ padding: '0 20px 18px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ flex: '2 1 240px' }}>
             <label htmlFor="service-new-name">Service Name</label>
-            <input id="service-new-name" value={newName} onChange={e => setNewName(e.target.value)} maxLength={NAME_MAX}
+            <input id="service-new-name" type="text" className="form-control" value={newName} onChange={e => setNewName(e.target.value)} maxLength={NAME_MAX}
               placeholder="e.g. Stock Cash Premium" style={field} required />
           </div>
           <div className="form-group" style={{ flex: '1 1 160px' }}>
             <label htmlFor="service-new-value">Value (₹)</label>
-            <input id="service-new-value" inputMode="decimal" value={newValue} onChange={e => setNewValue(cleanValue(e.target.value))}
+            <input id="service-new-value" type="text" className="form-control" inputMode="decimal" value={newValue} onChange={e => setNewValue(cleanValue(e.target.value))}
               placeholder="e.g. 15000" style={{ ...field, textAlign: 'right' }} />
           </div>
           <button type="submit" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', height: '38px' }}>
@@ -121,8 +123,8 @@ export const ServiceMasterBlock = () => {
             <tr>
               <th style={{ width: '48px' }}>No.</th>
               <th>Service Name</th>
-              <th style={{ textAlign: 'right', width: '200px' }}>Value (₹)</th>
-              {canEdit && <th style={{ width: '90px' }}>Action</th>}
+              <th style={{ textAlign: 'right', width: '180px', minWidth: '150px' }}>Value (₹)</th>
+              {canEdit && <th style={{ width: '100px' }}>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -132,18 +134,18 @@ export const ServiceMasterBlock = () => {
               const draft = drafts[srv.id] || { name: srv.name || '', value: valueText(srv.value) };
               return (
                 <tr key={srv.id}>
-                  <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                  <td>
+                  <td style={{ color: 'var(--text-muted)', verticalAlign: 'middle' }}>{i + 1}</td>
+                  <td style={{ verticalAlign: 'middle' }}>
                     {canEdit ? (
-                      <input aria-label={`Service Name ${i + 1}`} value={draft.name} maxLength={NAME_MAX}
+                      <input aria-label={`Service Name ${i + 1}`} type="text" className="form-control" title={draft.name} value={draft.name} maxLength={NAME_MAX}
                         onChange={e => setDrafts(d => ({ ...d, [srv.id]: { ...draft, name: e.target.value } }))}
                         onBlur={() => saveRow(srv)} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-                        style={{ ...field, width: '100%', fontWeight: 600 }} />
+                        style={{ ...field, width: '100%', minWidth: '220px', fontWeight: 600 }} />
                     ) : <span style={{ fontWeight: 600 }}>{srv.name}</span>}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                     {canEdit ? (
-                      <input aria-label={`Value for ${srv.name}`} inputMode="decimal" value={draft.value} placeholder="Not set"
+                      <input aria-label={`Value for ${srv.name}`} type="text" className="form-control" inputMode="decimal" value={draft.value} placeholder="Not set"
                         onChange={e => setDrafts(d => ({ ...d, [srv.id]: { ...draft, value: cleanValue(e.target.value) } }))}
                         onBlur={() => saveRow(srv)} onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
                         style={{ ...field, width: '100%', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }} />
@@ -154,9 +156,9 @@ export const ServiceMasterBlock = () => {
                     )}
                   </td>
                   {canEdit && (
-                    <td>
+                    <td style={{ verticalAlign: 'middle' }}>
                       <button type="button" className="btn-secondary" onClick={() => handleDelete(srv)} title={`Delete ${srv.name}`}
-                        style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--status-danger)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--status-danger)', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                         <Trash2 size={13} /> Delete
                       </button>
                     </td>
