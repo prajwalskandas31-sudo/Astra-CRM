@@ -72,6 +72,7 @@ const RaComplianceBlock = lazyNamed(() => import('./components/RaComplianceBlock
 const ServiceMasterBlock = lazyNamed(() => import('./components/ServiceMasterBlock'), 'ServiceMasterBlock');
 const ResearchRecommendationsBlock = lazyNamed(() => import('./components/ResearchRecommendationsBlock'), 'ResearchRecommendationsBlock');
 const SalaryBlock = lazyNamed(() => import('./components/SalaryBlock'), 'SalaryBlock');
+const PayslipBlock = lazyNamed(() => import('./components/PayslipBlock'), 'PayslipBlock');
 const TelegramControlBlock = lazyNamed(() => import('./components/TelegramControlBlock'), 'TelegramControlBlock');
 const CompanyProfileBlock = lazyNamed(() => import('./components/CompanyProfileBlock'), 'CompanyProfileBlock');
 const BranchProfilesBlock = lazyNamed(() => import('./components/BranchProfilesBlock'), 'BranchProfilesBlock');
@@ -275,6 +276,8 @@ const AppContent = () => {
         return <ExtendedServiceBlock />;
       case 'salary-block':
         return <SalaryBlock />;
+      case 'payslip-block':
+        return <PayslipBlock />;
       case 'kra-block':
         return <KraBlock />;
       case 'client-master':

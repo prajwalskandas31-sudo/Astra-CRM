@@ -207,6 +207,7 @@ const SERVICES_VERSION = '2026-11-official-tiers';
 // Company Profile block: the firm's own details, edited by the Super Admin
 export const DEFAULT_COMPANY_PROFILE = {
   companyName: '',
+  brandName: '', // payslips print "<Brand Name> by <Company Name>"
   natureOfBusiness: '',
   companyLogo: '', // image data URL, shrunk in the browser; checked in backend/sync.py
   sebiRegistrationNumber: '',
@@ -733,6 +734,13 @@ export const CRM_FEATURES = [
     name: 'Running Account Statement',
     category: 'Sales & Approvals',
     description: 'Monthly Credits (client payments, absent / half-day deductions), Debits (advances, expenses, salary paid) and manual entries with a running Net Balance from ₹0; Excel and PDF export. Checked by the server too (backend/running_account.py).',
+    defaultForRoles: ['Super Admin']
+  },
+  {
+    id: 'payslip-block',
+    name: 'Pay Slip',
+    category: 'Sales & Approvals',
+    description: "Pick any employee (all branches) and a month: their payslip with User Directory details (Aadhaar masked) and the Salary Block's earnings, deductions and net pay, downloadable as a PDF. Checked by the server too (backend/payslip.py).",
     defaultForRoles: ['Super Admin']
   },
   {

@@ -29,6 +29,7 @@ try:
     from backend import invoice_block
     from backend import salary
     from backend import running_account
+    from backend import payslip
     from backend import audit_report
     from backend import ra_periodic_report
     from backend import annexure_a_saas
@@ -58,6 +59,7 @@ except ImportError:
     import invoice_block
     import salary
     import running_account
+    import payslip
     import audit_report
     import ra_periodic_report
     import annexure_a_saas
@@ -99,6 +101,7 @@ app.include_router(client_master.router)
 app.include_router(invoice_block.router)
 app.include_router(salary.router)
 app.include_router(running_account.router)
+app.include_router(payslip.router)
 app.include_router(audit_report.router)
 app.include_router(ra_periodic_report.router)
 app.include_router(annexure_a_saas.router)
@@ -149,6 +152,7 @@ class UserCreate(BaseModel):
     dateOfJoining: Optional[str] = ""
     aadhaarNumber: Optional[str] = ""
     panNumber: Optional[str] = ""
+    uanNumber: Optional[str] = ""
     currentAddress: Optional[str] = ""
     correspondenceAddress: Optional[str] = ""
     bankAccountNumber: Optional[str] = ""
@@ -176,6 +180,7 @@ class UserUpdate(BaseModel):
     dateOfJoining: Optional[str] = None
     aadhaarNumber: Optional[str] = None
     panNumber: Optional[str] = None
+    uanNumber: Optional[str] = None
     currentAddress: Optional[str] = None
     correspondenceAddress: Optional[str] = None
     bankAccountNumber: Optional[str] = None
@@ -426,7 +431,7 @@ def create_user(req: UserCreate, current_user: dict = Depends(require_roles(["Su
     return public_user(new_user)
 
 # Personal details captured on the Add / Edit User form
-PERSONAL_DETAIL_FIELDS = ("dateOfBirth", "dateOfJoining", "aadhaarNumber", "panNumber", "currentAddress", "correspondenceAddress")
+PERSONAL_DETAIL_FIELDS = ("dateOfBirth", "dateOfJoining", "aadhaarNumber", "panNumber", "uanNumber", "currentAddress", "correspondenceAddress")
 _PAN_RE = re.compile(r"[A-Z]{5}[0-9]{4}[A-Z]")
 
 def _clean_personal_details(req, only_given: bool = False) -> dict:
@@ -456,6 +461,10 @@ def _clean_personal_details(req, only_given: bool = False) -> dict:
             value = value.upper()
             if not _PAN_RE.fullmatch(value):
                 raise HTTPException(status_code=400, detail="PAN Number must look like ABCDE1234F.")
+        elif key == "uanNumber":
+            value = re.sub(r"[\s-]", "", value)
+            if not re.fullmatch(r"[0-9]{12}", value):
+                raise HTTPException(status_code=400, detail="UAN Number must be 12 digits.")
         elif len(value) > 500:
             raise HTTPException(status_code=400, detail="Address must be 500 characters or fewer.")
         clean[key] = value

@@ -26,7 +26,7 @@ ADMIN_ROLES = ["Super Admin", "Admin"]
 
 # Fields never sent to non-admin users; password hashes are never sent to anyone.
 SENSITIVE_USER_FIELDS = {"bankAccountNumber", "ifscCode", "bankNameAndBranch", "familyReferenceNumber", "documents", "payDetails",
-                         "dateOfBirth", "aadhaarNumber", "panNumber", "currentAddress", "correspondenceAddress"}
+                         "dateOfBirth", "aadhaarNumber", "panNumber", "uanNumber", "currentAddress", "correspondenceAddress"}
 SECRET_USER_FIELDS = {"password", "passwordHash", "tokenVersion"}
 
 security = HTTPBearer()

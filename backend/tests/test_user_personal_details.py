@@ -58,3 +58,13 @@ def test_admin_edits_and_privacy(crm):
     assert listed[other_id]["dateOfJoining"] == "2026-11-01"
     me = listed[EXEC_ID]
     assert me["panNumber"] == "PQRSX9876Z"
+
+
+def test_uan_number(crm):
+    h = bearer(crm.token(SA))
+    res = crm.client.post("/api/users", json=_body(uanNumber="1002 0030 0400"), headers=h)
+    assert res.status_code == 200, res.text
+    assert res.json()["uanNumber"] == "100200300400"
+    assert crm.client.post("/api/users", json=_body(uanNumber="12345"), headers=h).status_code == 400
+    assert crm.client.put(f"/api/users/{EXEC_ID}", json={"uanNumber": "200300400500"}, headers=h).status_code == 200
+    assert crm.store.get("users", EXEC_ID)["uanNumber"] == "200300400500"

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Shield, TrendingUp, CheckCircle, Sliders, Layers, Command, Upload, PieChart, Key, History,
   FileSignature, BadgeIndianRupee, Send, Building2, FileText, GitBranch, Mail, Activity, ShieldCheck, Contact, Wallet,
   Tags, Receipt, BookOpen, ClipboardList, ScrollText, Cloud, ShieldAlert, NotebookPen, Settings, BarChart3, Scale,
-  ChevronDown, ChevronRight, Shuffle, PackagePlus, MailCheck, PhoneCall, CalendarCheck
+  ChevronDown, ChevronRight, Shuffle, PackagePlus, MailCheck, PhoneCall, CalendarCheck, FileSpreadsheet
 } from 'lucide-react';
 
 /** The sub-blocks of Team Performance Tracking, each opened on its own from the sidebar. */
@@ -55,6 +55,7 @@ export const buildNavTree = ({ pendingSalesCount = 0, pendingRequestsCount = 0, 
     group: 'reports', label: 'Reports', icon: BarChart3,
     children: [
       { id: 'salary-block', label: 'Salary Block', icon: Wallet },
+      { id: 'payslip-block', label: 'Pay Slip', icon: FileSpreadsheet },
       { id: 'client-master', label: 'Client MASTER', icon: Contact },
       { id: 'research-reports', label: 'Research Reports', icon: FileText },
       { id: 'research-recommendations', label: 'Records for Research Recommendations', icon: NotebookPen },
