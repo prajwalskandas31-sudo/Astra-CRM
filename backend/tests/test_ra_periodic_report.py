@@ -11,7 +11,7 @@ URL = "/api/ra-periodic-report"
 @pytest.fixture
 def crm_data(crm):
     s = crm.store
-    for col in ("raPeriodicReport", "branches", "researchReports", "sales", "paidClients", "eSignRecords", "auditClientFee"):
+    for col in ("raPeriodicReport", "branches", "researchReports", "sales", "paidClients", "eSignRecords", "auditClientFee", "raCompliance"):
         s.delete_many(col, [d["id"] for d in s.all(col)])
     for key, value in {
         "companyName": "UNITE TECHNOLOGIES FINANCIAL SERVICE", "sebiRegistrationNumber": "inh000020350",
@@ -67,7 +67,7 @@ def test_auto_values_from_crm(crm_data):
                               "accountType": "CURRENT", "ifsc": "UTIB0000047", "bankName": "AXIS BANK LTD", "branch": "SURAT MAIN ROAD"}]
     assert auto["upi"] == [{"upiId": "unite.ra@validaxis"}]
     assert auto["clientsFees"]["r8.D"] == 1000  # Non-Individual fees from the Audit Report
-    assert auto["social"] == [] and auto["directors"] == []
+    assert auto["social"] == [] and auto["directors"] == [] and auto["nism"] == []
 
 
 def test_save_keeps_values_per_half_and_offers_copy(crm_data):
@@ -135,3 +135,34 @@ def test_branch_address_comes_from_branch_profiles(crm_data):
     # A branch saved with only the one-line address: State and Pincode are picked out of it
     assert rows["Old"]["state"] == "Kerala" and rows["Old"]["pincode"] == "682016" and rows["Old"]["country"] == "India"
     assert rows["Bengaluru"]["state"] == ""  # no State named in that address
+
+
+def test_social_media_comes_from_the_compliance_tracker(crm_data):
+    s = crm_data.store
+    rows = lambda *names: {"rows": [{"platform": n, "handle": f"@{n.lower()}", "url": f"https://{n.lower()}.com/x" if n != "Telegram" else ""} for n in names]}
+    s.put("raCompliance", "2026-02:socialBio", {"id": "2026-02:socialBio", "data": rows("Instagram")})
+    s.put("raCompliance", "2026-03:socialBio", {"id": "2026-03:socialBio", "data": rows("Instagram", "Telegram")})
+    s.put("raCompliance", "2026-05:socialBio", {"id": "2026-05:socialBio", "data": rows("YouTube")})  # after the half
+    s.put("raCompliance", "2026-03:details", {"id": "2026-03:details", "data": {"fields": {"x": "y"}}})
+    social = get(crm_data).json()["auto"]["social"]
+    assert social == [{"platform": "Instagram", "link": "https://instagram.com/x"}, {"platform": "Telegram", "link": "@telegram"}]
+    # a half before any saved month uses the earliest month
+    assert get(crm_data, period="2024-25-H2").json()["auto"]["social"] == [{"platform": "Instagram", "link": "https://instagram.com/x"}]
+
+
+def test_nism_comes_from_user_nism_details(crm_data):
+    s = crm_data.store
+    users = s.all("users")
+    a, b = users[0], users[1]
+    try:
+        s.put("users", a["id"], {**a, "status": "Active", "officialEmail": "ra@co.in",
+                                 "nism": {"name": "Ravi Kumar", "series": "Series XV - Research Analyst", "clearedDate": "2025-01-02", "validUpto": "2028-01-01"}})
+        s.put("users", b["id"], {**b, "status": "Active", "nism": {"name": "", "series": "NISM Series III-A", "clearedDate": "2024-05-06", "validUpto": ""}})
+        nism = {r["name"]: r for r in get(crm_data).json()["auto"]["nism"]}
+        assert nism["Ravi Kumar"]["certType"] == "NISM XV" and nism["Ravi Kumar"]["xvFrom"] == "2025-01-02"
+        assert nism["Ravi Kumar"]["xvTo"] == "2028-01-01" and nism["Ravi Kumar"]["email"] == "ra@co.in"
+        assert nism[b["name"]]["certType"] == "NISM III A" and nism[b["name"]]["iiiaFrom"] == "2024-05-06"
+        assert len(nism) == 2  # users without NISM details are left out
+    finally:
+        for u in (a, b):
+            s.put("users", u["id"], u)
