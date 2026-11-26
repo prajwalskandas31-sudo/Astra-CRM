@@ -92,3 +92,34 @@ def test_feature_access(crm_clean):
     # nor can the records be read or written through the generic sync
     r = crm.client.get("/api/sync", params={"collections": "raCompliance", "since": 0}, headers=bearer(crm.token(SA)))
     assert r.status_code == 404
+
+
+def test_reco_register_from_research_reports(crm_clean):
+    crm = crm_clean
+    s = crm.store
+    s.delete_many("researchReports", [d["id"] for d in s.all("researchReports")])
+    base = {"status": "Ready", "test": False, "segment": "NSE DERIVATIVES"}
+    s.put("researchReports", "rr-opt", {**base, "id": "rr-opt", "day": "2026-11-05", "callAt": "2026-11-05T04:00:00+00:00",
+          "expiry": "27-Nov-2026", "fileName": "05-11-2026 (1) NIFTY 24500 CE.pdf",
+          "details": {"symbol": "NIFTY", "instrument": "option", "side": "Buy", "strike": "24500", "optionType": "CE",
+                      "entry": "120", "stopLoss": "100", "targets": ["150", "180"]}})
+    s.put("researchReports", "rr-eq", {**base, "id": "rr-eq", "day": "2026-11-03", "segment": "NSE BSE EQUITY",
+          "details": {"symbol": "RELIANCE", "instrument": "equity", "side": "SELL", "entry": "1400", "stopLoss": "1420", "targets": ["1360"]}})
+    s.put("researchReports", "rr-held", {**base, "id": "rr-held", "day": "2026-11-04", "status": "Held"})
+    s.put("researchReports", "rr-test", {**base, "id": "rr-test", "day": "2026-11-04", "test": True, "details": {"symbol": "X"}})
+    s.put("researchReports", "rr-oct", {**base, "id": "rr-oct", "day": "2026-10-30", "details": {"symbol": "TCS"}})
+
+    r = crm.client.get(f"{URL}/reco-from-reports", params={"month": "2026-11"}, headers=bearer(crm.token(SA)))
+    assert r.status_code == 200, r.text
+    rows = r.json()["rows"]
+    assert [x["reportId"] for x in rows] == ["rr-eq", "rr-opt"]  # oldest first; held, test and other months left out
+    eq, opt = rows
+    assert opt == {"id": "rep-rr-opt", "reportId": "rr-opt", "date": "2026-11-05", "nature": "Options (NSE DERIVATIVES)",
+                   "security": "NIFTY 24500 CE (expiry 27-Nov-2026)", "strike": "24500", "period": "Till expiry (27-Nov-2026)",
+                   "callPut": "Call", "buyRate": "120", "sellRate": "150 / 180", "sl": "100", "rationale": "Yes",
+                   "reportFile": "05-11-2026 (1) NIFTY 24500 CE.pdf"}
+    # a Sell call: sold at the entry, bought back at the target
+    assert (eq["sellRate"], eq["buyRate"], eq["sl"], eq["callPut"], eq["strike"]) == ("1400", "1360", "1420", "Put", "1400")
+
+    assert crm.client.get(f"{URL}/reco-from-reports", params={"month": "2026-11"}, headers=bearer(crm.token(ADMIN))).status_code == 403
+    s.delete_many("researchReports", ["rr-opt", "rr-eq", "rr-held", "rr-test", "rr-oct"])
