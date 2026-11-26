@@ -102,7 +102,7 @@ export const getLeegalityBackendStatus = async () => (await backendFetch('/leega
  * Returns Leegality's response as recorded by the backend: documentId, invitees (with signUrl),
  * messages, Date 1, tenure option and signature timestamps.
  */
-export const dispatchLeegalitySignRequest = async ({ saleId, clientName, email, phone, serviceTenure }) => {
+export const dispatchLeegalitySignRequest = async ({ saleId, clientName, email, phone, serviceTenure, signatureType }) => {
   if (getLeegalityConfig().status === 'Disabled') {
     throw new Error('Leegality API is currently disabled in Settings. Please enable API to dispatch.');
   }
@@ -115,6 +115,8 @@ export const dispatchLeegalitySignRequest = async ({ saleId, clientName, email, 
       email,
       phone,
       serviceTenure,
+      // 'aadhaar' | 'virtualSign' chosen for this client in the Sale Approval queue (null = E-Sign Block default)
+      signatureType: signatureType || null,
       signatureDataUrl: signatory?.signatureDataUrl || null,
       signatoryName: signatory?.signerName || null
     })

@@ -12,7 +12,7 @@ const COMBOS = ['aadhaar', 'virtualSign', 'both'];
 const comboOf = ({ aadhaar, virtualSign }) =>
   aadhaar && virtualSign ? 'both' : aadhaar ? 'aadhaar' : virtualSign ? 'virtualSign' : null;
 
-const Switch = ({ on, onChange, disabled, label }) => (
+export const Switch = ({ on, onChange, disabled, label }) => (
   <button
     type="button"
     role="switch"

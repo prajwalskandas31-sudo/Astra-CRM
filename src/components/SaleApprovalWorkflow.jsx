@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCRM, TELEGRAM_REVIEW_STATUS, isOldClientSale, OLD_CLIENT_STATUS } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { 
@@ -20,7 +20,8 @@ import {
 import { SuperAdminEmailReviewModal } from './SuperAdminEmailReviewModal';
 import { VoiceAgentCallModal } from './VoiceAgentCallModal';
 import { LiveLeegalityDispatchModal } from './LiveLeegalityDispatchModal';
-import { isRealLeegalityDispatch, getEKycLight } from '../services/leegalityService';
+import { isRealLeegalityDispatch, getEKycLight, getSignatureTypes } from '../services/leegalityService';
+import { SaleSignatureTypeToggle } from './SaleSignatureTypeToggle';
 
 const LIGHTS = ['red', 'yellow', 'green'];
 
@@ -71,7 +72,7 @@ const EKycTrafficLight = ({ sale, canTrigger, isDispatching, onTrigger, onViewSt
       className={`ekyc-light ${light}`}
       onClick={onClick}
       disabled={light === 'red' && isDispatching}
-      title={light === 'red' ? 'Create the real Leegality signing request (Workflow KKliSJp)' : 'Live status from Leegality'}
+      title={light === 'red' ? "Create the real Leegality signing request with this client's signature type" : 'Live status from Leegality'}
     >
       {content}
     </button>
@@ -89,9 +90,37 @@ export const SaleApprovalWorkflow = () => {
     voiceAgentSettings,
     triggerEKycAndESign,
     deleteESignLink,
+    setSaleSignatureType,
     currentUser
   } = useCRM();
   const { showToast } = useToast();
+
+  // Per-client signature type (Aadhaar or Virtual Sign, never both). A client without a choice yet
+  // starts from the E-Sign Block's setting: Aadhaar when only Aadhaar is on there, otherwise Virtual Sign.
+  const [defaultSignatureType, setDefaultSignatureType] = useState('virtualSign');
+  useEffect(() => {
+    if (currentUser?.role !== 'Super Admin') return;
+    getSignatureTypes()
+      .then(cfg => setDefaultSignatureType(cfg.aadhaar && !cfg.virtualSign ? 'aadhaar' : 'virtualSign'))
+      .catch(() => {});
+  }, [currentUser?.role]);
+  const sentCombo = (s) => s.eSignDetails?.signatureTypes?.combo;
+  const signatureTypeOf = (s) =>
+    s.signatureType || (['aadhaar', 'virtualSign'].includes(sentCombo(s)) ? sentCombo(s) : defaultSignatureType);
+  const signatureTypeLocked = (s) =>
+    isRealLeegalityDispatch(s) && !['Rejected by Client', 'Invitation Expired'].includes(s.eSignStatus);
+  const handleSignatureTypeChange = (s, type) => {
+    setSaleSignatureType(s.id, type);
+    showToast(`'${s.clientName}' will sign with ${type === 'aadhaar' ? 'Aadhaar' : 'Virtual Sign'}.`, 'info');
+  };
+  const SignatureTypeCell = ({ sale }) => (
+    <SaleSignatureTypeToggle
+      value={signatureTypeOf(sale)}
+      onChange={type => handleSignatureTypeChange(sale, type)}
+      disabled={!hasPermission('sale-approvals') || isDispatchingDirect}
+      locked={signatureTypeLocked(sale)}
+    />
+  );
 
   const [selectedReviewSale, setSelectedReviewSale] = useState(null);
   const [selectedVoiceSale, setSelectedVoiceSale] = useState(null);
@@ -136,9 +165,10 @@ The client will no longer be able to sign it. The sale goes back to the pending 
 
   const handleDirectTriggerEKycAndESign = async (targetSale) => {
     setIsDispatchingDirect(true);
-    showToast(`Dispatching live Leegality e-KYC & E-Sign package for '${targetSale.clientName}' (Workflow KKliSJp)...`, 'info');
+    const signatureType = signatureTypeOf(targetSale);
+    showToast(`Dispatching live Leegality e-KYC & E-Sign package for '${targetSale.clientName}' (${signatureType === 'aadhaar' ? 'Aadhaar' : 'Virtual Sign'})...`, 'info');
     try {
-      const res = await triggerEKycAndESign(targetSale.id);
+      const res = await triggerEKycAndESign(targetSale.id, signatureType);
       setIsDispatchingDirect(false);
       setLiveDispatchData({ sale: targetSale, result: res.apiResult });
       showToast(`Leegality created document ${res.apiResult.documentId} for '${targetSale.clientName}'.`, 'success');
@@ -229,13 +259,14 @@ The client will no longer be able to sign it. The sale goes back to the pending 
                 <th>Submitted By</th>
                 <th>Attachments</th>
                 <th>Workflow Stage</th>
+                <th>Signature Type</th>
                 <th>Super Admin Action</th>
               </tr>
             </thead>
             <tbody>
               {pendingSales.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No pending sales awaiting Super Admin approval.
                   </td>
                 </tr>
@@ -264,6 +295,7 @@ The client will no longer be able to sign it. The sale goes back to the pending 
                           {s.stage === 'Under Review by Super Admin' ? 'E-Sign is pending' : (s.stage || s.status)}
                         </span>
                       </td>
+                      <td><SignatureTypeCell sale={s} /></td>
                       <td>
                         {hasPermission('sale-approvals') ? (
                           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -292,7 +324,7 @@ The client will no longer be able to sign it. The sale goes back to the pending 
                               }}
                               onClick={() => handleDirectTriggerEKycAndESign(s)}
                               disabled={isDispatchingDirect}
-                              title="Directly trigger real Leegality e-KYC & E-Sign dispatch (Workflow KKliSJp)"
+                              title="Send the real Leegality e-KYC & E-Sign request with this client's signature type"
                             >
                               <Sparkles size={12} /> Trigger e-KYC & E-Sign
                             </button>
@@ -358,13 +390,14 @@ The client will no longer be able to sign it. The sale goes back to the pending 
                 <th>Amount</th>
                 <th>Submitted By</th>
                 <th>Current Stage</th>
+                <th>Signature Type</th>
                 <th>e-KYC & E-Sign</th>
               </tr>
             </thead>
             <tbody>
               {processedSales.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
                     No finalized sales yet.
                   </td>
                 </tr>
@@ -380,6 +413,11 @@ The client will no longer be able to sign it. The sale goes back to the pending 
                         <span className="badge badge-disposition">
                           <ArrowRight size={11} /> {s.stage || 'Approved'}
                         </span>
+                      </td>
+                      <td>
+                        {isOldClientSale(s)
+                          ? <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Not sent for e-sign</span>
+                          : <SignatureTypeCell sale={s} />}
                       </td>
                       <td>
                         {isOldClientSale(s) ? (

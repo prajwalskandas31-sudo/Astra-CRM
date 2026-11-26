@@ -250,6 +250,9 @@ class ESignDispatchRequest(BaseModel):
     serviceTenure: str
     signatureDataUrl: Optional[str] = None
     signatoryName: Optional[str] = None
+    # Per-client choice from the Sale Approval queue: exactly one of "aadhaar" / "virtualSign".
+    # Absent = the E-Sign Block's default toggles.
+    signatureType: Optional[str] = None
 
 
 # ==========================================
@@ -277,6 +280,16 @@ def _sign_types():
     cfg.update({k: bool(saved[k]) for k in ("aadhaar", "virtualSign") if k in saved})
     cfg["workflows"].update({k: v for k, v in (saved.get("workflows") or {}).items() if k in COMBO_LABELS})
     return cfg
+
+
+def _sign_types_for(signature_type):
+    """The E-Sign Block settings, narrowed to one signature type when the sale picked one (never both)."""
+    cfg = _sign_types()
+    if not signature_type:
+        return cfg
+    if signature_type not in SIGN_TYPE_LABELS:
+        raise HTTPException(status_code=400, detail=f"Unknown signature type '{signature_type}'; use 'aadhaar' or 'virtualSign'.")
+    return {**cfg, **{k: k == signature_type for k in SIGN_TYPE_LABELS}}
 
 
 def _combo(cfg):
@@ -469,7 +482,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         raise HTTPException(status_code=400, detail=f"{' and '.join(missing)} missing on the Client Information Page; Leegality needs both email and phone.")
 
     option_idx = _tenure_option(tmap, req.serviceTenure)
-    sign_cfg = _sign_types()
+    sign_cfg = _sign_types_for(req.signatureType)
     combo, profile_id = _active_workflow(sign_cfg)
     executed_at = _now(tmap)
 
@@ -514,6 +527,7 @@ def dispatch_esign(req: ESignDispatchRequest, current_user: dict = Depends(requi
         "signatureTypes": {
             "requested": [SIGN_TYPE_LABELS[k] for k in SIGN_TYPE_LABELS if sign_cfg[k]],
             "combo": combo,
+            "source": "sale" if req.signatureType else "default",
             "check": check_status,
             "message": check_message,
         },
