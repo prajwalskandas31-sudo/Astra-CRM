@@ -313,6 +313,12 @@ button, input, select, textarea {
   flex-direction: column;
   flex-shrink: 0;
   transition: var(--transition);
+  /* Stays fixed in view while the main screen scrolls; the nav scrolls inside it if it is long */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
+  z-index: 50;
 }
 
 .sidebar-header {
@@ -362,6 +368,9 @@ button, input, select, textarea {
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Sidebar Nav Items with Left Accent Bar */
@@ -1487,6 +1496,9 @@ button.ekyc-light:disabled {
   }
   .sidebar {
     width: 100%;
+    position: static;
+    height: auto;
+    align-self: stretch;
     border-right: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
