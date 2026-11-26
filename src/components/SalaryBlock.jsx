@@ -57,7 +57,10 @@ const OnOff = ({ on, onChange, label }) => (
 );
 
 const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-const amountInput = { width: '92px', height: '30px', padding: '4px 8px', fontSize: '0.8rem', textAlign: 'right', boxSizing: 'border-box' };
+// type="text" + form-control give inputs the app's themed colours; without them the browser draws a white
+// box while the text keeps the light theme colour, so typed amounts vanish.
+const amountInput = { width: '112px', minWidth: '112px', height: '34px', padding: '6px 10px', fontSize: '0.82rem', lineHeight: 1.4, textAlign: 'right', fontVariantNumeric: 'tabular-nums', boxSizing: 'border-box' };
+const nowrap = { whiteSpace: 'nowrap' };
 const cleanNumber = (v) => v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 
 const AttendanceCell = ({ a }) => (
@@ -87,14 +90,14 @@ const Breakdown = ({ r, settings }) => {
     ['− PF', -c.pf, r.entry.pf ? 'On' : 'Off']
   ];
   return (
-    <table className="crm-table" style={{ fontSize: '0.78rem' }}>
+    <table className="crm-table" style={{ fontSize: '0.78rem', width: 'auto', minWidth: '420px', flex: '1 1 420px' }}>
       <thead><tr><th>Calculation</th><th>Detail</th><th style={num}>Amount</th></tr></thead>
       <tbody>
         {lines.map(([label, value, detail]) => (
-          <tr key={label}><td>{label}</td><td style={{ color: 'var(--text-muted)' }}>{detail}</td><td style={num}>{money(value)}</td></tr>
+          <tr key={label}><td style={{ whiteSpace: 'nowrap' }}>{label}</td><td style={{ color: 'var(--text-muted)', minWidth: '160px' }}>{detail}</td><td style={num}>{money(value)}</td></tr>
         ))}
         <tr>
-          <td style={{ fontWeight: 700 }}>Final Total Salary</td>
+          <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Final Total Salary</td>
           <td style={{ color: 'var(--text-muted)' }}>{a.notMarked ? `${a.notMarked} day(s) not marked (no deduction)` : ''}</td>
           <td style={{ ...num, fontWeight: 700 }}>{money(c.finalSalary)}</td>
         </tr>
@@ -256,9 +259,12 @@ export const SalaryBlock = () => {
                   <legend style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>{g}</legend>
                   {SETTING_FIELDS.filter(f => f.group === g).map(f => (
                     <div className="form-group" key={f.key}>
-                      <label htmlFor={`sal-set-${f.key}`}>{f.label}</label>
+                      <label htmlFor={`sal-set-${f.key}`} style={{ lineHeight: 1.35 }}>{f.label}</label>
                       <input
                         id={`sal-set-${f.key}`}
+                        type="text"
+                        className="form-control"
+                        style={{ width: '100%', minWidth: 0, minHeight: '38px', boxSizing: 'border-box', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                         inputMode={f.whole ? 'numeric' : 'decimal'}
                         value={settings[f.key] ?? ''}
                         placeholder="0"
@@ -276,7 +282,7 @@ export const SalaryBlock = () => {
           </div>
         )}
 
-        <div className="paid-service-tabs" role="tablist" aria-label="Pay Type" style={{ margin: '0 20px 12px' }}>
+        <div className="paid-service-tabs" role="tablist" aria-label="Pay Type" style={{ margin: '0 20px 14px' }}>
           {PAY_TYPES.map(t => (
             <button
               key={t}
@@ -285,35 +291,45 @@ export const SalaryBlock = () => {
               aria-selected={payType === t}
               className={`paid-service-tab${payType === t ? ' active' : ''}`}
               onClick={() => { setPayType(t); setOpen(new Set()); }}
+              style={nowrap}
             >
               {t}
             </button>
           ))}
         </div>
 
-        <div className="paid-filters" style={{ flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}>
-            Month <input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} style={{ height: '36px' }} />
+        <div className="paid-filters" style={{ flexWrap: 'wrap', alignItems: 'center', gap: '10px', margin: '0 20px 14px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flex: '0 0 auto' }}>
+            Month
+            <input
+              type="month"
+              className="form-control"
+              value={month}
+              onChange={e => e.target.value && setMonth(e.target.value)}
+              style={{ height: '36px', minWidth: '170px', padding: '6px 10px', boxSizing: 'border-box' }}
+            />
           </label>
-          <div style={{ position: 'relative', flex: '1 1 220px' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '200px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none', zIndex: 1 }} />
             <input
               type="text"
+              className="form-control"
+              aria-label="Search employee, code or branch"
               placeholder="Search employee, code or branch..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: '32px', paddingRight: search ? '32px' : '12px', width: '100%', fontSize: '0.83rem', height: '36px', boxSizing: 'border-box' }}
+              style={{ paddingLeft: '34px', paddingRight: search ? '32px' : '12px', width: '100%', fontSize: '0.83rem', height: '36px', boxSizing: 'border-box' }}
             />
             {search && (
-              <button type="button" onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', lineHeight: 1 }}>
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', lineHeight: 1, zIndex: 1 }}>
                 <X size={13} />
               </button>
             )}
           </div>
-          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportConsolidated(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }} title="One sheet with every employee of this pay type">
+          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportConsolidated(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', whiteSpace: 'nowrap', flex: '0 0 auto' }} title="One sheet with every employee of this pay type">
             <FileSpreadsheet size={14} /> Export all
           </button>
-          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportIndividual(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px' }} title="One workbook with a sheet per employee">
+          <button className="btn-secondary" disabled={!computed.length} onClick={() => exportIndividual(payType, month, computed, settings)} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', whiteSpace: 'nowrap', flex: '0 0 auto' }} title="One workbook with a sheet per employee">
             <Files size={14} /> Export per employee
           </button>
         </div>
@@ -333,12 +349,12 @@ export const SalaryBlock = () => {
           </div>
         ) : !error && (
           <div className="table-responsive">
-            <table className="crm-table">
+            <table className="crm-table" style={{ minWidth: 'max-content' }}>
               <thead>
                 <tr>
                   <th style={{ width: '28px' }} aria-label="Details" />
-                  <th>Employee</th>
-                  <th>Branch</th>
+                  <th style={{ minWidth: '180px' }}>Employee</th>
+                  <th style={{ minWidth: '110px' }}>Branch</th>
                   <th style={num}>Net Sales</th>
                   {isCommission && <th style={num}>Commission %</th>}
                   {!isCommission && <th style={num}>Target</th>}
@@ -368,6 +384,9 @@ export const SalaryBlock = () => {
                     <td style={num}>
                       <input
                         aria-label={`${key} for ${r.name}`}
+                        type="text"
+                        className="form-control"
+                        title={r.entry[key] ? money(r.entry[key]) : undefined}
                         inputMode="decimal"
                         placeholder="0"
                         value={r.entry[key] ?? ''}
@@ -384,13 +403,13 @@ export const SalaryBlock = () => {
                             {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                           </button>
                         </td>
-                        <td style={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => toggle(r.userId)}>
+                        <td style={{ fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggle(r.userId)} title={r.name}>
                           {r.name}
-                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                             {[r.employeeId, r.role, r.userStatus !== 'Active' ? r.userStatus : ''].filter(Boolean).join(' · ')}
                           </div>
                         </td>
-                        <td style={{ fontSize: '0.8rem' }}>{r.branch || '—'}</td>
+                        <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{r.branch || '—'}</td>
                         <td style={{ ...num, fontWeight: 600 }}>{money(r.netSales)}</td>
                         {isCommission && <td style={num}>{pct(r.commissionPercent)}</td>}
                         {!isCommission && <td style={num}>{money(r.targetValue)}</td>}
@@ -419,23 +438,23 @@ export const SalaryBlock = () => {
                       {expanded && (
                         <tr>
                           <td />
-                          <td colSpan={columns - 1} style={{ background: 'var(--bg-subtle, transparent)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px', alignItems: 'start' }}>
+                          <td colSpan={columns - 1} style={{ background: 'var(--bg-subtle, transparent)', whiteSpace: 'normal' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-start' }}>
                               <Breakdown r={r} settings={settings} />
                               {r.transactions.length === 0 ? (
                                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No closed client transactions in this month.</span>
                               ) : (
-                                <table className="crm-table" style={{ fontSize: '0.78rem' }}>
+                                <table className="crm-table" style={{ fontSize: '0.78rem', width: 'auto', minWidth: '420px', flex: '1 1 420px' }}>
                                   <thead>
                                     <tr><th>Payment Date</th><th>Client</th><th>Sale</th><th>Credited as</th><th style={num}>Net Sales credited</th></tr>
                                   </thead>
                                   <tbody>
                                     {r.transactions.map((t, i) => (
                                       <tr key={`${t.saleId}-${i}`}>
-                                        <td>{t.paymentDate}</td>
-                                        <td>{t.clientName || '—'}</td>
-                                        <td style={{ fontFamily: 'monospace' }}>{t.saleId}</td>
-                                        <td>{t.role}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{t.paymentDate}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{t.clientName || '—'}</td>
+                                        <td style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{t.saleId}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{t.role}</td>
                                         <td style={num}>{money(t.credited)}</td>
                                       </tr>
                                     ))}
@@ -453,7 +472,7 @@ export const SalaryBlock = () => {
               <tfoot>
                 <tr>
                   <td />
-                  <td colSpan={2} style={{ fontWeight: 700 }}>Total ({shown.length} employee{shown.length === 1 ? '' : 's'})</td>
+                  <td colSpan={2} style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>Total ({shown.length} employee{shown.length === 1 ? '' : 's'})</td>
                   <td style={{ ...num, fontWeight: 700 }}>{money(totals.net)}</td>
                   <td colSpan={typeColumns} />
                   <td style={{ ...num, fontWeight: 700 }}>{money(totals.pay)}</td>
