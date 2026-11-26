@@ -84,6 +84,12 @@ const AppContent = () => {
   } = useCRM();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('dashboard');
+  // A sub-block of the open page picked in the sidebar (Team Performance Tracking), or null for the whole page
+  const [activeSection, setActiveSection] = useState(null);
+  const openTab = (tab, section = null) => {
+    setActiveTab(tab);
+    setActiveSection(section);
+  };
   const [globalReviewSale, setGlobalReviewSale] = useState(null);
   const [globalVoiceSale, setGlobalVoiceSale] = useState(null);
   const [globalLiveDispatchData, setGlobalLiveDispatchData] = useState(null);
@@ -203,7 +209,7 @@ const AppContent = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <CRMDashboard onOpenBlock={setActiveTab} />;
+        return <CRMDashboard onOpenBlock={openTab} />;
       case 'lead-history':
         return <LeadHistoryBlock />;
       case 'directory':
@@ -217,7 +223,7 @@ const AppContent = () => {
       case 'team-monitoring':
         return <TeamMonitoring />;
       case 'team-performance':
-        return <TeamPerformanceBlock />;
+        return <TeamPerformanceBlock section={activeSection} />;
       case 'sale-approvals':
         return <SaleApprovalWorkflow />;
       case 'esign-block':
@@ -271,13 +277,13 @@ const AppContent = () => {
       case 'feature-access':
         return <FeatureAccessBlock />;
       default:
-        return <CRMDashboard onOpenBlock={setActiveTab} />;
+        return <CRMDashboard onOpenBlock={openTab} />;
     }
   };
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} activeSection={activeTab === 'team-performance' ? activeSection : null} setActiveTab={openTab} />
       <div className="main-content">
         <Navbar 
           currentTabTitle={tabTitles[activeTab] || 'Astra CRM'} 
