@@ -1,0 +1,181 @@
+/* CRM Dashboard: overview panels and the restyled workspace below them.
+   Everything uses the app's theme tokens, so light/dark mode and the chosen accent carry over. */
+
+.dash-page { display: flex; flex-direction: column; gap: 22px; }
+
+.dash-overview { display: flex; flex-direction: column; gap: 16px; }
+
+.dash-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.dash-head h2 { margin: 0; font-size: 1.45rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+.dash-head p { margin: 4px 0 0; font-size: 0.84rem; color: var(--text-secondary); }
+.dash-scope-chip {
+  display: inline-block; padding: 1px 9px; border-radius: var(--radius-full);
+  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border);
+  font-size: 0.76rem; font-weight: 600;
+}
+
+.dash-periods {
+  display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-md);
+  background: var(--bg-card); border: 1px solid var(--border-default);
+}
+.dash-periods button {
+  border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.78rem; font-weight: 600;
+  padding: 5px 11px; border-radius: 7px; cursor: pointer;
+}
+.dash-periods button:hover { color: var(--text-primary); }
+.dash-periods button.is-active { background: var(--accent-soft); color: var(--accent); }
+
+.dash-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.dash-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.dash-row { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+
+.dash-card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  padding: 16px 18px; box-shadow: var(--shadow-sm); min-width: 0;
+}
+.dash-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.dash-card-head h3, .dash-section-title {
+  margin: 0; font-size: 0.92rem; font-weight: 650; color: var(--text-primary);
+}
+.dash-section-title { margin-bottom: 10px; }
+.dash-link {
+  border: 0; background: none; padding: 0; font: inherit; font-size: 0.78rem; font-weight: 600;
+  color: var(--accent); cursor: pointer;
+}
+.dash-link:hover { text-decoration: underline; }
+.dash-muted { font-size: 0.76rem; color: var(--text-muted); }
+.dash-empty { margin: 8px 0 4px; font-size: 0.84rem; color: var(--text-muted); }
+
+/* Lead overview gauge */
+.dash-overview-body { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.dash-gauge { position: relative; width: 200px; max-width: 100%; flex-shrink: 0; }
+.dash-gauge svg { display: block; width: 100%; height: auto; }
+.dash-gauge-track, .dash-gauge-fill { fill: none; stroke-width: 22; }
+.dash-gauge-track { stroke: var(--accent-soft); stroke: color-mix(in srgb, var(--accent) 18%, transparent); }
+.dash-gauge-fill { stroke: var(--accent); transition: stroke-dasharray 0.5s ease; }
+.dash-gauge-value {
+  position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; display: flex; flex-direction: column;
+}
+.dash-gauge-value strong { font-size: 1.3rem; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+.dash-gauge-value span { font-size: 0.74rem; color: var(--text-muted); }
+
+.dash-figures { margin: 0; display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 130px; }
+.dash-figures div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-left: 10px; border-left: 2px solid var(--border-default);
+}
+.dash-figures div:first-child { border-left-color: var(--accent); }
+.dash-figures dt { font-size: 0.78rem; color: var(--text-muted); }
+.dash-figures dd { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* Stage mix under the gauge */
+.dash-overview-card { display: flex; flex-direction: column; }
+.dash-mix { margin-top: auto; padding-top: 14px; }
+.dash-mix-bar {
+  display: flex; height: 8px; border-radius: var(--radius-full); overflow: hidden; gap: 2px;
+  background: var(--border-subtle);
+}
+.dash-mix-bar span { display: block; min-width: 3px; }
+.dash-mix-legend {
+  list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px;
+  font-size: 0.74rem; color: var(--text-muted);
+}
+.dash-mix-legend li { display: inline-flex; align-items: center; gap: 5px; }
+.dash-mix-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.dash-mix-legend strong { color: var(--text-primary); font-weight: 600; }
+
+/* Activity stats */
+.dash-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.dash-stat {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle); background: var(--bg-surface); min-width: 0;
+}
+.dash-stat strong { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-top: 6px; }
+.dash-stat strong small { font-size: 0.78rem; font-weight: 500; color: var(--text-muted); }
+.dash-stat > span:last-child { font-size: 0.74rem; color: var(--text-muted); line-height: 1.3; }
+.dash-stat-icon {
+  width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+}
+.tone-accent { background: var(--accent-soft); color: var(--accent); }
+.tone-success { background: var(--status-success-bg); color: var(--status-success); }
+.tone-warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.tone-info { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+
+/* Quick access tiles */
+.dash-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.dash-tile {
+  display: flex; align-items: center; gap: 10px; text-align: left; padding: 11px 12px; cursor: pointer;
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  color: var(--text-primary); font: inherit; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.dash-tile:hover { border-color: var(--accent-border); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.dash-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dash-tile-icon {
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.dash-tile-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dash-tile-text strong { font-size: 0.82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-tile-text small { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-tile-arrow { color: var(--text-muted); flex-shrink: 0; }
+
+/* Leads by stage */
+.dash-stages { position: sticky; top: 12px; }
+.dash-stage-list {
+  list-style: none; margin: 0; padding: 0 2px 0 0; display: flex; flex-direction: column; gap: 8px;
+  max-height: 520px; overflow-y: auto;
+}
+.dash-stage-list li > button, .dash-stage-list li > div {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
+  padding: 9px 12px; border: 1px solid var(--border-subtle); border-left: 3px solid var(--stage);
+  border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-primary); font: inherit;
+}
+.dash-stage-list li > button { cursor: pointer; }
+.dash-stage-list li > button:hover { border-color: var(--accent-border); border-left-color: var(--stage); background: var(--bg-card-hover); }
+.dash-stage-list li.is-empty { opacity: 0.55; }
+.dash-stage-main { display: flex; flex-direction: column; min-width: 0; }
+.dash-stage-main strong { font-size: 1.02rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dash-stage-main span { font-size: 0.74rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-stage-pct { font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+/* Workspace (shortcut bar / pipeline / history) under the overview */
+.dash-workspace-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.dash-workspace-head h3 { margin: 0; font-size: 1.02rem; font-weight: 650; color: var(--text-primary); }
+.dash-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.dash-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-full);
+  font-size: 0.76rem; font-weight: 600; background: var(--bg-card); border: 1px solid var(--border-default); color: var(--text-secondary);
+}
+.dash-pill strong { color: var(--text-primary); }
+.dash-tabs {
+  display: flex; gap: 4px; border-bottom: 1px solid var(--border-default); overflow-x: auto; scrollbar-width: none;
+}
+.dash-tabs::-webkit-scrollbar { display: none; }
+.dash-tabs button {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; padding: 10px 14px; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent; background: none; font: inherit; font-size: 0.86rem; font-weight: 600;
+  color: var(--text-secondary); cursor: pointer;
+}
+.dash-tabs button:hover { color: var(--text-primary); }
+.dash-tabs button.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+
+@media (max-width: 1180px) {
+  /* One column: overview cards, then Leads by Stage, then Quick Access */
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dash-main { display: contents; }
+  .dash-row { order: 1; }
+  .dash-stages { position: static; order: 2; }
+  .dash-quick { order: 3; }
+  .dash-stage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); max-height: none; }
+}
+@media (max-width: 860px) {
+  .dash-row { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .dash-overview-body { justify-content: center; }
+  .dash-figures { min-width: 100%; }
+  .dash-tiles { grid-template-columns: minmax(0, 1fr); }
+  .dash-head { align-items: flex-start; }
+}

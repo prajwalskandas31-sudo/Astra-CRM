@@ -20,11 +20,11 @@ import {
   ShieldCheck,
   FileText,
   CheckCircle2,
-  AlertCircle,
-  ArrowRightLeft
+  AlertCircle
 } from 'lucide-react';
 import { lazyNamed } from '../lib/lazyNamed';
-import { DASHBOARD_SUB_BLOCKS } from './Sidebar';
+import { DashboardOverview } from './DashboardOverview';
+import { buildDescendants } from '../lib/teamScope';
 
 // Loaded when first opened: Lead History brings the Excel library, the client form is large
 const LeadHistoryBlock = lazyNamed(() => import('./LeadHistoryBlock'), 'LeadHistoryBlock');
@@ -74,6 +74,7 @@ export const CRMDashboard = ({ onOpenBlock }) => {
   const [reqNote, setReqNote] = useState('');
 
   const isSuperAdmin = simulatedRole === 'Super Admin';
+  const hasReports = useMemo(() => simulatedRole !== 'Executive' && buildDescendants((users || []).filter(u => String(u.status || '').toLowerCase() !== 'inactive'))((users || []).find(u => u.id === currentUser?.id) || currentUser).length > 0, [users, currentUser, simulatedRole]);
   const [adminViewUserFilter, setAdminViewUserFilter] = useState('ALL');
 
   // Recomputed only when the leads or the filter change, not on every keystroke in the call form
@@ -288,88 +289,53 @@ export const CRMDashboard = ({ onOpenBlock }) => {
   // User-level shortcuts filter (User_Shortcut_Settings)
   const visibleDispositions = dispositions.filter(d => isShortcutEnabled(currentUser?.id, d.id));
 
-  // Separate blocks listed under the CRM Dashboard that this user may open
-  const switchableBlocks = DASHBOARD_SUB_BLOCKS.filter(b => hasPermission(b.id));
+  // Leads by Stage opens the pipeline filtered to that stage when both show the same leads
+  // (own leads for everyone, the whole company for Super Admin viewing "All")
+  const stageMatchesPipeline = (isSuperAdmin && adminViewUserFilter === 'ALL') || (!['Super Admin', 'Admin'].includes(simulatedRole) && !hasReports);
+  const workspaceRef = React.useRef(null);
+  const handlePickStage = (stageName) => {
+    setSelectedDispFilter(stageName);
+    setActiveSubBlock('pipeline');
+    workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const workspaceTabs = [
+    { id: 'pipeline', label: 'Assigned Leads Pipeline', icon: Layers, show: true },
+    { id: 'shortcuts', label: 'Disposition Shortcuts', icon: Sparkles, show: true },
+    { id: 'history', label: 'Lead Assignment History', icon: History, show: hasPermission('lead-history') }
+  ].filter(t => t.show);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Switch to a block listed under the CRM Dashboard (Team Monitoring / Team Performance Tracking) */}
-      {onOpenBlock && switchableBlocks.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            <ArrowRightLeft size={15} /> Switch to
-            <select
-              className="select-filter"
-              value=""
-              onChange={e => e.target.value && onOpenBlock(e.target.value)}
-              style={{ minWidth: '240px' }}
-              aria-label="Open a block listed under the CRM Dashboard"
-            >
-              <option value="">Select a block…</option>
-              {switchableBlocks.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-            </select>
-          </label>
-        </div>
-      )}
+    <div className="dash-page">
+      <DashboardOverview onOpenBlock={onOpenBlock} onPickStage={stageMatchesPipeline ? handlePickStage : undefined} />
 
-      {/* Report Counter Sync Banner (Block 2 & Block 3 Integration) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <div className="directory-card" style={{ padding: '16px 20px', borderLeft: '4px solid #3b82f6' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                New Leads Waiting
-              </span>
-              <h3 style={{ fontSize: '1.4rem', marginTop: '4px', color: '#3b82f6', fontWeight: 700 }}>
-                {newLeadsCount} <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>New Leads</span>
-              </h3>
-            </div>
-            <UserCheck size={28} color="#3b82f6" style={{ opacity: 0.8 }} />
-          </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Leads not yet called. Every uploaded or assigned lead starts as New Lead.
-          </p>
-        </div>
-
-        <div className="directory-card" style={{ padding: '16px 20px', borderLeft: '4px solid var(--accent-primary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                Active Leads Pipeline
-              </span>
-              <h3 style={{ fontSize: '1.4rem', marginTop: '4px', color: 'var(--accent-primary)', fontWeight: 700 }}>
-                {scopedLeads.length} <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Total Leads</span>
-              </h3>
-            </div>
-            <Layers size={28} color="var(--accent-primary)" style={{ opacity: 0.8 }} />
-          </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Role scope: {simulatedRole} • Live disposition distribution.
-          </p>
+      {/* Workspace: the agent's working tools, restyled as tabs under the overview */}
+      <div ref={workspaceRef} className="dash-workspace-head" style={{ scrollMarginTop: '16px' }}>
+        <h3>My Workspace</h3>
+        <div className="dash-pills">
+          <span className="dash-pill" title="Leads not yet called. Every uploaded or assigned lead starts as New Lead."><UserCheck size={13} /> New leads waiting <strong>{newLeadsCount}</strong></span>
+          <span className="dash-pill" title={`Role scope: ${simulatedRole}`}><Layers size={13} /> In pipeline <strong>{scopedLeads.length}</strong></span>
+          {selectedDispFilter !== 'All' && (
+            <button type="button" className="dash-pill" style={{ cursor: 'pointer' }} onClick={() => setSelectedDispFilter('All')} title="Clear the stage filter">
+              Stage: <strong>{selectedDispFilter}</strong> <X size={12} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Sub-block switcher: one button per dashboard sub-block */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-        {[
-          { id: 'shortcuts', label: 'Dynamic Disposition Shortcut Bar', icon: Sparkles, show: true },
-          { id: 'pipeline', label: 'Assigned Leads Pipeline', icon: Layers, show: true },
-          { id: 'history', label: 'Lead Assignment History', icon: History, show: hasPermission('lead-history') }
-        ].filter(t => t.show).map(({ id, label, icon: Icon }) => {
-          const isActive = activeSubBlock === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              className={isActive ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setActiveSubBlock(id)}
-              aria-pressed={isActive}
-              style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: 'var(--radius-md)' }}
-            >
-              <Icon size={16} /> {label}
-            </button>
-          );
-        })}
+      <div className="dash-tabs" role="tablist" aria-label="Dashboard workspace">
+        {workspaceTabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeSubBlock === id}
+            className={activeSubBlock === id ? 'is-active' : ''}
+            onClick={() => setActiveSubBlock(id)}
+          >
+            <Icon size={15} /> {label}
+          </button>
+        ))}
       </div>
 
       {/* Dynamic Disposition Shortcut Buttons Bar */}
