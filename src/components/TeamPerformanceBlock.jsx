@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { useToast } from './ToastNotification';
 import { todayKey } from '../services/serviceTenure';
+import { norm, buildDescendants } from '../lib/teamScope';
 import {
   PhoneCall,
   Layers,
@@ -51,7 +52,6 @@ const toneStyle = (tone, filled = true) => {
   };
 };
 
-const norm = (s) => String(s || '').trim().toLowerCase();
 const leadOwner = (l) => (l.isUnassigned ? null : l.assignedToId || l.assigned_user_id || null);
 const dataSetOf = (l) => l.sourceFileName || l.sourceFile || l.batchName || 'Single entries';
 const saleDate = (s) => s.fullClientInfo?.paymentDate || s.clientInfo?.paymentDate || s.date || '';
@@ -72,33 +72,6 @@ const formatDay = (key) => {
 const daysBetween = (from, to) => {
   const [a, b] = [from, to].map(k => { const [y, m, d] = k.split('-').map(Number); return Date.UTC(y, m - 1, d); });
   return Math.round((b - a) / 86400000) + 1;
-};
-
-/** Everyone who reports to `user`, directly or further down (reportingTo holds the manager's name). */
-const buildDescendants = (users) => {
-  const byManager = new Map();
-  users.forEach(u => {
-    const key = norm(u.reportingTo);
-    if (!byManager.has(key)) byManager.set(key, []);
-    byManager.get(key).push(u);
-  });
-  return (user) => {
-    if (!user) return [];
-    const seen = new Set([user.id]);
-    const out = [];
-    const queue = [user];
-    while (queue.length) {
-      const next = queue.pop();
-      (byManager.get(norm(next.name)) || []).forEach(r => {
-        if (!seen.has(r.id)) {
-          seen.add(r.id);
-          out.push(r);
-          queue.push(r);
-        }
-      });
-    }
-    return out;
-  };
 };
 
 const emptyStats = () => ({ calls: 0, callsByDisposition: {}, netSales: 0, paid: 0, newLeads: 0, leads: 0, attendance: {} });
